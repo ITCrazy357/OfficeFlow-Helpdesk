@@ -1,7 +1,7 @@
 import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
-import prisma from "./config/prisma";
+import { prisma } from "./config/prisma";
 
 dotenv.config();
 
@@ -13,7 +13,7 @@ app.use(express.json());
 app.get("/api/health", (req, res) => {
   res.json({
     success: true,
-    message: "OfficeFlow API is running",
+    message: "OfficeFlow API is running 🚀🚀🚀",
   });
 });
 
@@ -23,7 +23,7 @@ app.get("/api/db-health", async (req, res) => {
 
     res.json({
       success: true,
-      message: "Database connected successfully",
+      message: "Database connected successfully 🚀🚀🚀",
       data: departments,
     });
   } catch (error) {
@@ -37,5 +37,5 @@ app.get("/api/db-health", async (req, res) => {
 const PORT = process.env.PORT || 5000;
 
 app.listen(PORT, () => {
-  console.log(`API is running on port ${PORT}`);
+  console.log(`API is running on port ${PORT} 🚀🚀🚀`);
 });
