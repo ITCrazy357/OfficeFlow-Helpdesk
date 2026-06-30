@@ -35,6 +35,16 @@ async function main() {
     },
   });
 
+  const categoryNames = ["Hardware", "Software", "Network", "Account", "Other"];
+
+  for (const name of categoryNames) {
+    await prisma.ticketCategory.upsert({
+      where: { name },
+      update: {},
+      create: { name },
+    });
+  }
+
   console.log("Seed data created successfully");
 }
 

@@ -11,7 +11,8 @@ export function requireAuth(
   const authHeader = req.headers.authorization;
 
   if (!authHeader || !authHeader.startsWith("Bearer ")) {
-    return res.status(401).json({
+    return res.json({
+      status: 401,
       success: false,
       message: "Unauthorized",
     });
@@ -24,7 +25,8 @@ export function requireAuth(
     req.user = payload;
     next();
   } catch {
-    return res.status(401).json({
+    return res.json({
+      status: 401,
       success: false,
       message: "Invalid or expired token",
     });
@@ -34,14 +36,16 @@ export function requireAuth(
 export function requireRoles(...roles: UserRole[]) {
   return (req: AuthRequest, res: Response, next: NextFunction) => {
     if (!req.user) {
-      return res.status(401).json({
+      return res.json({
+        status: 401,
         success: false,
         message: "Unauthorized",
       });
     }
 
     if (!roles.includes(req.user.role)) {
-      return res.status(403).json({
+      return res.json({
+        status: 403,
         success: false,
         message: "Forbidden",
       });

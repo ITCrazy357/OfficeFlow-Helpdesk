@@ -68,9 +68,8 @@ model User {
 }
 
 model TicketCategory {
-  id          Int     @id @default(autoincrement())
-  name        String  @unique
-  description String? @db.Text
+  id   Int    @id @default(autoincrement())
+  name String @unique
 
   tickets Ticket[]
 
