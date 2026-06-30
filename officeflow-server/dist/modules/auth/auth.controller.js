@@ -39,9 +39,18 @@ async function meController(req, res) {
     }
     try {
         const user = await (0, auth_service_1.getMeService)(userId);
-        return (0, api_response_1.successResponse)(res, 200, "Get me successfully", user);
+        return res.json({
+            status: 200,
+            success: true,
+            data: user,
+            message: "Get user successfully",
+        });
     }
     catch {
-        return (0, api_response_1.errorResponse)(res, 404, "User not found");
+        return res.json({
+            status: 400,
+            success: false,
+            message: "Get user failed",
+        });
     }
 }

@@ -1,6 +1,7 @@
 import { NextFunction, Response } from "express";
 import { verifyAccessToken } from "../utils/jwt";
 import { AuthRequest } from "../types/express";
+import { UserRole } from "@prisma/client";
 
 export function requireAuth(
   req: AuthRequest,
@@ -28,4 +29,24 @@ export function requireAuth(
       message: "Invalid or expired token",
     });
   }
+}
+
+export function requireRoles(...roles: UserRole[]) {
+  return (req: AuthRequest, res: Response, next: NextFunction) => {
+    if (!req.user) {
+      return res.status(401).json({
+        success: false,
+        message: "Unauthorized",
+      });
+    }
+
+    if (!roles.includes(req.user.role)) {
+      return res.status(403).json({
+        success: false,
+        message: "Forbidden",
+      });
+    }
+
+    next();
+  };
 }
