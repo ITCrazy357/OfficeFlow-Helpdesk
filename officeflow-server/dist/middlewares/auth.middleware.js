@@ -6,7 +6,8 @@ const jwt_1 = require("../utils/jwt");
 function requireAuth(req, res, next) {
     const authHeader = req.headers.authorization;
     if (!authHeader || !authHeader.startsWith("Bearer ")) {
-        return res.status(401).json({
+        return res.json({
+            status: 401,
             success: false,
             message: "Unauthorized",
         });
@@ -18,7 +19,8 @@ function requireAuth(req, res, next) {
         next();
     }
     catch {
-        return res.status(401).json({
+        return res.json({
+            status: 401,
             success: false,
             message: "Invalid or expired token",
         });
@@ -27,13 +29,15 @@ function requireAuth(req, res, next) {
 function requireRoles(...roles) {
     return (req, res, next) => {
         if (!req.user) {
-            return res.status(401).json({
+            return res.json({
+                status: 401,
                 success: false,
                 message: "Unauthorized",
             });
         }
         if (!roles.includes(req.user.role)) {
-            return res.status(403).json({
+            return res.json({
+                status: 403,
                 success: false,
                 message: "Forbidden",
             });
