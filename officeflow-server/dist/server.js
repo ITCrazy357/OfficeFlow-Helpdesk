@@ -11,6 +11,7 @@ const prisma_1 = require("./config/prisma");
 const auth_routes_1 = __importDefault(require("./modules/auth/auth.routes"));
 const users_routes_1 = __importDefault(require("./modules/users/users.routes"));
 const departments_routes_1 = __importDefault(require("./modules/departments/departments.routes"));
+const tickets_routes_1 = __importDefault(require("./modules/tickets/tickets.routes"));
 dotenv_1.default.config();
 const app = (0, express_1.default)();
 app.use((0, cors_1.default)());
@@ -18,6 +19,7 @@ app.use(express_1.default.json());
 app.use("/api/auth", auth_routes_1.default);
 app.use("/api/users", users_routes_1.default);
 app.use("/api/departments", departments_routes_1.default);
+app.use("/api/tickets", tickets_routes_1.default);
 app.get("/api/health", (req, res) => {
     res.json({
         success: true,

@@ -7,6 +7,7 @@ import { prisma } from "./config/prisma";
 import authRoutes from "./modules/auth/auth.routes";
 import usersRoutes from "./modules/users/users.routes";
 import departmentsRoutes from "./modules/departments/departments.routes";
+import ticketsRoutes from "./modules/tickets/tickets.routes";
 
 dotenv.config();
 
@@ -18,6 +19,7 @@ app.use(express.json());
 app.use("/api/auth", authRoutes);
 app.use("/api/users", usersRoutes);
 app.use("/api/departments", departmentsRoutes);
+app.use("/api/tickets", ticketsRoutes);
 
 app.get("/api/health", (req, res) => {
   res.json({

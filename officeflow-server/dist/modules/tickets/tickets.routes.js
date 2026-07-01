@@ -1,2 +1,16 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = require("express");
+const auth_middleware_1 = require("../../middlewares/auth.middleware");
+const validate_middleware_1 = require("../../middlewares/validate.middleware");
+const tickets_schema_1 = require("./tickets.schema");
+const tickets_controller_1 = require("./tickets.controller");
+const router = (0, express_1.Router)();
+router.get("/", auth_middleware_1.requireAuth, tickets_controller_1.getTicketsController);
+router.post("/", auth_middleware_1.requireAuth, (0, validate_middleware_1.validate)(tickets_schema_1.createTicketSchema), tickets_controller_1.createTicketController);
+router.get("/:id", auth_middleware_1.requireAuth, tickets_controller_1.getTicketByIdController);
+router.patch("/:id", auth_middleware_1.requireAuth, (0, validate_middleware_1.validate)(tickets_schema_1.updateTicketSchema), tickets_controller_1.updateTicketController);
+router.patch("/:id/status", auth_middleware_1.requireAuth, (0, validate_middleware_1.validate)(tickets_schema_1.updateTicketStatusSchema), tickets_controller_1.updateTicketStatusController);
+router.patch("/:id/assign", auth_middleware_1.requireAuth, (0, validate_middleware_1.validate)(tickets_schema_1.assignTicketSchema), tickets_controller_1.assignTicketController);
+router.delete("/:id", auth_middleware_1.requireAuth, tickets_controller_1.deleteTicketController);
+exports.default = router;
