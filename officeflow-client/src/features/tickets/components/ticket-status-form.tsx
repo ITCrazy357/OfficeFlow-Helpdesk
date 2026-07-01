@@ -44,7 +44,7 @@ export function TicketStatusForm({ ticket, onUpdated }: TicketStatusFormProps) {
   };
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="grid gap-4">
+    <form onSubmit={handleSubmit(onSubmit)} className="motion-enter grid gap-4">
       <SelectField
         label="Trạng thái"
         error={errors.status?.message}

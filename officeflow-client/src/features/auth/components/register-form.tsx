@@ -44,7 +44,7 @@ export function RegisterForm() {
   };
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="grid gap-4">
+    <form onSubmit={handleSubmit(onSubmit)} className="motion-enter grid gap-4">
       <InputField
         label="Họ tên"
         autoComplete="name"

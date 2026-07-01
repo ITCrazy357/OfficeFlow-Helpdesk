@@ -43,7 +43,7 @@ export default function DashboardLayout({
     <ProtectedRoute>
       <div className="min-h-[100dvh] bg-[#f2f5f4]">
         <aside className="fixed inset-y-0 left-0 hidden w-72 border-r border-zinc-900/10 bg-[#111817] p-4 text-white shadow-2xl shadow-zinc-950/20 lg:block">
-          <div className="mb-5 rounded-2xl border border-white/10 bg-white/[0.06] p-4 shadow-inner shadow-white/[0.03]">
+          <div className="motion-enter mb-5 rounded-2xl border border-white/10 bg-white/[0.06] p-4 shadow-inner shadow-white/[0.03]">
             <div className="flex items-center gap-3">
               <div className="grid h-11 w-11 place-items-center rounded-xl bg-teal-400 text-zinc-950 shadow-lg shadow-teal-950/20">
                 <Workflow className="h-5 w-5" />
@@ -63,7 +63,7 @@ export default function DashboardLayout({
             </div>
           </div>
           <nav className="grid gap-1.5">
-            {links.map((link) => {
+            {links.map((link, index) => {
               const Icon = link.icon;
               const isActive = isLinkActive(link.href);
 
@@ -71,7 +71,8 @@ export default function DashboardLayout({
                 <Link
                   key={link.href}
                   href={link.href}
-                  className={`flex min-h-11 items-center gap-3 rounded-xl px-3 text-sm font-semibold transition duration-200 ${
+                  style={{ "--motion-index": index } as React.CSSProperties}
+                  className={`motion-nav motion-row flex min-h-11 items-center gap-3 rounded-xl px-3 text-sm font-semibold ${
                     isActive
                       ? "bg-teal-400 text-zinc-950 shadow-lg shadow-teal-950/20"
                       : "text-zinc-300 hover:bg-white/[0.08] hover:text-white"
@@ -112,7 +113,7 @@ export default function DashboardLayout({
               </div>
             </div>
             <nav className="mx-auto mt-3 flex max-w-7xl gap-2 overflow-x-auto pb-1 lg:hidden">
-              {links.map((link) => {
+              {links.map((link, index) => {
                 const Icon = link.icon;
                 const isActive = isLinkActive(link.href);
 
@@ -120,7 +121,8 @@ export default function DashboardLayout({
                   <Link
                     key={link.href}
                     href={link.href}
-                    className={`inline-flex min-h-10 shrink-0 items-center gap-2 rounded-xl border px-3 text-sm font-semibold transition ${
+                    style={{ "--motion-index": index } as React.CSSProperties}
+                    className={`motion-nav motion-row inline-flex min-h-10 shrink-0 items-center gap-2 rounded-xl border px-3 text-sm font-semibold ${
                       isActive
                         ? "border-teal-700 bg-teal-700 text-white"
                         : "border-zinc-200 bg-white text-zinc-700"

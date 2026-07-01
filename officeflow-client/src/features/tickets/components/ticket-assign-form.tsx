@@ -91,7 +91,7 @@ export function TicketAssignForm({ ticket, onUpdated }: TicketAssignFormProps) {
   };
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="grid gap-4">
+    <form onSubmit={handleSubmit(onSubmit)} className="motion-enter grid gap-4">
       {canUseUsersApi ? (
         <SelectField
           label="Người xử lý"

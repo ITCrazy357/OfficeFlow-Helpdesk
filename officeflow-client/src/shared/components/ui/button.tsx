@@ -29,7 +29,7 @@ export function Button({
   return (
     <button
       type={type}
-      className={`inline-flex min-h-10 items-center justify-center gap-2 whitespace-nowrap rounded-[10px] border px-4 py-2 text-sm font-semibold transition duration-200 ease-out active:translate-y-px focus:outline-none focus:ring-2 focus:ring-teal-700/20 focus:ring-offset-2 focus:ring-offset-white disabled:translate-y-0 disabled:opacity-70 ${variants[variant]} ${className}`}
+      className={`inline-flex min-h-10 items-center justify-center gap-2 whitespace-nowrap rounded-[10px] border px-4 py-2 text-sm font-semibold transition duration-200 ease-out hover:-translate-y-0.5 active:translate-y-px focus:outline-none focus:ring-2 focus:ring-teal-700/20 focus:ring-offset-2 focus:ring-offset-white disabled:translate-y-0 disabled:opacity-70 [&_svg]:transition-transform [&_svg]:duration-200 hover:[&_svg]:-translate-y-0.5 ${variants[variant]} ${className}`}
       {...props}
     >
       {icon}

@@ -18,10 +18,10 @@ type TicketFiltersProps = {
 
 export function TicketFiltersBar({ filters, onChange }: TicketFiltersProps) {
   return (
-    <section className="rounded-2xl border border-white/80 bg-white/85 p-4 shadow-sm shadow-zinc-950/[0.04] ring-1 ring-zinc-950/[0.03] backdrop-blur">
+    <section className="motion-panel group rounded-2xl border border-white/80 bg-white/85 p-4 shadow-sm shadow-zinc-950/[0.04] ring-1 ring-zinc-950/[0.03] backdrop-blur">
       <div className="mb-4 flex items-center justify-between gap-3">
         <div className="flex items-center gap-3">
-          <div className="grid h-10 w-10 place-items-center rounded-xl bg-teal-50 text-teal-700">
+          <div className="grid h-10 w-10 place-items-center rounded-xl bg-teal-50 text-teal-700 transition duration-200 group-hover:bg-teal-100">
             <SlidersHorizontal className="h-5 w-5" />
           </div>
           <h2 className="text-sm font-semibold text-zinc-950">Bộ lọc</h2>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type CSSProperties } from "react";
 import { Building2 } from "lucide-react";
 import { formatDate } from "@/shared/lib/format";
 import {
@@ -63,7 +63,7 @@ export function DepartmentsPanel() {
   }
 
   return (
-    <section className="rounded-2xl border border-white/80 bg-white/75 p-4 shadow-sm shadow-zinc-950/[0.04] ring-1 ring-zinc-950/[0.03] backdrop-blur">
+    <section className="motion-panel rounded-2xl border border-white/80 bg-white/75 p-4 shadow-sm shadow-zinc-950/[0.04] ring-1 ring-zinc-950/[0.03] backdrop-blur">
       <div className="mb-4 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <h2 className="text-base font-semibold text-zinc-950">
@@ -76,13 +76,14 @@ export function DepartmentsPanel() {
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-        {departments.map((department) => (
+        {departments.map((department, index) => (
           <article
             key={department.id}
-            className="group flex min-h-32 items-start justify-between gap-4 rounded-2xl border border-zinc-200/80 bg-white p-4 shadow-sm shadow-zinc-950/[0.03] transition duration-200 hover:-translate-y-0.5 hover:border-teal-200 hover:shadow-lg hover:shadow-teal-950/[0.06]"
+            style={{ "--motion-index": index } as CSSProperties}
+            className="motion-card group flex min-h-32 items-start justify-between gap-4 rounded-2xl border border-zinc-200/80 bg-white p-4 shadow-sm shadow-zinc-950/[0.03] hover:-translate-y-1 hover:border-teal-200 hover:shadow-lg hover:shadow-teal-950/[0.06]"
           >
             <div className="flex min-w-0 items-start gap-3">
-              <div className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-teal-50 text-teal-700 transition group-hover:bg-teal-100">
+              <div className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-teal-50 text-teal-700 transition duration-200 group-hover:bg-teal-100 group-hover:text-teal-800">
                 <Building2 className="h-5 w-5" />
               </div>
               <div className="min-w-0">

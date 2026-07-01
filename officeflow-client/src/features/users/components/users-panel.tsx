@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type CSSProperties } from "react";
 import { Users } from "lucide-react";
 import { Badge } from "@/shared/components/ui/badge";
 import {
@@ -30,7 +30,9 @@ export function UsersPanel() {
       })
       .catch((err) => {
         if (isMounted) {
-          setError(err instanceof Error ? err.message : "Không tải được người dùng");
+          setError(
+            err instanceof Error ? err.message : "Không tải được người dùng",
+          );
         }
       })
       .finally(() => {
@@ -62,7 +64,7 @@ export function UsersPanel() {
   }
 
   return (
-    <section className="overflow-hidden rounded-2xl border border-white/80 bg-white shadow-sm shadow-zinc-950/[0.04] ring-1 ring-zinc-950/[0.03]">
+    <section className="motion-panel overflow-hidden rounded-2xl border border-white/80 bg-white shadow-sm shadow-zinc-950/[0.04] ring-1 ring-zinc-950/[0.03]">
       <div className="flex flex-col gap-1 border-b border-zinc-200/80 bg-zinc-50/70 px-4 py-4">
         <h2 className="text-base font-semibold text-zinc-950">
           Danh sách người dùng
@@ -77,13 +79,14 @@ export function UsersPanel() {
         <span>Ngày tạo</span>
       </div>
 
-      {users.map((user) => (
+      {users.map((user, index) => (
         <article
           key={user.id}
-          className="grid gap-3 border-b border-zinc-100 px-4 py-4 transition last:border-0 hover:bg-teal-50/30 md:grid-cols-[1.4fr_1fr_0.8fr_0.8fr] md:items-center"
+          style={{ "--motion-index": index } as CSSProperties}
+          className="motion-row grid gap-3 border-b border-zinc-100 px-4 py-4 last:border-0 hover:bg-teal-50/30 hover:shadow-[inset_3px_0_0_rgba(15,118,110,0.35)] md:grid-cols-[1.4fr_1fr_0.8fr_0.8fr] md:items-center"
         >
           <div className="flex min-w-0 items-center gap-3">
-            <div className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-teal-50 text-teal-700">
+            <div className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-teal-50 text-teal-700 transition duration-200">
               <Users className="h-5 w-5" />
             </div>
             <div className="min-w-0">

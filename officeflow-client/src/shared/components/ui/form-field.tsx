@@ -32,7 +32,7 @@ export function InputField({ label, error, className = "", ...props }: InputFiel
   return (
     <FieldShell label={label} error={error}>
       <input
-        className={`min-h-11 rounded-[10px] border border-zinc-300 bg-white px-3.5 text-sm text-zinc-950 shadow-inner shadow-zinc-950/[0.02] outline-none transition placeholder:text-zinc-400 hover:border-zinc-400 focus:border-teal-700 focus:ring-4 focus:ring-teal-700/10 disabled:bg-zinc-100 disabled:text-zinc-500 ${className}`}
+        className={`min-h-11 rounded-[10px] border border-zinc-300 bg-white px-3.5 text-sm text-zinc-950 shadow-inner shadow-zinc-950/[0.02] outline-none transition duration-200 ease-out placeholder:text-zinc-400 hover:-translate-y-px hover:border-zinc-400 focus:-translate-y-px focus:border-teal-700 focus:ring-4 focus:ring-teal-700/10 disabled:translate-y-0 disabled:bg-zinc-100 disabled:text-zinc-500 ${className}`}
         {...props}
       />
     </FieldShell>
@@ -53,7 +53,7 @@ export function TextareaField({
   return (
     <FieldShell label={label} error={error}>
       <textarea
-        className={`min-h-36 resize-y rounded-[10px] border border-zinc-300 bg-white px-3.5 py-3 text-sm leading-6 text-zinc-950 shadow-inner shadow-zinc-950/[0.02] outline-none transition placeholder:text-zinc-400 hover:border-zinc-400 focus:border-teal-700 focus:ring-4 focus:ring-teal-700/10 disabled:bg-zinc-100 disabled:text-zinc-500 ${className}`}
+        className={`min-h-36 resize-y rounded-[10px] border border-zinc-300 bg-white px-3.5 py-3 text-sm leading-6 text-zinc-950 shadow-inner shadow-zinc-950/[0.02] outline-none transition duration-200 ease-out placeholder:text-zinc-400 hover:-translate-y-px hover:border-zinc-400 focus:-translate-y-px focus:border-teal-700 focus:ring-4 focus:ring-teal-700/10 disabled:translate-y-0 disabled:bg-zinc-100 disabled:text-zinc-500 ${className}`}
         {...props}
       />
     </FieldShell>
@@ -76,7 +76,7 @@ export function SelectField({
   return (
     <FieldShell label={label} error={error}>
       <select
-        className={`min-h-11 rounded-[10px] border border-zinc-300 bg-white px-3.5 text-sm text-zinc-950 shadow-inner shadow-zinc-950/[0.02] outline-none transition hover:border-zinc-400 focus:border-teal-700 focus:ring-4 focus:ring-teal-700/10 disabled:bg-zinc-100 disabled:text-zinc-500 ${className}`}
+        className={`min-h-11 rounded-[10px] border border-zinc-300 bg-white px-3.5 text-sm text-zinc-950 shadow-inner shadow-zinc-950/[0.02] outline-none transition duration-200 ease-out hover:-translate-y-px hover:border-zinc-400 focus:-translate-y-px focus:border-teal-700 focus:ring-4 focus:ring-teal-700/10 disabled:translate-y-0 disabled:bg-zinc-100 disabled:text-zinc-500 ${className}`}
         {...props}
       >
         {children}

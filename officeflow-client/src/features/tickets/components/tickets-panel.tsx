@@ -1,7 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useState,
+  type CSSProperties,
+} from "react";
 import { ChevronLeft, ChevronRight, Eye, Plus, Trash2 } from "lucide-react";
 import { Button } from "@/shared/components/ui/button";
 import {
@@ -124,7 +129,7 @@ export function TicketsPanel() {
       ) : null}
 
       {!isLoading && !error && tickets.length > 0 ? (
-        <section className="overflow-hidden rounded-2xl border border-white/80 bg-white shadow-sm shadow-zinc-950/[0.04] ring-1 ring-zinc-950/[0.03]">
+        <section className="motion-panel overflow-hidden rounded-2xl border border-white/80 bg-white shadow-sm shadow-zinc-950/[0.04] ring-1 ring-zinc-950/[0.03]">
           <div className="flex flex-col gap-3 border-b border-zinc-200/80 bg-zinc-50/70 px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <h2 className="text-base font-semibold text-zinc-950">
@@ -144,15 +149,16 @@ export function TicketsPanel() {
             <span></span>
           </div>
 
-          {tickets.map((ticket) => (
+          {tickets.map((ticket, index) => (
             <article
               key={ticket.id}
-              className="group grid gap-4 border-b border-zinc-100 px-4 py-4 transition last:border-0 hover:bg-teal-50/30 lg:grid-cols-[1.5fr_0.9fr_0.8fr_1fr_0.7fr] lg:items-center"
+              style={{ "--motion-index": index } as CSSProperties}
+              className="motion-row group grid gap-4 border-b border-zinc-100 px-4 py-4 last:border-0 hover:bg-teal-50/30 hover:shadow-[inset_3px_0_0_rgba(15,118,110,0.35)] lg:grid-cols-[1.5fr_0.9fr_0.8fr_1fr_0.7fr] lg:items-center"
             >
               <div className="min-w-0">
                 <Link
                   href={`/tickets/${ticket.id}`}
-                  className="text-base font-semibold tracking-[-0.01em] text-zinc-950 transition group-hover:text-teal-800"
+                  className="text-base font-semibold tracking-[-0.01em] text-zinc-950 transition duration-200 group-hover:text-teal-800"
                 >
                   {ticket.title}
                 </Link>
@@ -217,7 +223,7 @@ export function TicketsPanel() {
       ) : null}
 
       {pagination && pagination.totalPages > 1 ? (
-        <div className="flex flex-col gap-3 rounded-2xl border border-white/80 bg-white/85 px-4 py-3 shadow-sm shadow-zinc-950/[0.04] ring-1 ring-zinc-950/[0.03] sm:flex-row sm:items-center sm:justify-between">
+        <div className="motion-enter flex flex-col gap-3 rounded-2xl border border-white/80 bg-white/85 px-4 py-3 shadow-sm shadow-zinc-950/[0.04] ring-1 ring-zinc-950/[0.03] sm:flex-row sm:items-center sm:justify-between">
           <p className="text-sm font-medium text-zinc-600">
             Trang {pagination.page}/{pagination.totalPages} -{" "}
             {pagination.totalItems} ticket

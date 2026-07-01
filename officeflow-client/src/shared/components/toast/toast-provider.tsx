@@ -52,7 +52,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
         {toasts.map((toast) => (
           <div
             key={toast.id}
-            className="flex items-start gap-3 rounded-2xl border border-white/80 bg-white/95 p-4 text-sm shadow-2xl shadow-zinc-950/15 ring-1 ring-zinc-950/[0.04] backdrop-blur"
+            className="motion-toast flex items-start gap-3 rounded-2xl border border-white/80 bg-white/95 p-4 text-sm shadow-2xl shadow-zinc-950/15 ring-1 ring-zinc-950/[0.04] backdrop-blur"
           >
             {toast.type === "success" ? (
               <CheckCircle2 className="mt-0.5 h-5 w-5 text-emerald-600" />

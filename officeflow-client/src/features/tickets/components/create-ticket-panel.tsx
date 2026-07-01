@@ -30,9 +30,9 @@ export function CreateTicketPanel() {
   };
 
   return (
-    <section className="max-w-3xl overflow-hidden rounded-2xl border border-white/80 bg-white shadow-sm shadow-zinc-950/[0.04] ring-1 ring-zinc-950/[0.03]">
+    <section className="motion-panel group max-w-3xl overflow-hidden rounded-2xl border border-white/80 bg-white shadow-sm shadow-zinc-950/[0.04] ring-1 ring-zinc-950/[0.03]">
       <div className="flex items-center gap-3 border-b border-zinc-200/80 bg-zinc-50/70 px-5 py-4">
-        <div className="grid h-10 w-10 place-items-center rounded-xl bg-teal-50 text-teal-700">
+        <div className="grid h-10 w-10 place-items-center rounded-xl bg-teal-50 text-teal-700 transition duration-200 group-hover:bg-teal-100">
           <FilePlus2 className="h-5 w-5" />
         </div>
         <h2 className="text-base font-semibold text-zinc-950">
@@ -40,11 +40,11 @@ export function CreateTicketPanel() {
         </h2>
       </div>
       <div className="p-5">
-      <TicketForm
-        submitLabel="Tạo ticket"
-        isSubmitting={isSubmitting}
-        onSubmit={handleSubmit}
-      />
+        <TicketForm
+          submitLabel="Tạo ticket"
+          isSubmitting={isSubmitting}
+          onSubmit={handleSubmit}
+        />
       </div>
     </section>
   );

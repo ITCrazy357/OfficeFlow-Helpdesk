@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, type CSSProperties } from "react";
 import { useRouter } from "next/navigation";
 import {
   ArrowLeft,
@@ -161,9 +161,32 @@ export function TicketDetailPanel({ ticketId }: { ticketId: number }) {
     return <EmptyBlock title="Không có dữ liệu ticket" />;
   }
 
+  const infoCards = [
+    {
+      icon: UserRound,
+      label: "Người tạo",
+      value: ticket.createdBy.name,
+    },
+    {
+      icon: UserCheck,
+      label: "Người xử lý",
+      value: ticket.assignedTo?.name ?? "-",
+    },
+    {
+      icon: FolderOpen,
+      label: "Category",
+      value: ticket.category?.name ?? "-",
+    },
+    {
+      icon: CalendarClock,
+      label: "Cập nhật",
+      value: formatDate(ticket.updatedAt),
+    },
+  ];
+
   return (
     <div className="grid gap-5">
-      <div className="flex flex-wrap items-center justify-between gap-3">
+      <div className="motion-enter flex flex-wrap items-center justify-between gap-3">
         <Link href="/tickets">
           <Button variant="secondary" icon={<ArrowLeft className="h-4 w-4" />}>
             Quay lại
@@ -180,7 +203,7 @@ export function TicketDetailPanel({ ticketId }: { ticketId: number }) {
         ) : null}
       </div>
 
-      <section className="overflow-hidden rounded-2xl border border-white/80 bg-white shadow-sm shadow-zinc-950/[0.04] ring-1 ring-zinc-950/[0.03]">
+      <section className="motion-panel overflow-hidden rounded-2xl border border-white/80 bg-white shadow-sm shadow-zinc-950/[0.04] ring-1 ring-zinc-950/[0.03]">
         <div className="bg-zinc-950 px-5 py-5 text-white">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div className="min-w-0">
@@ -204,49 +227,32 @@ export function TicketDetailPanel({ ticketId }: { ticketId: number }) {
           </p>
 
           <dl className="grid gap-3 border-t border-zinc-200/80 pt-5 sm:grid-cols-2 xl:grid-cols-4">
-            <div className="rounded-xl bg-zinc-50 p-3.5 ring-1 ring-zinc-950/[0.03]">
-              <dt className="flex items-center gap-2 text-xs font-semibold text-zinc-500">
-                <UserRound className="h-4 w-4" />
-                Người tạo
-              </dt>
-              <dd className="mt-2 text-sm font-semibold text-zinc-950">
-                {ticket.createdBy.name}
-              </dd>
-            </div>
-            <div className="rounded-xl bg-zinc-50 p-3.5 ring-1 ring-zinc-950/[0.03]">
-              <dt className="flex items-center gap-2 text-xs font-semibold text-zinc-500">
-                <UserCheck className="h-4 w-4" />
-                Người xử lý
-              </dt>
-              <dd className="mt-2 text-sm font-semibold text-zinc-950">
-                {ticket.assignedTo?.name ?? "-"}
-              </dd>
-            </div>
-            <div className="rounded-xl bg-zinc-50 p-3.5 ring-1 ring-zinc-950/[0.03]">
-              <dt className="flex items-center gap-2 text-xs font-semibold text-zinc-500">
-                <FolderOpen className="h-4 w-4" />
-                Category
-              </dt>
-              <dd className="mt-2 text-sm font-semibold text-zinc-950">
-                {ticket.category?.name ?? "-"}
-              </dd>
-            </div>
-            <div className="rounded-xl bg-zinc-50 p-3.5 ring-1 ring-zinc-950/[0.03]">
-              <dt className="flex items-center gap-2 text-xs font-semibold text-zinc-500">
-                <CalendarClock className="h-4 w-4" />
-                Cập nhật
-              </dt>
-              <dd className="mt-2 text-sm font-semibold text-zinc-950">
-                {formatDate(ticket.updatedAt)}
-              </dd>
-            </div>
+            {infoCards.map((item, index) => {
+              const Icon = item.icon;
+
+              return (
+                <div
+                  key={item.label}
+                  style={{ "--motion-index": index } as CSSProperties}
+                  className="motion-card rounded-xl bg-zinc-50 p-3.5 ring-1 ring-zinc-950/[0.03]"
+                >
+                  <dt className="flex items-center gap-2 text-xs font-semibold text-zinc-500">
+                    <Icon className="h-4 w-4" />
+                    {item.label}
+                  </dt>
+                  <dd className="mt-2 text-sm font-semibold text-zinc-950">
+                    {item.value}
+                  </dd>
+                </div>
+              );
+            })}
           </dl>
         </div>
       </section>
 
       <div className="grid gap-5 lg:grid-cols-[minmax(0,1.45fr)_minmax(320px,0.85fr)]">
         {canUpdateTicket(user, ticket) ? (
-          <section className="overflow-hidden rounded-2xl border border-white/80 bg-white shadow-sm shadow-zinc-950/[0.04] ring-1 ring-zinc-950/[0.03]">
+          <section className="motion-panel overflow-hidden rounded-2xl border border-white/80 bg-white shadow-sm shadow-zinc-950/[0.04] ring-1 ring-zinc-950/[0.03]">
             <div className="flex items-center gap-3 border-b border-zinc-200/80 bg-zinc-50/70 px-5 py-4">
               <div className="grid h-10 w-10 place-items-center rounded-xl bg-teal-50 text-teal-700">
                 <PencilLine className="h-5 w-5" />
@@ -274,7 +280,7 @@ export function TicketDetailPanel({ ticketId }: { ticketId: number }) {
 
         {canManageTicket(user) ? (
           <div className="grid gap-5">
-            <section className="overflow-hidden rounded-2xl border border-white/80 bg-white shadow-sm shadow-zinc-950/[0.04] ring-1 ring-zinc-950/[0.03]">
+            <section className="motion-panel overflow-hidden rounded-2xl border border-white/80 bg-white shadow-sm shadow-zinc-950/[0.04] ring-1 ring-zinc-950/[0.03]">
               <div className="flex items-center gap-3 border-b border-zinc-200/80 bg-zinc-50/70 px-5 py-4">
                 <div className="grid h-10 w-10 place-items-center rounded-xl bg-amber-50 text-amber-700">
                   <Settings2 className="h-5 w-5" />
@@ -288,7 +294,7 @@ export function TicketDetailPanel({ ticketId }: { ticketId: number }) {
               </div>
             </section>
 
-            <section className="overflow-hidden rounded-2xl border border-white/80 bg-white shadow-sm shadow-zinc-950/[0.04] ring-1 ring-zinc-950/[0.03]">
+            <section className="motion-panel overflow-hidden rounded-2xl border border-white/80 bg-white shadow-sm shadow-zinc-950/[0.04] ring-1 ring-zinc-950/[0.03]">
               <div className="flex items-center gap-3 border-b border-zinc-200/80 bg-zinc-50/70 px-5 py-4">
                 <div className="grid h-10 w-10 place-items-center rounded-xl bg-sky-50 text-sky-700">
                   <UserCheck className="h-5 w-5" />
