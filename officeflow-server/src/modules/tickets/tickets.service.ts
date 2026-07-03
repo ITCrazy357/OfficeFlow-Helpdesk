@@ -7,6 +7,7 @@ import {
   UpdateTicketInput,
   UpdateTicketStatusInput,
 } from "./tickets.schema";
+import { AppError } from "../../utils/AppError";
 
 // Kieu du lieu user dang dang nhap, dung de kiem tra quyen.
 type CurrentUser = {
@@ -148,7 +149,7 @@ export async function getTicketByIdService(
 
   // Neu khong tim thay thi bao loi.
   if (!ticket) {
-    throw new Error("Ticket not found");
+    throw new AppError("Ticket not found", 404);
   }
 
   // Kiem tra ticket nay co phai cua user hien tai khong.
@@ -156,7 +157,7 @@ export async function getTicketByIdService(
 
   // EMPLOYEE khong duoc xem ticket cua nguoi khac.
   if (isEmployee(currentUser) && !isOwner) {
-    throw new Error("Forbidden");
+    throw new AppError("Forbidden", 403);
   }
 
   // Tra ve chi tiet ticket.
@@ -198,7 +199,7 @@ export async function updateTicketService(
 
   // Neu khong tim thay thi bao loi.
   if (!ticket) {
-    throw new Error("Ticket not found");
+    throw new AppError("Ticket not found", 404);
   }
 
   // Kiem tra ticket co phai cua user hien tai va con OPEN khong.
@@ -207,7 +208,7 @@ export async function updateTicketService(
 
   // EMPLOYEE chi duoc sua ticket cua minh khi ticket con OPEN.
   if (isEmployee(currentUser) && (!isOwner || !isOpen)) {
-    throw new Error("Forbidden");
+    throw new AppError("Forbidden", 403);
   }
 
   // Cap nhat ticket trong database.
@@ -234,7 +235,7 @@ export async function updateTicketStatusService(
 ) {
   // Chi ADMIN hoac IT_STAFF duoc doi status.
   if (!isAdminOrITStaff(currentUser)) {
-    throw new Error("Forbidden");
+    throw new AppError("Forbidden", 403);
   }
 
   // Tim ticket can doi status.
@@ -244,7 +245,7 @@ export async function updateTicketStatusService(
 
   // Neu khong tim thay thi bao loi.
   if (!ticket) {
-    throw new Error("Ticket not found");
+    throw new AppError("Ticket not found", 404);
   }
 
   // Cap nhat status trong database.
@@ -268,7 +269,7 @@ export async function assignTicketService(
 ) {
   // Chi ADMIN hoac IT_STAFF duoc assign ticket.
   if (!isAdminOrITStaff(currentUser)) {
-    throw new Error("Forbidden");
+    throw new AppError("Forbidden", 403);
   }
 
   // Tim ticket can assign.
@@ -278,7 +279,7 @@ export async function assignTicketService(
 
   // Neu ticket khong ton tai thi bao loi.
   if (!ticket) {
-    throw new Error("Ticket not found");
+    throw new AppError("Ticket not found", 404);
   }
 
   // Tim user se duoc assign.
@@ -288,7 +289,7 @@ export async function assignTicketService(
 
   // Neu user duoc assign khong ton tai thi bao loi.
   if (!assignedUser) {
-    throw new Error("Assigned user not found");
+    throw new AppError("Assigned user not found", 404);
   }
 
   // Chi cho assign cho ADMIN hoac IT_STAFF.
@@ -296,7 +297,7 @@ export async function assignTicketService(
     assignedUser.role !== UserRole.IT_STAFF &&
     assignedUser.role !== UserRole.ADMIN
   ) {
-    throw new Error("Assigned user must be IT_STAFF or ADMIN");
+    throw new AppError("Assigned user must be IT_STAFF or ADMIN", 400);
   }
 
   // Cap nhat nguoi duoc assign cho ticket.
@@ -325,7 +326,7 @@ export async function deleteTicketService(
 
   // Neu khong tim thay thi bao loi.
   if (!ticket) {
-    throw new Error("Ticket not found");
+    throw new AppError("Ticket not found", 404);
   }
 
   // ADMIN duoc xoa moi ticket.
@@ -351,5 +352,5 @@ export async function deleteTicketService(
   }
 
   // Cac truong hop con lai khong duoc xoa.
-  throw new Error("Forbidden");
+  throw new AppError("Forbidden", 403);
 }

@@ -9,7 +9,7 @@ export type ApiErrorResponse = {
   success?: false;
   message?: string;
   status?: number;
-  errors?: unknown;
+  error?: unknown;
 };
 
 export type Pagination = {
@@ -24,4 +24,4 @@ export type PaginatedData<T> = {
   pagination: Pagination;
 };
 
-export type PaginatedResponse<T> = ApiResponse<PaginatedData<T>>;
+export type PaginatedApiResponse<T> = ApiResponse<PaginatedData<T>>;

@@ -13,7 +13,6 @@ export function setAccessToken(token: string): void {
     localStorage.removeItem(ACCESS_TOKEN_KEY);
     return;
   }
-
   localStorage.setItem(ACCESS_TOKEN_KEY, token);
 }
 

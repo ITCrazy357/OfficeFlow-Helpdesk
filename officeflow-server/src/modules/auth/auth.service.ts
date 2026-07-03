@@ -2,6 +2,7 @@ import bcrypt from "bcrypt";
 import { prisma } from "../../config/prisma";
 import { RegisterInput, LoginInput } from "./auth.schema";
 import { signAccessToken } from "../../utils/jwt";
+import { AppError } from "../../utils/AppError";
 
 export async function registerService(input: RegisterInput) {
   const existedUser = await prisma.user.findUnique({
@@ -9,7 +10,7 @@ export async function registerService(input: RegisterInput) {
   });
 
   if (existedUser) {
-    throw new Error("Email already exists");
+    throw new AppError("Email already exists", 400);
   }
 
   const passwordHash = await bcrypt.hash(input.password, 10);
@@ -42,17 +43,17 @@ export async function loginService(input: LoginInput) {
   });
 
   if (!user) {
-    throw new Error("Invalid email or password");
+    throw new AppError("Invalid email or password", 400);
   }
 
   if (user.isActive === false) {
-    throw new Error("Account is inactive");
+    throw new AppError("Account is inactive", 400);
   }
 
   const passwordMatch = await bcrypt.compare(input.password, user.passwordHash);
 
   if (!passwordMatch) {
-    throw new Error("Invalid email or password");
+    throw new AppError("Invalid email or password", 400);
   }
 
   const accessToken = signAccessToken({
@@ -92,7 +93,7 @@ export async function getMeService(userId: number) {
   });
 
   if (!user) {
-    throw new Error("User not found");
+    throw new AppError("User not found", 404);
   }
 
   return user;

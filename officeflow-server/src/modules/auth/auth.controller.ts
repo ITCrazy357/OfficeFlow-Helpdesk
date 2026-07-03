@@ -1,57 +1,58 @@
 import { Response } from "express";
 import { AuthRequest } from "../../types/express";
 import { successResponse, errorResponse } from "../../utils/api-response";
+import { asyncHandler } from "../../utils/asyncHandler";
 import { registerService, loginService, getMeService } from "./auth.service";
 
-export async function registerController(req: AuthRequest, res: Response) {
-  try {
-    const user = await registerService(req.body);
-
-    return successResponse(res, 201, "Register successfully", user);
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "Register failed";
-
-    return errorResponse(res, 400, message);
-  }
+function getErrorMessage(error: unknown, fallback: string) {
+  return error instanceof Error ? error.message : fallback;
 }
 
-export async function loginController(req: AuthRequest, res: Response) {
-  // TODO:
-  // gọi loginService(req.body)
-  try {
-    const { accessToken, user } = await loginService(req.body);
-    return successResponse(res, 200, "Login successfully", {
-      accessToken,
-      user,
-    });
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "Login failed";
-    return errorResponse(res, 401, message);
-  }
-  // trả successResponse status 200
-  // catch error và trả 401 nếu sai email/password
-}
+export const registerController = asyncHandler(
+  async (req: AuthRequest, res: Response) => {
+    try {
+      const user = await registerService(req.body);
 
-export async function meController(req: AuthRequest, res: Response) {
-  const userId = req.user?.userId;
+      return successResponse(res, 201, "Register successfully", user);
+    } catch (error) {
+      return errorResponse(
+        res,
+        400,
+        getErrorMessage(error, "Register failed"),
+      );
+    }
+  },
+);
 
-  if (userId === undefined) {
-    return errorResponse(res, 401, "Unauthorized");
-  }
+export const loginController = asyncHandler(
+  async (req: AuthRequest, res: Response) => {
+    try {
+      const { accessToken, user } = await loginService(req.body);
 
-  try {
-    const user = await getMeService(userId);
-    return res.json({
-      status: 200,
-      success: true,
-      data: user,
-      message: "Get user successfully",
-    });
-  } catch {
-    return res.json({
-      status: 400,
-      success: false,
-      message: "Get user failed",
-    });
-  }
-}
+      return successResponse(res, 200, "Login successfully", {
+        accessToken,
+        user,
+      });
+    } catch (error) {
+      return errorResponse(res, 401, getErrorMessage(error, "Login failed"));
+    }
+  },
+);
+
+export const meController = asyncHandler(
+  async (req: AuthRequest, res: Response) => {
+    const userId = req.user?.userId;
+
+    if (!userId) {
+      return errorResponse(res, 401, "Unauthorized");
+    }
+
+    try {
+      const user = await getMeService(userId);
+
+      return successResponse(res, 200, "Get user successfully", user);
+    } catch (error) {
+      return errorResponse(res, 404, getErrorMessage(error, "Get user failed"));
+    }
+  },
+);

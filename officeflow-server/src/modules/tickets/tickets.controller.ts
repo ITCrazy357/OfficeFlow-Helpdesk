@@ -12,6 +12,8 @@ import {
   updateTicketStatusService,
 } from "./tickets.service";
 
+import { asyncHandler } from "../../utils/asyncHandler";
+
 // chuyển string từ req thành Number
 function parseNumber(value: unknown) {
   if (typeof value !== "string") {
@@ -87,165 +89,181 @@ function getErrorStatus(message: string) {
 }
 
 // Lấy ticket
-export async function getTicketsController(req: AuthRequest, res: Response) {
-  try {
-    if (!req.user) {
-      return errorResponse(res, 401, "Unauthorized");
+export const getTicketsController = asyncHandler(
+  async (req: AuthRequest, res: Response) => {
+    try {
+      if (!req.user) {
+        return errorResponse(res, 401, "Unauthorized");
+      }
+
+      const query = {
+        page: parseNumber(req.query.page),
+        limit: parseNumber(req.query.limit),
+        keyword: parseString(req.query.keyword),
+        status: parseTicketStatus(req.query.status),
+        priority: parseTicketPriority(req.query.priority),
+        categoryId: parseNumber(req.query.categoryId),
+      };
+
+      const result = await getTicketsService(req.user, query);
+
+      return successResponse(res, 200, "Get tickets successfully", result);
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Get tickets failed";
+      return errorResponse(res, 500, message);
     }
-
-    const query = {
-      page: parseNumber(req.query.page),
-      limit: parseNumber(req.query.limit),
-      keyword: parseString(req.query.keyword),
-      status: parseTicketStatus(req.query.status),
-      priority: parseTicketPriority(req.query.priority),
-      categoryId: parseNumber(req.query.categoryId),
-    };
-
-    const result = await getTicketsService(req.user, query);
-
-    return successResponse(res, 200, "Get tickets successfully", result);
-  } catch (error) {
-    const message =
-      error instanceof Error ? error.message : "Get tickets failed";
-    return errorResponse(res, 500, message);
-  }
-}
+  },
+);
 
 //
-export async function getTicketByIdController(req: AuthRequest, res: Response) {
-  try {
-    if (!req.user) {
-      return errorResponse(res, 401, "Unauthorized");
+export const getTicketByIdController = asyncHandler(
+  async (req: AuthRequest, res: Response) => {
+    try {
+      if (!req.user) {
+        return errorResponse(res, 401, "Unauthorized");
+      }
+
+      const id = getTicketId(req, res);
+
+      if (!id) {
+        return;
+      }
+
+      const ticket = await getTicketByIdService(id, req.user);
+
+      return successResponse(res, 200, "Get ticket successfully", ticket);
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Get ticket failed";
+      return errorResponse(res, getErrorStatus(message), message);
     }
-
-    const id = getTicketId(req, res);
-
-    if (!id) {
-      return;
-    }
-
-    const ticket = await getTicketByIdService(id, req.user);
-
-    return successResponse(res, 200, "Get ticket successfully", ticket);
-  } catch (error) {
-    const message =
-      error instanceof Error ? error.message : "Get ticket failed";
-    return errorResponse(res, getErrorStatus(message), message);
-  }
-}
+  },
+);
 
 //Tạo mới ticket
-export async function createTicketController(req: AuthRequest, res: Response) {
-  try {
-    if (!req.user) {
-      return errorResponse(res, 401, "Unauthorized");
+export const createTicketController = asyncHandler(
+  async (req: AuthRequest, res: Response) => {
+    try {
+      if (!req.user) {
+        return errorResponse(res, 401, "Unauthorized");
+      }
+
+      const ticket = await createTicketService(req.body, req.user);
+
+      return successResponse(res, 201, "Create ticket successfully", ticket);
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Create ticket failed";
+      return errorResponse(res, 400, message);
     }
-
-    const ticket = await createTicketService(req.body, req.user);
-
-    return successResponse(res, 201, "Create ticket successfully", ticket);
-  } catch (error) {
-    const message =
-      error instanceof Error ? error.message : "Create ticket failed";
-    return errorResponse(res, 400, message);
-  }
-}
+  },
+);
 
 //update ticket
-export async function updateTicketController(req: AuthRequest, res: Response) {
-  try {
-    if (!req.user) {
-      return errorResponse(res, 401, "Unauthorized");
+export const updateTicketController = asyncHandler(
+  async (req: AuthRequest, res: Response) => {
+    try {
+      if (!req.user) {
+        return errorResponse(res, 401, "Unauthorized");
+      }
+
+      const id = getTicketId(req, res);
+
+      if (!id) {
+        return;
+      }
+
+      const ticket = await updateTicketService(id, req.body, req.user);
+
+      return successResponse(res, 200, "Update ticket successfully", ticket);
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Update ticket failed";
+      return errorResponse(res, getErrorStatus(message), message);
     }
-
-    const id = getTicketId(req, res);
-
-    if (!id) {
-      return;
-    }
-
-    const ticket = await updateTicketService(id, req.body, req.user);
-
-    return successResponse(res, 200, "Update ticket successfully", ticket);
-  } catch (error) {
-    const message =
-      error instanceof Error ? error.message : "Update ticket failed";
-    return errorResponse(res, getErrorStatus(message), message);
-  }
-}
+  },
+);
 
 //Cap nhat trang thai ticket
-export async function updateTicketStatusController(
-  req: AuthRequest,
-  res: Response,
-) {
-  try {
-    if (!req.user) {
-      return errorResponse(res, 401, "Unauthorized");
+export const updateTicketStatusController = asyncHandler(
+  async (req: AuthRequest, res: Response) => {
+    try {
+      if (!req.user) {
+        return errorResponse(res, 401, "Unauthorized");
+      }
+
+      const id = getTicketId(req, res);
+
+      if (!id) {
+        return;
+      }
+
+      const ticket = await updateTicketStatusService(id, req.body, req.user);
+
+      return successResponse(
+        res,
+        200,
+        "Update ticket status successfully",
+        ticket,
+      );
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Update ticket status failed";
+      return errorResponse(res, getErrorStatus(message), message);
     }
+  },
+);
 
-    const id = getTicketId(req, res);
+export const assignTicketController = asyncHandler(
+  async (req: AuthRequest, res: Response) => {
+    try {
+      if (!req.user) {
+        return errorResponse(res, 401, "Unauthorized");
+      }
 
-    if (!id) {
-      return;
+      const id = getTicketId(req, res);
+
+      if (!id) {
+        return;
+      }
+
+      const ticket = await updateTicketStatusService(id, req.body, req.user);
+
+      return successResponse(
+        res,
+        200,
+        "Update ticket status successfully",
+        ticket,
+      );
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Update ticket status failed";
+      return errorResponse(res, getErrorStatus(message), message);
     }
+  },
+);
 
-    const ticket = await updateTicketStatusService(id, req.body, req.user);
+export const deleteTicketController = asyncHandler(
+  async (req: AuthRequest, res: Response) => {
+    try {
+      if (!req.user) {
+        return errorResponse(res, 401, "Unauthorized");
+      }
 
-    return successResponse(
-      res,
-      200,
-      "Update ticket status successfully",
-      ticket,
-    );
-  } catch (error) {
-    const message =
-      error instanceof Error ? error.message : "Update ticket status failed";
-    return errorResponse(res, getErrorStatus(message), message);
-  }
-}
+      const id = getTicketId(req, res);
 
-export async function assignTicketController(req: AuthRequest, res: Response) {
-  try {
-    if (!req.user) {
-      return errorResponse(res, 401, "Unauthorized");
+      if (!id) {
+        return;
+      }
+
+      const result = await deleteTicketService(id, req.user);
+
+      return successResponse(res, 200, "Delete ticket successfully", result);
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Delete ticket failed";
+      return errorResponse(res, getErrorStatus(message), message);
     }
-
-    const id = getTicketId(req, res);
-
-    if (!id) {
-      return;
-    }
-
-    const ticket = await assignTicketService(id, req.body, req.user);
-
-    return successResponse(res, 200, "Assign ticket successfully", ticket);
-  } catch (error) {
-    const message =
-      error instanceof Error ? error.message : "Assign ticket failed";
-    return errorResponse(res, getErrorStatus(message), message);
-  }
-}
-
-export async function deleteTicketController(req: AuthRequest, res: Response) {
-  try {
-    if (!req.user) {
-      return errorResponse(res, 401, "Unauthorized");
-    }
-
-    const id = getTicketId(req, res);
-
-    if (!id) {
-      return;
-    }
-
-    const result = await deleteTicketService(id, req.user);
-
-    return successResponse(res, 200, "Delete ticket successfully", result);
-  } catch (error) {
-    const message =
-      error instanceof Error ? error.message : "Delete ticket failed";
-    return errorResponse(res, getErrorStatus(message), message);
-  }
-}
+  },
+);
