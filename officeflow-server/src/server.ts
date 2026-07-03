@@ -9,12 +9,18 @@ import usersRoutes from "./modules/users/users.routes";
 import departmentsRoutes from "./modules/departments/departments.routes";
 import ticketsRoutes from "./modules/tickets/tickets.routes";
 
+//middleware
+import { notFoundMiddleware } from "./middlewares/not-found.middleware";
+import { errorMiddleware } from "./middlewares/error.middleware";
+import { requestLogger } from "./middlewares/request-logger.middleware";
+
 dotenv.config();
 
 const app = express();
 
 app.use(cors());
 app.use(express.json());
+app.use(requestLogger);
 
 app.use("/api/auth", authRoutes);
 app.use("/api/users", usersRoutes);
@@ -44,6 +50,10 @@ app.get("/api/db-health", async (req, res) => {
     });
   }
 });
+
+// Error handling middleware
+app.use(notFoundMiddleware);
+app.use(errorMiddleware);
 
 const PORT = process.env.PORT || 5000;
 
