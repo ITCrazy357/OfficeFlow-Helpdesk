@@ -1,21 +1,22 @@
+import { AppQueryClientProvider } from "@/lib/query-client-provider";
 import type { Metadata } from "next";
-import { AppProviders } from "@/app/providers";
+import type { ReactNode } from "react";
 import "./globals.css";
 
 export const metadata: Metadata = {
   title: "OfficeFlow Helpdesk",
-  description: "Helpdesk ticket management workspace",
+  description: "OfficeFlow internal helpdesk client",
 };
 
 export default function RootLayout({
   children,
 }: Readonly<{
-  children: React.ReactNode;
+  children: ReactNode;
 }>) {
   return (
-    <html lang="vi" className="h-full antialiased">
-      <body className="min-h-[100dvh] bg-zinc-100 text-zinc-950">
-        <AppProviders>{children}</AppProviders>
+    <html lang="vi">
+      <body className="bg-background text-foreground antialiased">
+        <AppQueryClientProvider>{children}</AppQueryClientProvider>
       </body>
     </html>
   );

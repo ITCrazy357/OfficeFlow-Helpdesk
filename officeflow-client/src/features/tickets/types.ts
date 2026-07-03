@@ -1,29 +1,13 @@
-import type { UserRole } from "@/features/auth/types";
+import type { PaginatedData } from "@/types/api";
 
-export const ticketStatuses = [
-  "OPEN",
-  "IN_PROGRESS",
-  "RESOLVED",
-  "CLOSED",
-  "CANCELLED",
-] as const;
+export type TicketStatus =
+  | "OPEN"
+  | "IN_PROGRESS"
+  | "RESOLVED"
+  | "CLOSED"
+  | "CANCELLED";
 
-export const ticketPriorities = ["LOW", "MEDIUM", "HIGH", "URGENT"] as const;
-
-export type TicketStatus = (typeof ticketStatuses)[number];
-export type TicketPriority = (typeof ticketPriorities)[number];
-
-export type TicketUser = {
-  id: number;
-  name: string;
-  email: string;
-  role?: UserRole;
-};
-
-export type TicketCategory = {
-  id: number;
-  name: string;
-};
+export type TicketPriority = "LOW" | "MEDIUM" | "HIGH" | "URGENT";
 
 export type Ticket = {
   id: number;
@@ -33,12 +17,23 @@ export type Ticket = {
   priority: TicketPriority;
   createdAt: string;
   updatedAt: string;
-  createdBy: TicketUser;
-  assignedTo?: TicketUser | null;
-  category?: TicketCategory | null;
+  createdBy?: {
+    id: number;
+    name: string;
+    email: string;
+  };
+  assignedTo?: {
+    id: number;
+    name: string;
+    email: string;
+  } | null;
+  category?: {
+    id: number;
+    name: string;
+  } | null;
 };
 
-export type TicketFilters = {
+export type GetTicketsParams = {
   page?: number;
   limit?: number;
   keyword?: string;
@@ -47,3 +42,4 @@ export type TicketFilters = {
   categoryId?: number;
 };
 
+export type TicketsList = PaginatedData<Ticket>;

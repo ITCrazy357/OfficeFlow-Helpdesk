@@ -12,7 +12,7 @@ import {
   updateTicketStatusService,
 } from "./tickets.service";
 
-// Kieu du lieu user dang dang nhap, dung de kiem tra quyen.
+// chuyển string từ req thành Number
 function parseNumber(value: unknown) {
   if (typeof value !== "string") {
     return undefined;
@@ -27,6 +27,7 @@ function parseNumber(value: unknown) {
   return numberValue;
 }
 
+//Xử lý keyword
 function parseString(value: unknown) {
   if (typeof value !== "string") {
     return undefined;
@@ -36,6 +37,7 @@ function parseString(value: unknown) {
   return text || undefined;
 }
 
+//Xử lý status có đúng enum prisma không
 function parseTicketStatus(value: unknown) {
   if (
     typeof value === "string" &&
@@ -47,6 +49,7 @@ function parseTicketStatus(value: unknown) {
   return undefined;
 }
 
+//Xử lý priority có đúng enum không
 function parseTicketPriority(value: unknown) {
   if (
     typeof value === "string" &&
@@ -58,7 +61,7 @@ function parseTicketPriority(value: unknown) {
   return undefined;
 }
 
-//
+// Lấy Id từ URL
 function getTicketId(req: AuthRequest, res: Response) {
   const id = parseNumber(req.params.id);
 
@@ -70,6 +73,7 @@ function getTicketId(req: AuthRequest, res: Response) {
   return id;
 }
 
+// Chuyển message lỗi thành HTTO status code
 function getErrorStatus(message: string) {
   if (message === "Forbidden") {
     return 403;
@@ -82,6 +86,7 @@ function getErrorStatus(message: string) {
   return 400;
 }
 
+// Lấy ticket
 export async function getTicketsController(req: AuthRequest, res: Response) {
   try {
     if (!req.user) {
@@ -107,6 +112,7 @@ export async function getTicketsController(req: AuthRequest, res: Response) {
   }
 }
 
+//
 export async function getTicketByIdController(req: AuthRequest, res: Response) {
   try {
     if (!req.user) {
@@ -129,6 +135,7 @@ export async function getTicketByIdController(req: AuthRequest, res: Response) {
   }
 }
 
+//Tạo mới ticket
 export async function createTicketController(req: AuthRequest, res: Response) {
   try {
     if (!req.user) {
@@ -145,6 +152,7 @@ export async function createTicketController(req: AuthRequest, res: Response) {
   }
 }
 
+//update ticket
 export async function updateTicketController(req: AuthRequest, res: Response) {
   try {
     if (!req.user) {
@@ -167,6 +175,7 @@ export async function updateTicketController(req: AuthRequest, res: Response) {
   }
 }
 
+//Cap nhat trang thai ticket
 export async function updateTicketStatusController(
   req: AuthRequest,
   res: Response,

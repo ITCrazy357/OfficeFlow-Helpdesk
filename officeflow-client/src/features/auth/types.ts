@@ -7,11 +7,11 @@ export type AuthUser = {
   role: UserRole;
   isActive?: boolean;
   departmentId?: number | null;
+  createdAt?: string;
   department?: {
     id: number;
     name: string;
   } | null;
-  createdAt?: string;
 };
 
 export type LoginResponse = {
@@ -19,3 +19,7 @@ export type LoginResponse = {
   user: AuthUser;
 };
 
+export type LoginInput = {
+  email: string;
+  password: string;
+};
