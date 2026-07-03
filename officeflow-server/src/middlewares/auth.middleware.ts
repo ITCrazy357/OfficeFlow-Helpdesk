@@ -22,7 +22,7 @@ export function requireAuth(
     req.user = payload;
     next();
   } catch {
-    return next(new AppError("Invalid or expired token", 401));
+    return next(new AppError("Invalid or expired token", 403));
   }
 }
 
