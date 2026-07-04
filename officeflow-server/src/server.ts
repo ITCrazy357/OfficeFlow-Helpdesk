@@ -9,6 +9,10 @@ import usersRoutes from "./modules/users/users.routes";
 import departmentsRoutes from "./modules/departments/departments.routes";
 import ticketsRoutes from "./modules/tickets/tickets.routes";
 
+//swagger
+import swaggerUi from "swagger-ui-express";
+import { swaggerSpec } from "./config/swagger";
+
 //middleware
 import { notFoundMiddleware } from "./middlewares/not-found.middleware";
 import { errorMiddleware } from "./middlewares/error.middleware";
@@ -50,6 +54,8 @@ app.get("/api/db-health", async (req, res) => {
     });
   }
 });
+
+app.use("/api/docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
 // Error handling middleware
 app.use(notFoundMiddleware);
