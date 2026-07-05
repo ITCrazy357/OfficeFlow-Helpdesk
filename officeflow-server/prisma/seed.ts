@@ -3,6 +3,7 @@ import bcrypt from "bcrypt";
 import { prisma } from "../src/config/prisma";
 
 async function main() {
+  // Seed departments
   const departments = ["IT", "HR", "Finance", "Marketing"];
 
   for (const name of departments) {
@@ -13,6 +14,7 @@ async function main() {
     });
   }
 
+  // Seed an admin user in the IT department
   const itDepartment = await prisma.department.findUnique({
     where: { name: "IT" },
   });
@@ -32,6 +34,27 @@ async function main() {
       passwordHash,
       role: UserRole.ADMIN,
       departmentId: itDepartment.id,
+    },
+  });
+
+  // Seed an employee user in the HR department
+  const hrDepartment = await prisma.department.findUnique({
+    where: { name: "HR" },
+  });
+
+  if (!hrDepartment) {
+    throw new Error("HR department not found");
+  }
+
+  await prisma.user.upsert({
+    where: { email: "employee1@officeflow.com" },
+    update: {},
+    create: {
+      name: "Employee One",
+      email: "employee1@officeflow.com",
+      passwordHash,
+      role: UserRole.EMPLOYEE,
+      departmentId: hrDepartment.id,
     },
   });
 
