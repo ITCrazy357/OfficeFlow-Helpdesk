@@ -3,14 +3,11 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.requireAuth = requireAuth;
 exports.requireRoles = requireRoles;
 const jwt_1 = require("../utils/jwt");
+const AppError_1 = require("../utils/AppError");
 function requireAuth(req, res, next) {
     const authHeader = req.headers.authorization;
     if (!authHeader || !authHeader.startsWith("Bearer ")) {
-        return res.json({
-            status: 401,
-            success: false,
-            message: "Unauthorized",
-        });
+        return next(new AppError_1.AppError("Unauthorized", 401));
     }
     const token = authHeader.split(" ")[1];
     try {
@@ -19,28 +16,16 @@ function requireAuth(req, res, next) {
         next();
     }
     catch {
-        return res.json({
-            status: 401,
-            success: false,
-            message: "Invalid or expired token",
-        });
+        return next(new AppError_1.AppError("Invalid or expired token", 403));
     }
 }
 function requireRoles(...roles) {
     return (req, res, next) => {
         if (!req.user) {
-            return res.json({
-                status: 401,
-                success: false,
-                message: "Unauthorized",
-            });
+            return next(new AppError_1.AppError("Unauthorized", 401));
         }
         if (!roles.includes(req.user.role)) {
-            return res.json({
-                status: 403,
-                success: false,
-                message: "Forbidden",
-            });
+            return next(new AppError_1.AppError("Forbidden", 403));
         }
         next();
     };

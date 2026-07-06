@@ -1,16 +1,11 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.getTicketsController = getTicketsController;
-exports.getTicketByIdController = getTicketByIdController;
-exports.createTicketController = createTicketController;
-exports.updateTicketController = updateTicketController;
-exports.updateTicketStatusController = updateTicketStatusController;
-exports.assignTicketController = assignTicketController;
-exports.deleteTicketController = deleteTicketController;
+exports.deleteTicketController = exports.assignTicketController = exports.updateTicketStatusController = exports.updateTicketController = exports.createTicketController = exports.getTicketByIdController = exports.getTicketsController = void 0;
 const client_1 = require("@prisma/client");
 const api_response_1 = require("../../utils/api-response");
 const tickets_service_1 = require("./tickets.service");
-// Kieu du lieu user dang dang nhap, dung de kiem tra quyen.
+const asyncHandler_1 = require("../../utils/asyncHandler");
+// chuyển string từ req thành Number
 function parseNumber(value) {
     if (typeof value !== "string") {
         return undefined;
@@ -21,6 +16,7 @@ function parseNumber(value) {
     }
     return numberValue;
 }
+//Xử lý keyword
 function parseString(value) {
     if (typeof value !== "string") {
         return undefined;
@@ -28,6 +24,7 @@ function parseString(value) {
     const text = value.trim();
     return text || undefined;
 }
+//Xử lý status có đúng enum prisma không
 function parseTicketStatus(value) {
     if (typeof value === "string" &&
         Object.values(client_1.TicketStatus).includes(value)) {
@@ -35,6 +32,7 @@ function parseTicketStatus(value) {
     }
     return undefined;
 }
+//Xử lý priority có đúng enum không
 function parseTicketPriority(value) {
     if (typeof value === "string" &&
         Object.values(client_1.TicketPriority).includes(value)) {
@@ -42,7 +40,7 @@ function parseTicketPriority(value) {
     }
     return undefined;
 }
-//
+// Lấy Id từ URL
 function getTicketId(req, res) {
     const id = parseNumber(req.params.id);
     if (!id) {
@@ -51,6 +49,7 @@ function getTicketId(req, res) {
     }
     return id;
 }
+// Chuyển message lỗi thành HTTO status code
 function getErrorStatus(message) {
     if (message === "Forbidden") {
         return 403;
@@ -60,7 +59,8 @@ function getErrorStatus(message) {
     }
     return 400;
 }
-async function getTicketsController(req, res) {
+// Lấy ticket
+exports.getTicketsController = (0, asyncHandler_1.asyncHandler)(async (req, res) => {
     try {
         if (!req.user) {
             return (0, api_response_1.errorResponse)(res, 401, "Unauthorized");
@@ -80,8 +80,9 @@ async function getTicketsController(req, res) {
         const message = error instanceof Error ? error.message : "Get tickets failed";
         return (0, api_response_1.errorResponse)(res, 500, message);
     }
-}
-async function getTicketByIdController(req, res) {
+});
+//
+exports.getTicketByIdController = (0, asyncHandler_1.asyncHandler)(async (req, res) => {
     try {
         if (!req.user) {
             return (0, api_response_1.errorResponse)(res, 401, "Unauthorized");
@@ -97,8 +98,9 @@ async function getTicketByIdController(req, res) {
         const message = error instanceof Error ? error.message : "Get ticket failed";
         return (0, api_response_1.errorResponse)(res, getErrorStatus(message), message);
     }
-}
-async function createTicketController(req, res) {
+});
+//Tạo mới ticket
+exports.createTicketController = (0, asyncHandler_1.asyncHandler)(async (req, res) => {
     try {
         if (!req.user) {
             return (0, api_response_1.errorResponse)(res, 401, "Unauthorized");
@@ -110,8 +112,9 @@ async function createTicketController(req, res) {
         const message = error instanceof Error ? error.message : "Create ticket failed";
         return (0, api_response_1.errorResponse)(res, 400, message);
     }
-}
-async function updateTicketController(req, res) {
+});
+//update ticket
+exports.updateTicketController = (0, asyncHandler_1.asyncHandler)(async (req, res) => {
     try {
         if (!req.user) {
             return (0, api_response_1.errorResponse)(res, 401, "Unauthorized");
@@ -127,8 +130,9 @@ async function updateTicketController(req, res) {
         const message = error instanceof Error ? error.message : "Update ticket failed";
         return (0, api_response_1.errorResponse)(res, getErrorStatus(message), message);
     }
-}
-async function updateTicketStatusController(req, res) {
+});
+//Cap nhat trang thai ticket
+exports.updateTicketStatusController = (0, asyncHandler_1.asyncHandler)(async (req, res) => {
     try {
         if (!req.user) {
             return (0, api_response_1.errorResponse)(res, 401, "Unauthorized");
@@ -144,8 +148,8 @@ async function updateTicketStatusController(req, res) {
         const message = error instanceof Error ? error.message : "Update ticket status failed";
         return (0, api_response_1.errorResponse)(res, getErrorStatus(message), message);
     }
-}
-async function assignTicketController(req, res) {
+});
+exports.assignTicketController = (0, asyncHandler_1.asyncHandler)(async (req, res) => {
     try {
         if (!req.user) {
             return (0, api_response_1.errorResponse)(res, 401, "Unauthorized");
@@ -154,15 +158,15 @@ async function assignTicketController(req, res) {
         if (!id) {
             return;
         }
-        const ticket = await (0, tickets_service_1.assignTicketService)(id, req.body, req.user);
-        return (0, api_response_1.successResponse)(res, 200, "Assign ticket successfully", ticket);
+        const ticket = await (0, tickets_service_1.updateTicketStatusService)(id, req.body, req.user);
+        return (0, api_response_1.successResponse)(res, 200, "Update ticket status successfully", ticket);
     }
     catch (error) {
-        const message = error instanceof Error ? error.message : "Assign ticket failed";
+        const message = error instanceof Error ? error.message : "Update ticket status failed";
         return (0, api_response_1.errorResponse)(res, getErrorStatus(message), message);
     }
-}
-async function deleteTicketController(req, res) {
+});
+exports.deleteTicketController = (0, asyncHandler_1.asyncHandler)(async (req, res) => {
     try {
         if (!req.user) {
             return (0, api_response_1.errorResponse)(res, 401, "Unauthorized");
@@ -178,4 +182,4 @@ async function deleteTicketController(req, res) {
         const message = error instanceof Error ? error.message : "Delete ticket failed";
         return (0, api_response_1.errorResponse)(res, getErrorStatus(message), message);
     }
-}
+});

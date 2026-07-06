@@ -1,23 +1,22 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.registerController = registerController;
-exports.loginController = loginController;
-exports.meController = meController;
+exports.meController = exports.loginController = exports.registerController = void 0;
 const api_response_1 = require("../../utils/api-response");
+const asyncHandler_1 = require("../../utils/asyncHandler");
 const auth_service_1 = require("./auth.service");
-async function registerController(req, res) {
+function getErrorMessage(error, fallback) {
+    return error instanceof Error ? error.message : fallback;
+}
+exports.registerController = (0, asyncHandler_1.asyncHandler)(async (req, res) => {
     try {
         const user = await (0, auth_service_1.registerService)(req.body);
         return (0, api_response_1.successResponse)(res, 201, "Register successfully", user);
     }
     catch (error) {
-        const message = error instanceof Error ? error.message : "Register failed";
-        return (0, api_response_1.errorResponse)(res, 400, message);
+        return (0, api_response_1.errorResponse)(res, 400, getErrorMessage(error, "Register failed"));
     }
-}
-async function loginController(req, res) {
-    // TODO:
-    // gọi loginService(req.body)
+});
+exports.loginController = (0, asyncHandler_1.asyncHandler)(async (req, res) => {
     try {
         const { accessToken, user } = await (0, auth_service_1.loginService)(req.body);
         return (0, api_response_1.successResponse)(res, 200, "Login successfully", {
@@ -26,31 +25,19 @@ async function loginController(req, res) {
         });
     }
     catch (error) {
-        const message = error instanceof Error ? error.message : "Login failed";
-        return (0, api_response_1.errorResponse)(res, 401, message);
+        return (0, api_response_1.errorResponse)(res, 401, getErrorMessage(error, "Login failed"));
     }
-    // trả successResponse status 200
-    // catch error và trả 401 nếu sai email/password
-}
-async function meController(req, res) {
+});
+exports.meController = (0, asyncHandler_1.asyncHandler)(async (req, res) => {
     const userId = req.user?.userId;
-    if (userId === undefined) {
+    if (!userId) {
         return (0, api_response_1.errorResponse)(res, 401, "Unauthorized");
     }
     try {
         const user = await (0, auth_service_1.getMeService)(userId);
-        return res.json({
-            status: 200,
-            success: true,
-            data: user,
-            message: "Get user successfully",
-        });
+        return (0, api_response_1.successResponse)(res, 200, "Get user successfully", user);
     }
-    catch {
-        return res.json({
-            status: 400,
-            success: false,
-            message: "Get user failed",
-        });
+    catch (error) {
+        return (0, api_response_1.errorResponse)(res, 404, getErrorMessage(error, "Get user failed"));
     }
-}
+});

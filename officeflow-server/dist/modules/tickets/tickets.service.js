@@ -9,6 +9,7 @@ exports.assignTicketService = assignTicketService;
 exports.deleteTicketService = deleteTicketService;
 const client_1 = require("@prisma/client");
 const prisma_1 = require("../../config/prisma");
+const AppError_1 = require("../../utils/AppError");
 // Cac truong ticket se tra ve cho client.
 const ticketSelect = {
     id: true,
@@ -112,13 +113,13 @@ async function getTicketByIdService(id, currentUser) {
     });
     // Neu khong tim thay thi bao loi.
     if (!ticket) {
-        throw new Error("Ticket not found");
+        throw new AppError_1.AppError("Ticket not found", 404);
     }
     // Kiem tra ticket nay co phai cua user hien tai khong.
     const isOwner = ticket.createdBy.id === currentUser.userId;
     // EMPLOYEE khong duoc xem ticket cua nguoi khac.
     if (isEmployee(currentUser) && !isOwner) {
-        throw new Error("Forbidden");
+        throw new AppError_1.AppError("Forbidden", 403);
     }
     // Tra ve chi tiet ticket.
     return ticket;
@@ -148,14 +149,14 @@ async function updateTicketService(id, input, currentUser) {
     });
     // Neu khong tim thay thi bao loi.
     if (!ticket) {
-        throw new Error("Ticket not found");
+        throw new AppError_1.AppError("Ticket not found", 404);
     }
     // Kiem tra ticket co phai cua user hien tai va con OPEN khong.
     const isOwner = ticket.createdBy.id === currentUser.userId;
     const isOpen = ticket.status === client_1.TicketStatus.OPEN;
     // EMPLOYEE chi duoc sua ticket cua minh khi ticket con OPEN.
     if (isEmployee(currentUser) && (!isOwner || !isOpen)) {
-        throw new Error("Forbidden");
+        throw new AppError_1.AppError("Forbidden", 403);
     }
     // Cap nhat ticket trong database.
     const updatedTicket = await prisma_1.prisma.ticket.update({
@@ -175,7 +176,7 @@ async function updateTicketService(id, input, currentUser) {
 async function updateTicketStatusService(id, input, currentUser) {
     // Chi ADMIN hoac IT_STAFF duoc doi status.
     if (!isAdminOrITStaff(currentUser)) {
-        throw new Error("Forbidden");
+        throw new AppError_1.AppError("Forbidden", 403);
     }
     // Tim ticket can doi status.
     const ticket = await prisma_1.prisma.ticket.findUnique({
@@ -183,7 +184,7 @@ async function updateTicketStatusService(id, input, currentUser) {
     });
     // Neu khong tim thay thi bao loi.
     if (!ticket) {
-        throw new Error("Ticket not found");
+        throw new AppError_1.AppError("Ticket not found", 404);
     }
     // Cap nhat status trong database.
     const updatedTicket = await prisma_1.prisma.ticket.update({
@@ -200,7 +201,7 @@ async function updateTicketStatusService(id, input, currentUser) {
 async function assignTicketService(id, input, currentUser) {
     // Chi ADMIN hoac IT_STAFF duoc assign ticket.
     if (!isAdminOrITStaff(currentUser)) {
-        throw new Error("Forbidden");
+        throw new AppError_1.AppError("Forbidden", 403);
     }
     // Tim ticket can assign.
     const ticket = await prisma_1.prisma.ticket.findUnique({
@@ -208,7 +209,7 @@ async function assignTicketService(id, input, currentUser) {
     });
     // Neu ticket khong ton tai thi bao loi.
     if (!ticket) {
-        throw new Error("Ticket not found");
+        throw new AppError_1.AppError("Ticket not found", 404);
     }
     // Tim user se duoc assign.
     const assignedUser = await prisma_1.prisma.user.findUnique({
@@ -216,12 +217,12 @@ async function assignTicketService(id, input, currentUser) {
     });
     // Neu user duoc assign khong ton tai thi bao loi.
     if (!assignedUser) {
-        throw new Error("Assigned user not found");
+        throw new AppError_1.AppError("Assigned user not found", 404);
     }
     // Chi cho assign cho ADMIN hoac IT_STAFF.
     if (assignedUser.role !== client_1.UserRole.IT_STAFF &&
         assignedUser.role !== client_1.UserRole.ADMIN) {
-        throw new Error("Assigned user must be IT_STAFF or ADMIN");
+        throw new AppError_1.AppError("Assigned user must be IT_STAFF or ADMIN", 400);
     }
     // Cap nhat nguoi duoc assign cho ticket.
     const updatedTicket = await prisma_1.prisma.ticket.update({
@@ -243,7 +244,7 @@ async function deleteTicketService(id, currentUser) {
     });
     // Neu khong tim thay thi bao loi.
     if (!ticket) {
-        throw new Error("Ticket not found");
+        throw new AppError_1.AppError("Ticket not found", 404);
     }
     // ADMIN duoc xoa moi ticket.
     if (currentUser.role === client_1.UserRole.ADMIN) {
@@ -263,5 +264,5 @@ async function deleteTicketService(id, currentUser) {
         return { message: "Ticket deleted" };
     }
     // Cac truong hop con lai khong duoc xoa.
-    throw new Error("Forbidden");
+    throw new AppError_1.AppError("Forbidden", 403);
 }
