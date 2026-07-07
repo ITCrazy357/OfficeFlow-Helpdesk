@@ -128,46 +128,46 @@ router.get("/:id", auth_middleware_1.requireAuth, tickets_controller_1.getTicket
  *     summary: Update ticket by id
  *     tags:
  *       - Tickets
- *    security:
- *     - bearerAuth: []
- *   parameters:
- *     - in: path
- *      name: id
- *    required: true
- *    schema:
- *      type: integer
- *    example: 1
- * requestBody:
- *   required: true
- *   content:
- *     application/json:
- *       schema:
- *         type: object
- *         properties:
- *           title:
- *             type: string
- *             example: Cannot connect to VPN
- *           description:
- *             type: string
- *             example: I cannot connect to company VPN from my laptop.
- *           priority:
- *             type: string
- *             enum: [LOW, MEDIUM, HIGH, URGENT]
- *             example: HIGH
- *           categoryId:
- *             type: integer
- *             example: 3
- * responses:
- *   200:
- *     description: Update ticket successfully
- *   401:
- *     description: Unauthorized
- *   403:
- *     description: Forbidden
- *   404:
- *     description: Ticket not found
- *   422:
- *     description: Validation failed
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *           example: 1
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               title:
+ *                 type: string
+ *                 example: Cannot connect to VPN
+ *               description:
+ *                 type: string
+ *                 example: I cannot connect to company VPN from my laptop.
+ *               priority:
+ *                 type: string
+ *                 enum: [LOW, MEDIUM, HIGH, URGENT]
+ *                 example: HIGH
+ *               categoryId:
+ *                 type: integer
+ *                 example: 3
+ *     responses:
+ *       200:
+ *         description: Update ticket successfully
+ *       401:
+ *         description: Unauthorized
+ *       403:
+ *         description: Forbidden
+ *       404:
+ *         description: Ticket not found
+ *       422:
+ *         description: Validation failed
  */
 router.patch("/:id", auth_middleware_1.requireAuth, (0, validate_middleware_1.validate)(tickets_schema_1.updateTicketSchema), tickets_controller_1.updateTicketController);
 /**
