@@ -29,8 +29,8 @@ services:
     environment:
       PORT: 5000
       DATABASE_URL: mysql://officeflow_user:officeflow_password@mysql:3306/officeflow_helpdesk
-      JWT_ACCESS_SECRET: dev_access_secret
-      JWT_REFRESH_SECRET: dev_refresh_secret
+      JWT_ACCESS_SECRET: 6112c199fa5336cd262d20c78cebab68ed25cc4ede747325d1a6c4577d53e07a
+      JWT_REFRESH_SECRET: 5b719426e27f361f087a24fda2d46eaa943355305bb634a806e7228e1c594a23
     depends_on:
       mysql:
         condition: service_healthy
