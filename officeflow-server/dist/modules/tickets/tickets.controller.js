@@ -158,11 +158,11 @@ exports.assignTicketController = (0, asyncHandler_1.asyncHandler)(async (req, re
         if (!id) {
             return;
         }
-        const ticket = await (0, tickets_service_1.updateTicketStatusService)(id, req.body, req.user);
-        return (0, api_response_1.successResponse)(res, 200, "Update ticket status successfully", ticket);
+        const ticket = await (0, tickets_service_1.assignTicketService)(id, req.body, req.user);
+        return (0, api_response_1.successResponse)(res, 200, "Assign ticket successfully", ticket);
     }
     catch (error) {
-        const message = error instanceof Error ? error.message : "Update ticket status failed";
+        const message = error instanceof Error ? error.message : "Assign failed";
         return (0, api_response_1.errorResponse)(res, getErrorStatus(message), message);
     }
 });

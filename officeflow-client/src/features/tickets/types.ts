@@ -43,3 +43,24 @@ export type GetTicketsParams = {
 };
 
 export type TicketsList = PaginatedData<Ticket>;
+
+export type CreateTicketInput = {
+  title: string;
+  description: string;
+  priority?: TicketPriority;
+  categoryId?: number;
+};
+
+export type UpdateTicketInput = Partial<CreateTicketInput>;
+
+export type UpdateTicketStatusInput = {
+  status: TicketStatus;
+};
+
+export type AssignTicketInput = {
+  assignedToId: number;
+};
+
+export type DeleteTicketResponse = {
+  message: string;
+};

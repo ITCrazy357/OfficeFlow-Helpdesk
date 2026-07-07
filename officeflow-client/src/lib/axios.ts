@@ -11,24 +11,30 @@ export const api = axios.create({
   },
 });
 
-// Lấy token từ localStorage và thêm vào header Authorization của mỗi request
 api.interceptors.request.use((config) => {
   const token = getAccessToken();
 
   if (token) {
     config.headers.set("Authorization", `Bearer ${token}`);
   }
+
   return config;
 });
 
-// Xử lý lỗi 401 Unauthorized và xóa token khỏi localStorage nếu xảy ra
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (axios.isAxiosError(error) && error.response?.status === 401) {
+    const message = axios.isAxiosError<ApiErrorResponse>(error)
+      ? error.response?.data?.message
+      : undefined;
+
+    if (
+      axios.isAxiosError(error) &&
+      (error.response?.status === 401 || message === "Invalid or expired token")
+    ) {
       removeAccessToken();
     }
-    // Trả về lỗi để xử lý tiếp theo
+
     return Promise.reject(error);
   },
 );

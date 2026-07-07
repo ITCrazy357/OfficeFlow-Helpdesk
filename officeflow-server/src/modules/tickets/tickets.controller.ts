@@ -228,17 +228,11 @@ export const assignTicketController = asyncHandler(
         return;
       }
 
-      const ticket = await updateTicketStatusService(id, req.body, req.user);
+      const ticket = await assignTicketService(id, req.body, req.user);
 
-      return successResponse(
-        res,
-        200,
-        "Update ticket status successfully",
-        ticket,
-      );
+      return successResponse(res, 200, "Assign ticket successfully", ticket);
     } catch (error) {
-      const message =
-        error instanceof Error ? error.message : "Update ticket status failed";
+      const message = error instanceof Error ? error.message : "Assign failed";
       return errorResponse(res, getErrorStatus(message), message);
     }
   },

@@ -1,10 +1,18 @@
 "use client";
 
-import { AlertCircle, ChevronLeft, ChevronRight, Search } from "lucide-react";
-import type { FormEvent } from "react";
-import { useState } from "react";
+import type { CSSProperties, FormEvent } from "react";
+import { useMemo, useState } from "react";
+import {
+  AlertCircle,
+  ChevronLeft,
+  ChevronRight,
+  Filter,
+  Plus,
+  Search,
+  SlidersHorizontal,
+} from "lucide-react";
+import Link from "next/link";
 
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -15,6 +23,13 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   Table,
   TableBody,
   TableCell,
@@ -22,8 +37,18 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import {
+  TicketPriorityBadge,
+  TicketStatusBadge,
+} from "@/features/tickets/components/ticket-badges";
+import {
+  mockTicketCategories,
+  ticketPriorityOptions,
+  ticketStatusOptions,
+} from "@/features/tickets/constants";
 import { useTickets } from "@/features/tickets/hooks";
 import type {
+  GetTicketsParams,
   Ticket,
   TicketPriority,
   TicketStatus,
@@ -32,50 +57,9 @@ import { getApiErrorMessage } from "@/lib/axios";
 
 const PAGE_SIZE = 10;
 
-const statusMeta: Record<TicketStatus, { label: string; className: string }> = {
-  OPEN: {
-    label: "Mở",
-    className: "border-emerald-200 bg-emerald-50 text-emerald-700",
-  },
-  IN_PROGRESS: {
-    label: "Đang xử lý",
-    className: "border-sky-200 bg-sky-50 text-sky-700",
-  },
-  RESOLVED: {
-    label: "Đã xử lý",
-    className: "border-teal-200 bg-teal-50 text-teal-700",
-  },
-  CLOSED: {
-    label: "Đã đóng",
-    className: "border-zinc-200 bg-zinc-50 text-zinc-700",
-  },
-  CANCELLED: {
-    label: "Đã hủy",
-    className: "border-red-200 bg-red-50 text-red-700",
-  },
-};
-
-const priorityMeta: Record<
-  TicketPriority,
-  { label: string; className: string }
-> = {
-  LOW: {
-    label: "Thấp",
-    className: "border-zinc-200 bg-zinc-50 text-zinc-700",
-  },
-  MEDIUM: {
-    label: "Trung bình",
-    className: "border-blue-200 bg-blue-50 text-blue-700",
-  },
-  HIGH: {
-    label: "Cao",
-    className: "border-orange-200 bg-orange-50 text-orange-700",
-  },
-  URGENT: {
-    label: "Khẩn cấp",
-    className: "border-red-200 bg-red-50 text-red-700",
-  },
-};
+type StatusFilter = "ALL" | TicketStatus;
+type PriorityFilter = "ALL" | TicketPriority;
+type CategoryFilter = "ALL" | string;
 
 function formatDateTime(value: string) {
   const date = new Date(value);
@@ -88,26 +72,6 @@ function formatDateTime(value: string) {
     dateStyle: "short",
     timeStyle: "short",
   }).format(date);
-}
-
-function StatusBadge({ status }: { status: TicketStatus }) {
-  const meta = statusMeta[status];
-
-  return (
-    <Badge variant="outline" className={meta.className}>
-      {meta.label}
-    </Badge>
-  );
-}
-
-function PriorityBadge({ priority }: { priority: TicketPriority }) {
-  const meta = priorityMeta[priority];
-
-  return (
-    <Badge variant="outline" className={meta.className}>
-      {meta.label}
-    </Badge>
-  );
 }
 
 function TicketsTable({ tickets }: { tickets: Ticket[] }) {
@@ -126,20 +90,29 @@ function TicketsTable({ tickets }: { tickets: Ticket[] }) {
         </TableRow>
       </TableHeader>
       <TableBody>
-        {tickets.map((ticket) => (
-          <TableRow key={ticket.id}>
+        {tickets.map((ticket, index) => (
+          <TableRow
+            key={ticket.id}
+            className="motion-row"
+            style={{ "--motion-index": index } as CSSProperties}
+          >
             <TableCell className="font-medium">#{ticket.id}</TableCell>
-            <TableCell className="min-w-64 max-w-sm whitespace-normal">
-              <div className="font-medium">{ticket.title}</div>
-              <div className="mt-1 line-clamp-2 text-xs text-muted-foreground">
+            <TableCell className="min-w-72 max-w-sm whitespace-normal">
+              <Link
+                href={`/tickets/${ticket.id}`}
+                className="font-semibold text-foreground hover:text-teal-800"
+              >
+                {ticket.title}
+              </Link>
+              <div className="mt-1 line-clamp-2 text-xs leading-5 text-muted-foreground">
                 {ticket.description}
               </div>
             </TableCell>
             <TableCell>
-              <StatusBadge status={ticket.status} />
+              <TicketStatusBadge status={ticket.status} />
             </TableCell>
             <TableCell>
-              <PriorityBadge priority={ticket.priority} />
+              <TicketPriorityBadge priority={ticket.priority} />
             </TableCell>
             <TableCell>{ticket.createdBy?.name ?? "-"}</TableCell>
             <TableCell>{ticket.assignedTo?.name ?? "-"}</TableCell>
@@ -152,6 +125,42 @@ function TicketsTable({ tickets }: { tickets: Ticket[] }) {
   );
 }
 
+function TicketsMobileList({ tickets }: { tickets: Ticket[] }) {
+  return (
+    <div className="grid gap-3 md:hidden">
+      {tickets.map((ticket, index) => (
+        <Link
+          key={ticket.id}
+          href={`/tickets/${ticket.id}`}
+          className="motion-card rounded-xl border bg-card p-4 shadow-sm"
+          style={{ "--motion-index": index } as CSSProperties}
+        >
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <p className="text-xs font-medium text-muted-foreground">
+                #{ticket.id}
+              </p>
+              <h3 className="mt-1 line-clamp-2 font-semibold leading-snug">
+                {ticket.title}
+              </h3>
+            </div>
+            <TicketStatusBadge status={ticket.status} />
+          </div>
+          <p className="mt-3 line-clamp-2 text-sm leading-6 text-muted-foreground">
+            {ticket.description}
+          </p>
+          <div className="mt-4 flex flex-wrap items-center gap-2">
+            <TicketPriorityBadge priority={ticket.priority} />
+            <span className="text-xs text-muted-foreground">
+              {formatDateTime(ticket.createdAt)}
+            </span>
+          </div>
+        </Link>
+      ))}
+    </div>
+  );
+}
+
 function TicketsSkeleton() {
   return (
     <Card>
@@ -159,7 +168,7 @@ function TicketsSkeleton() {
         {Array.from({ length: 6 }).map((_, index) => (
           <div
             key={index}
-            className="grid grid-cols-[80px_1fr_120px] gap-4 rounded-lg border p-3"
+            className="grid grid-cols-[80px_1fr_120px] gap-4 rounded-xl border p-3"
           >
             <div className="h-4 rounded-full bg-muted motion-shimmer" />
             <div className="h-4 rounded-full bg-muted motion-shimmer" />
@@ -175,12 +184,26 @@ export default function TicketsPage() {
   const [page, setPage] = useState(1);
   const [searchInput, setSearchInput] = useState("");
   const [keyword, setKeyword] = useState("");
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("ALL");
+  const [priorityFilter, setPriorityFilter] =
+    useState<PriorityFilter>("ALL");
+  const [categoryFilter, setCategoryFilter] = useState<CategoryFilter>("ALL");
 
-  const { data, error, isError, isFetching, isLoading, refetch } = useTickets({
-    page,
-    limit: PAGE_SIZE,
-    keyword: keyword || undefined,
-  });
+  const params = useMemo<GetTicketsParams>(
+    () => ({
+      page,
+      limit: PAGE_SIZE,
+      keyword: keyword || undefined,
+      status: statusFilter === "ALL" ? undefined : statusFilter,
+      priority: priorityFilter === "ALL" ? undefined : priorityFilter,
+      categoryId:
+        categoryFilter === "ALL" ? undefined : Number(categoryFilter),
+    }),
+    [categoryFilter, keyword, page, priorityFilter, statusFilter],
+  );
+
+  const { data, error, isError, isFetching, isLoading, refetch } =
+    useTickets(params);
 
   function handleSearch(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -188,9 +211,12 @@ export default function TicketsPage() {
     setKeyword(searchInput.trim());
   }
 
-  function handleClearSearch() {
+  function handleClearFilters() {
     setSearchInput("");
     setKeyword("");
+    setStatusFilter("ALL");
+    setPriorityFilter("ALL");
+    setCategoryFilter("ALL");
     setPage(1);
   }
 
@@ -200,52 +226,144 @@ export default function TicketsPage() {
   const currentPage = pagination?.page ?? page;
   const canGoPrevious = currentPage > 1;
   const canGoNext = currentPage < totalPages;
+  const hasActiveFilter =
+    Boolean(keyword) ||
+    statusFilter !== "ALL" ||
+    priorityFilter !== "ALL" ||
+    categoryFilter !== "ALL";
 
   return (
-    <div className="grid gap-6">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+    <div className="grid gap-6 motion-enter">
+      <section className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Tickets</h1>
+          <div className="mb-2 inline-flex items-center gap-2 rounded-full border bg-muted/60 px-3 py-1 text-xs font-medium text-muted-foreground">
+            <Filter className="size-3.5" />
+            Ticket workspace
+          </div>
+          <h1 className="text-2xl font-semibold tracking-normal">Tickets</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Quản lý yêu cầu hỗ trợ nội bộ.
+            Quản lý yêu cầu hỗ trợ nội bộ theo đúng quyền backend.
           </p>
         </div>
 
-        <form
-          className="flex w-full flex-col gap-2 sm:w-auto sm:min-w-96 sm:flex-row"
-          onSubmit={handleSearch}
-        >
-          <div className="relative flex-1">
-            <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              value={searchInput}
-              onChange={(event) => setSearchInput(event.target.value)}
-              className="pl-8"
-              placeholder="Tìm theo tiêu đề hoặc mô tả"
-            />
+        <Button asChild className="bg-teal-950 hover:bg-teal-900">
+          <Link href="/tickets/new">
+            <Plus className="size-4" />
+            Tạo ticket
+          </Link>
+        </Button>
+      </section>
+
+      <Card className="shadow-sm motion-panel">
+        <CardHeader className="border-b">
+          <div className="flex items-center gap-2">
+            <SlidersHorizontal className="size-4 text-muted-foreground" />
+            <div>
+              <CardTitle>Bộ lọc</CardTitle>
+              <CardDescription>
+                Tìm kiếm theo tiêu đề, mô tả, trạng thái và độ ưu tiên.
+              </CardDescription>
+            </div>
           </div>
-          <div className="flex gap-2">
-            <Button type="submit" disabled={isFetching}>
-              Tìm kiếm
-            </Button>
-            {keyword ? (
-              <Button
-                type="button"
-                variant="outline"
-                onClick={handleClearSearch}
-                disabled={isFetching}
-              >
-                Xóa
+        </CardHeader>
+        <CardContent className="pt-0">
+          <form
+            className="grid gap-3 xl:grid-cols-[1fr_180px_180px_180px_auto]"
+            onSubmit={handleSearch}
+          >
+            <div className="relative">
+              <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                value={searchInput}
+                onChange={(event) => setSearchInput(event.target.value)}
+                className="pl-8"
+                placeholder="Tìm theo tiêu đề hoặc mô tả"
+              />
+            </div>
+
+            <Select
+              value={statusFilter}
+              onValueChange={(value) => {
+                setStatusFilter(value as StatusFilter);
+                setPage(1);
+              }}
+            >
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Trạng thái" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ALL">Tất cả trạng thái</SelectItem>
+                {ticketStatusOptions.map((status) => (
+                  <SelectItem key={status.value} value={status.value}>
+                    {status.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <Select
+              value={priorityFilter}
+              onValueChange={(value) => {
+                setPriorityFilter(value as PriorityFilter);
+                setPage(1);
+              }}
+            >
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Ưu tiên" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ALL">Tất cả ưu tiên</SelectItem>
+                {ticketPriorityOptions.map((priority) => (
+                  <SelectItem key={priority.value} value={priority.value}>
+                    {priority.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <Select
+              value={categoryFilter}
+              onValueChange={(value) => {
+                setCategoryFilter(value as CategoryFilter);
+                setPage(1);
+              }}
+            >
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Danh mục" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ALL">Tất cả danh mục</SelectItem>
+                {mockTicketCategories.map((category) => (
+                  <SelectItem key={category.id} value={String(category.id)}>
+                    {category.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <div className="flex gap-2">
+              <Button type="submit" disabled={isFetching}>
+                Tìm
               </Button>
-            ) : null}
-          </div>
-        </form>
-      </div>
+              {hasActiveFilter ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={handleClearFilters}
+                  disabled={isFetching}
+                >
+                  Xóa
+                </Button>
+              ) : null}
+            </div>
+          </form>
+        </CardContent>
+      </Card>
 
       {isLoading ? (
         <TicketsSkeleton />
       ) : isError ? (
-        <Card>
+        <Card className="border-destructive/20 bg-destructive/5">
           <CardContent className="flex items-start gap-3 pt-0">
             <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-destructive/10 text-destructive">
               <AlertCircle className="size-5" />
@@ -264,28 +382,44 @@ export default function TicketsPage() {
           </CardContent>
         </Card>
       ) : (
-        <Card>
+        <Card className="shadow-sm">
           <CardHeader className="border-b">
-            <div>
-              <CardTitle>Danh sách tickets</CardTitle>
-              <CardDescription>
-                {pagination
-                  ? `${pagination.totalItems} ticket`
-                  : "Không có dữ liệu phân trang"}
-                {isFetching ? " - Đang cập nhật" : ""}
-              </CardDescription>
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <CardTitle>Danh sách tickets</CardTitle>
+                <CardDescription>
+                  {pagination
+                    ? `${pagination.totalItems} ticket`
+                    : "Không có dữ liệu phân trang"}
+                  {isFetching ? " / Đang cập nhật" : ""}
+                </CardDescription>
+              </div>
             </div>
           </CardHeader>
           <CardContent className="pt-0">
             {tickets.length > 0 ? (
-              <TicketsTable tickets={tickets} />
+              <>
+                <div className="hidden md:block">
+                  <TicketsTable tickets={tickets} />
+                </div>
+                <TicketsMobileList tickets={tickets} />
+              </>
             ) : (
               <div className="grid min-h-64 place-items-center text-center">
                 <div>
                   <p className="font-medium">Chưa có ticket phù hợp</p>
-                  <p className="mt-1 text-sm text-muted-foreground">
-                    Thử đổi từ khóa tìm kiếm hoặc kiểm tra lại dữ liệu backend.
+                  <p className="mt-1 max-w-md text-sm text-muted-foreground">
+                    Thử đổi bộ lọc hoặc tạo một ticket mới để bắt đầu luồng hỗ
+                    trợ.
                   </p>
+                  <div className="mt-4">
+                    <Button asChild className="bg-teal-950 hover:bg-teal-900">
+                      <Link href="/tickets/new">
+                        <Plus className="size-4" />
+                        Tạo ticket
+                      </Link>
+                    </Button>
+                  </div>
                 </div>
               </div>
             )}
@@ -305,7 +439,7 @@ export default function TicketsPage() {
             disabled={!canGoPrevious || isFetching}
           >
             <ChevronLeft className="size-4" />
-            Previous
+            Trước
           </Button>
           <Button
             type="button"
@@ -313,7 +447,7 @@ export default function TicketsPage() {
             onClick={() => setPage((value) => value + 1)}
             disabled={!canGoNext || isFetching}
           >
-            Next
+            Sau
             <ChevronRight className="size-4" />
           </Button>
         </div>

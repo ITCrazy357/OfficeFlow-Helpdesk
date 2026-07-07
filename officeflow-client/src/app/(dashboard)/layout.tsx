@@ -1,7 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import { DashboardHeader } from "@/components/layout/dashboard-header";
@@ -14,8 +14,8 @@ type Props = {
 
 function DashboardLoading() {
   return (
-    <div className="grid min-h-[100dvh] place-items-center bg-muted/30 px-4">
-      <div className="w-full max-w-sm rounded-lg border bg-card p-4 shadow-sm">
+    <div className="grid min-h-[100dvh] place-items-center bg-background px-4">
+      <div className="w-full max-w-sm rounded-lg border bg-card p-5 shadow-sm motion-panel">
         <div className="mb-3 h-4 w-40 rounded-full bg-muted motion-shimmer" />
         <div className="grid gap-2">
           <div className="h-3 rounded-full bg-muted motion-shimmer" />
@@ -29,11 +29,8 @@ function DashboardLoading() {
 export default function DashboardLayout({ children }: Props) {
   const router = useRouter();
   const logout = useLogout();
-  const {
-    data: user,
-    isError,
-    isLoading,
-  } = useMe();
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const { data: user, isError, isLoading } = useMe();
 
   useEffect(() => {
     if (isError) {
@@ -51,11 +48,18 @@ export default function DashboardLayout({ children }: Props) {
   }
 
   return (
-    <div className="min-h-[100dvh] bg-muted/30">
-      <DashboardSidebar />
+    <div className="min-h-[100dvh] bg-background">
+      <DashboardSidebar
+        isOpen={isSidebarOpen}
+        onClose={() => setIsSidebarOpen(false)}
+        userRole={user.role}
+      />
       <div className="min-h-[100dvh] md:pl-64">
-        <DashboardHeader user={user} />
-        <main className="mx-auto w-full max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
+        <DashboardHeader
+          user={user}
+          onMenuClick={() => setIsSidebarOpen(true)}
+        />
+        <main className="mx-auto w-full max-w-7xl px-4 py-7 sm:px-6 lg:px-8">
           {children}
         </main>
       </div>

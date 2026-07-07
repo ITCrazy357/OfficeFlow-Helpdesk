@@ -3,6 +3,7 @@ export type ApiResponse<T> = {
   message: string;
   data: T;
   status?: number;
+  errors?: unknown;
 };
 
 export type ApiErrorResponse = {
@@ -10,6 +11,7 @@ export type ApiErrorResponse = {
   message?: string;
   status?: number;
   error?: unknown;
+  errors?: unknown;
 };
 
 export type Pagination = {
@@ -25,3 +27,5 @@ export type PaginatedData<T> = {
 };
 
 export type PaginatedApiResponse<T> = ApiResponse<PaginatedData<T>>;
+
+export type PaginatedResponse<T> = PaginatedApiResponse<T>;

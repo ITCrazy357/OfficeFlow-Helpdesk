@@ -6,40 +6,45 @@
 
 :root {
   --surface: #ffffff;
-  --line: #d9e0de;
-  --muted: oklch(0.97 0 0);
-  --accent: oklch(0.97 0 0);
+  --line: #d7e0dd;
+  --motion-ease: cubic-bezier(0.16, 1, 0.3, 1);
+  --motion-ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --motion-duration-fast: 160ms;
+  --motion-duration: 240ms;
+  --motion-duration-slow: 420ms;
+  --muted: #eef4f2;
+  --accent: #e8f3ef;
   --accent-strong: #115e59;
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
+  --background: #f5f8f7;
+  --foreground: #17211f;
+  --card: #ffffff;
+  --card-foreground: #17211f;
+  --popover: #ffffff;
+  --popover-foreground: #17211f;
+  --primary: #134e4a;
+  --primary-foreground: #f8fffd;
+  --secondary: #edf3f1;
+  --secondary-foreground: #1f3430;
+  --muted-foreground: #60716d;
+  --accent-foreground: #153f3a;
+  --destructive: #d9303e;
+  --border: #dbe5e2;
+  --input: #cfdbd7;
+  --ring: #0f766e;
   --chart-1: oklch(0.87 0 0);
   --chart-2: oklch(0.556 0 0);
   --chart-3: oklch(0.439 0 0);
   --chart-4: oklch(0.371 0 0);
   --chart-5: oklch(0.269 0 0);
   --radius: 0.625rem;
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
+  --sidebar: #fbfdfc;
+  --sidebar-foreground: #17211f;
+  --sidebar-primary: #134e4a;
+  --sidebar-primary-foreground: #f8fffd;
+  --sidebar-accent: #edf5f2;
+  --sidebar-accent-foreground: #153f3a;
+  --sidebar-border: #dbe5e2;
+  --sidebar-ring: #0f766e;
 }
 
 @theme inline {
@@ -94,6 +99,8 @@ body {
   font-family:
     Aptos, "Segoe UI", ui-sans-serif, system-ui, -apple-system,
     BlinkMacSystemFont, Arial, Helvetica, sans-serif;
+  background:
+    linear-gradient(180deg, #f7faf9 0%, #f2f6f4 100%);
   text-rendering: optimizeLegibility;
 }
 
@@ -124,7 +131,7 @@ button:disabled {
 @keyframes of-fade-up {
   from {
     opacity: 0;
-    transform: translate3d(0, 12px, 0);
+    transform: translate3d(0, 10px, 0);
   }
 
   to {
@@ -136,7 +143,7 @@ button:disabled {
 @keyframes of-scale-in {
   from {
     opacity: 0;
-    transform: translate3d(0, 8px, 0) scale(0.98);
+    transform: translate3d(0, 8px, 0) scale(0.985);
   }
 
   to {
@@ -145,95 +152,199 @@ button:disabled {
   }
 }
 
+@keyframes of-soft-pop {
+  0% {
+    opacity: 0;
+    transform: translate3d(0, 6px, 0) scale(0.99);
+  }
+
+  100% {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+}
+
 @keyframes of-shimmer {
   from {
-    background-position: 120% 0;
+    background-position: 140% 0;
   }
 
   to {
-    background-position: -120% 0;
+    background-position: -140% 0;
   }
 }
 
 @media (prefers-reduced-motion: no-preference) {
+  [data-slot="button"] {
+    transition:
+      transform var(--motion-duration-fast) var(--motion-ease-out),
+      background-color var(--motion-duration-fast) ease,
+      border-color var(--motion-duration-fast) ease,
+      box-shadow var(--motion-duration) ease,
+      color var(--motion-duration-fast) ease,
+      opacity var(--motion-duration-fast) ease;
+  }
+
+  [data-slot="button"]:not(:disabled):hover {
+    transform: translate3d(0, -1px, 0);
+    box-shadow: 0 8px 20px rgb(15 23 42 / 0.08);
+  }
+
+  [data-slot="button"]:not(:disabled):active {
+    transform: translate3d(0, 0, 0) scale(0.985);
+    box-shadow: 0 3px 10px rgb(15 23 42 / 0.06);
+  }
+
+  [data-slot="button"] svg {
+    transition: transform var(--motion-duration-fast) var(--motion-ease-out);
+  }
+
+  [data-slot="button"]:not(:disabled):hover svg {
+    transform: translate3d(1px, 0, 0);
+  }
+
+  [data-slot="input"],
+  [data-slot="textarea"],
+  [data-slot="select-trigger"] {
+    transition:
+      transform var(--motion-duration-fast) var(--motion-ease-out),
+      background-color var(--motion-duration-fast) ease,
+      border-color var(--motion-duration-fast) ease,
+      box-shadow var(--motion-duration) ease;
+  }
+
+  [data-slot="input"]:focus-visible,
+  [data-slot="textarea"]:focus-visible,
+  [data-slot="select-trigger"]:focus-visible {
+    transform: translate3d(0, -1px, 0);
+    box-shadow:
+      0 0 0 3px rgb(20 184 166 / 0.12),
+      0 8px 20px rgb(15 23 42 / 0.05);
+  }
+
+  [data-slot="card"] {
+    transition:
+      transform var(--motion-duration) var(--motion-ease-out),
+      border-color var(--motion-duration) ease,
+      box-shadow var(--motion-duration) ease,
+      background-color var(--motion-duration) ease;
+  }
+
   .motion-enter {
-    animation: of-fade-up 420ms cubic-bezier(0.16, 1, 0.3, 1) both;
+    animation: of-fade-up var(--motion-duration-slow) var(--motion-ease) both;
   }
 
   .motion-panel {
-    animation: of-scale-in 440ms cubic-bezier(0.16, 1, 0.3, 1) both;
+    animation: of-scale-in 420ms var(--motion-ease) both;
     transition:
-      border-color 220ms ease,
-      box-shadow 220ms ease,
-      transform 220ms ease,
-      background-color 220ms ease;
+      border-color var(--motion-duration) ease,
+      box-shadow var(--motion-duration) ease,
+      transform var(--motion-duration) var(--motion-ease-out),
+      background-color var(--motion-duration) ease;
   }
 
   .motion-panel:hover {
     transform: translate3d(0, -2px, 0);
+    box-shadow: 0 16px 40px rgb(15 23 42 / 0.08);
   }
 
   .motion-row {
-    animation: of-fade-up 360ms cubic-bezier(0.16, 1, 0.3, 1) both;
-    animation-delay: calc(var(--motion-index, 0) * 45ms);
+    animation: of-fade-up 340ms var(--motion-ease) both;
+    animation-delay: calc(var(--motion-index, 0) * 38ms);
     transition:
-      background-color 180ms ease,
-      border-color 180ms ease,
-      box-shadow 180ms ease,
-      transform 180ms ease;
+      background-color var(--motion-duration-fast) ease,
+      border-color var(--motion-duration-fast) ease,
+      box-shadow var(--motion-duration-fast) ease,
+      transform var(--motion-duration-fast) var(--motion-ease-out);
   }
 
   .motion-row:hover {
-    transform: translate3d(3px, 0, 0);
+    transform: translate3d(2px, 0, 0);
+    box-shadow: inset 3px 0 0 rgb(20 184 166 / 0.34);
   }
 
   .motion-card {
-    animation: of-fade-up 380ms cubic-bezier(0.16, 1, 0.3, 1) both;
-    animation-delay: calc(var(--motion-index, 0) * 55ms);
+    animation: of-fade-up 380ms var(--motion-ease) both;
+    animation-delay: calc(var(--motion-index, 0) * 45ms);
     transition:
-      border-color 200ms ease,
-      box-shadow 220ms ease,
-      transform 220ms ease,
-      background-color 200ms ease;
+      border-color var(--motion-duration) ease,
+      box-shadow var(--motion-duration) ease,
+      transform var(--motion-duration) var(--motion-ease-out),
+      background-color var(--motion-duration) ease;
+  }
+
+  .motion-card:hover {
+    transform: translate3d(0, -3px, 0);
+    box-shadow: 0 16px 38px rgb(15 23 42 / 0.08);
+    border-color: rgb(20 184 166 / 0.22);
   }
 
   .motion-nav {
+    position: relative;
+    overflow: hidden;
     transition:
-      background-color 180ms ease,
-      color 180ms ease,
-      box-shadow 180ms ease,
-      transform 180ms ease;
+      background-color var(--motion-duration-fast) ease,
+      color var(--motion-duration-fast) ease,
+      box-shadow var(--motion-duration-fast) ease,
+      transform var(--motion-duration-fast) var(--motion-ease-out);
+  }
+
+  .motion-nav::before {
+    content: "";
+    position: absolute;
+    inset-block: 8px;
+    left: 4px;
+    width: 3px;
+    border-radius: 999px;
+    background: currentColor;
+    opacity: 0;
+    transform: scaleY(0.4);
+    transition:
+      opacity var(--motion-duration-fast) ease,
+      transform var(--motion-duration-fast) var(--motion-ease-out);
   }
 
   .motion-nav:hover {
-    transform: translate3d(3px, 0, 0);
+    transform: translate3d(2px, 0, 0);
+  }
+
+  .motion-nav[data-active="true"]::before,
+  .motion-nav:hover::before {
+    opacity: 0.8;
+    transform: scaleY(1);
   }
 
   .motion-badge {
+    animation: of-soft-pop 260ms var(--motion-ease) both;
     transition:
-      background-color 180ms ease,
-      border-color 180ms ease,
-      color 180ms ease,
-      transform 180ms ease;
+      background-color var(--motion-duration-fast) ease,
+      border-color var(--motion-duration-fast) ease,
+      color var(--motion-duration-fast) ease,
+      transform var(--motion-duration-fast) var(--motion-ease-out),
+      box-shadow var(--motion-duration-fast) ease;
   }
 
   .motion-badge:hover {
     transform: translate3d(0, -1px, 0);
+    box-shadow: 0 8px 18px rgb(15 23 42 / 0.06);
   }
 
   .motion-toast {
-    animation: of-scale-in 260ms cubic-bezier(0.16, 1, 0.3, 1) both;
+    animation: of-scale-in 260ms var(--motion-ease) both;
+    box-shadow: 0 12px 30px rgb(15 23 42 / 0.08);
   }
 
   .motion-shimmer {
     background-image: linear-gradient(
       90deg,
       rgb(244 244 245) 0%,
-      rgb(228 234 232) 48%,
+      rgb(228 234 232) 42%,
+      rgb(255 255 255) 50%,
+      rgb(228 234 232) 58%,
       rgb(244 244 245) 100%
     );
-    background-size: 240% 100%;
-    animation: of-shimmer 1.35s ease-in-out infinite;
+    background-size: 280% 100%;
+    animation: of-shimmer 1.45s ease-in-out infinite;
   }
 }
 
@@ -253,6 +364,7 @@ button:disabled {
   .motion-nav:hover,
   .motion-badge:hover {
     transform: none !important;
+    box-shadow: none !important;
   }
 
   button,

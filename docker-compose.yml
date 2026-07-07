@@ -28,7 +28,7 @@ services:
       - "5000:5000"
     environment:
       PORT: 5000
-      DATABASE_URL: mysql://officeflow_user:officeflow_password@mysql:3307/officeflow_helpdesk
+      DATABASE_URL: mysql://officeflow_user:officeflow_password@mysql:3306/officeflow_helpdesk
       JWT_ACCESS_SECRET: dev_access_secret
       JWT_REFRESH_SECRET: dev_refresh_secret
     depends_on:
