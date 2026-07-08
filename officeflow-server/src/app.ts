@@ -8,6 +8,7 @@ import departmentsRoutes from "./modules/departments/departments.routes";
 import ticketsRoutes from "./modules/tickets/tickets.routes";
 
 import { swaggerSpec } from "./config/swagger";
+import { prisma } from "./config/prisma";
 import { requestLogger } from "./middlewares/request-logger.middleware";
 import { notFoundMiddleware } from "./middlewares/not-found.middleware";
 import { errorMiddleware } from "./middlewares/error.middleware";
@@ -40,6 +41,22 @@ app.get("/api/health", (req, res) => {
     success: true,
     message: "OfficeFlow API is running",
   });
+});
+
+app.get("/api/health/db", async (req, res) => {
+  try {
+    await prisma.$queryRaw`SELECT 1`;
+
+    res.json({
+      success: true,
+      message: "Database connected successfully",
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: "Database connection failed",
+    });
+  }
 });
 
 app.use("/api/auth", authRoutes);
