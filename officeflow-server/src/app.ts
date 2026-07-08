@@ -28,6 +28,13 @@ app.use(
 app.use(express.json());
 app.use(requestLogger);
 
+app.get("/", (req, res) => {
+  res.json({
+    success: true,
+    message: "OfficeFlow Helpdesk API is running",
+  });
+});
+
 app.get("/api/health", (req, res) => {
   res.json({
     success: true,
