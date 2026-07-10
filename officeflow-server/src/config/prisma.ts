@@ -9,6 +9,21 @@ if (!databaseUrl) {
 }
 
 const parsedDatabaseUrl = new URL(databaseUrl);
+const sslAccept = parsedDatabaseUrl.searchParams.get("sslaccept")?.toLowerCase();
+const sslMode = (
+  parsedDatabaseUrl.searchParams.get("ssl-mode") ??
+  parsedDatabaseUrl.searchParams.get("sslmode")
+)?.toLowerCase();
+
+const ssl =
+  sslAccept || sslMode
+    ? {
+        rejectUnauthorized:
+          sslAccept !== "accept_invalid_certs" &&
+          sslAccept !== "accept_invalid_hostnames" &&
+          sslMode !== "required",
+      }
+    : undefined;
 
 const adapter = new PrismaMariaDb({
   host: parsedDatabaseUrl.hostname,
@@ -16,6 +31,7 @@ const adapter = new PrismaMariaDb({
   user: decodeURIComponent(parsedDatabaseUrl.username),
   password: decodeURIComponent(parsedDatabaseUrl.password),
   database: parsedDatabaseUrl.pathname.replace(/^\//, ""),
+  ssl,
 });
 
 export const prisma = new PrismaClient({ adapter });

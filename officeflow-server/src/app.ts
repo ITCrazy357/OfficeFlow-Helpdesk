@@ -52,6 +52,8 @@ app.get("/api/health/db", async (req, res) => {
       message: "Database connected successfully",
     });
   } catch (error) {
+    console.error("Database health check failed", error);
+
     res.status(500).json({
       success: false,
       message: "Database connection failed",
