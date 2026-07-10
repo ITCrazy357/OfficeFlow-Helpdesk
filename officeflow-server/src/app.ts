@@ -52,7 +52,17 @@ app.get("/api/health/db", async (req, res) => {
       message: "Database connected successfully",
     });
   } catch (error) {
-    console.error("Database health check failed", error);
+    const dbError =
+      error instanceof Error
+        ? {
+            name: error.name,
+            message: error.message,
+            code: "code" in error ? error.code : undefined,
+            meta: "meta" in error ? error.meta : undefined,
+          }
+        : error;
+
+    console.error("Database health check failed", dbError);
 
     res.status(500).json({
       success: false,

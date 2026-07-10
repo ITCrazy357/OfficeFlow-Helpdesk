@@ -4,14 +4,17 @@ WORKDIR /app
 
 COPY package*.json ./
 
-RUN npm install
+RUN npm ci
 
 COPY prisma ./prisma
-COPY tsconfig.json ./
+COPY prisma.config.ts ./
+COPY tsconfig*.json ./
 COPY src ./src
+COPY certs ./certs
 
-RUN npx prisma generate
+RUN npm run build
+RUN npm prune --omit=dev
 
 EXPOSE 5000
 
-CMD ["npm", "run", "dev"]
+CMD ["npm", "start"]
