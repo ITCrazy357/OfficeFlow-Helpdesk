@@ -17,6 +17,8 @@ function getDatabaseUrl() {
 }
 
 @Injectable()
+//Được đánh dấu là Injectable để có thể được sử dụng trong các lớp khác trong NestJS.
+//Được quản lý bởi hệ thống Dependency Injection của NestJS.
 export class PrismaService
   extends PrismaClient
   implements OnModuleInit, OnModuleDestroy

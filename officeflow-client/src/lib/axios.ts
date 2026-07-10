@@ -2,9 +2,16 @@ import axios from "axios";
 import { getAccessToken, removeAccessToken } from "./token";
 import { ApiErrorResponse } from "../types/api";
 
+const DEFAULT_API_TIMEOUT_MS = 70000;
+const configuredApiTimeout = Number(process.env.NEXT_PUBLIC_API_TIMEOUT_MS);
+const apiTimeout =
+  Number.isFinite(configuredApiTimeout) && configuredApiTimeout > 0
+    ? configuredApiTimeout
+    : DEFAULT_API_TIMEOUT_MS;
+
 export const api = axios.create({
   baseURL: process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:5000/api",
-  timeout: 10000,
+  timeout: apiTimeout,
   headers: {
     Accept: "application/json",
     "Content-Type": "application/json",
@@ -44,6 +51,13 @@ export function getApiErrorMessage(
   fallback = "Đã xảy ra lỗi. Vui lòng thử lại.",
 ) {
   if (axios.isAxiosError<ApiErrorResponse>(error)) {
+    if (
+      error.code === "ECONNABORTED" ||
+      error.message.toLowerCase().includes("timeout")
+    ) {
+      return "Máy chủ đang khởi động, vui lòng thử lại sau ít giây.";
+    }
+
     return error.response?.data?.message || error.message || fallback;
   }
 
