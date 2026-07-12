@@ -14,7 +14,7 @@ export function signAccessToken(payload: JwtPayload) {
   }
 
   return jwt.sign(payload, secret, {
-    expiresIn: "1d",
+    expiresIn: "1h",
   });
 }
 

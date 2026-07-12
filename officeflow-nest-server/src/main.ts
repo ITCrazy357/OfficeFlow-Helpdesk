@@ -11,8 +11,11 @@ async function bootstrap() {
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,
+      //Chỉ giữ lại các thuộc tính được khai báo trong DTO, loại bỏ các thuộc tính không mong muốn
       forbidNonWhitelisted: true,
+      //Nếu có các thuộc tính không mong muốn, sẽ ném ra lỗi
       transform: true,
+      //Tự động chuyển đổi các giá trị đầu vào sang kiểu dữ liệu mong muốn dựa trên các decorator trong DTO
     }),
   );
 
