@@ -5,6 +5,8 @@ import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 import { JwtAuthGuard } from './jwt-auth.guard';
 
+import {CurrentUser} from '../common/decorators/current-user.decorator';
+
 type AuthRequest = Request & {
   user?: {
     userId: number;
@@ -28,8 +30,7 @@ export class AuthController {
 
   @UseGuards(JwtAuthGuard)
   @Get('me')
-  me(@Req() req: AuthRequest) {
-    const userId = req.user?.userId;
-    return this.authService.getMe(userId as number);
+  me(@CurrentUser('userId') userId: number) {
+    return this.authService.getMe(userId);
   }
 }
