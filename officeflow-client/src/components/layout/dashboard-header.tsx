@@ -1,7 +1,7 @@
 "use client";
 
-import { LogOut, Menu, Search, UserRound } from "lucide-react";
-import { useRouter } from "next/navigation";
+import { ChevronRight, LogOut, Menu, UserRound } from "lucide-react";
+import { usePathname, useRouter } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
 import { useLogout } from "@/features/auth/hooks";
@@ -34,7 +34,20 @@ export function DashboardHeader({
   onMenuClick,
 }: DashboardHeaderProps) {
   const router = useRouter();
+  const pathname = usePathname();
   const logout = useLogout();
+
+  const currentPage = pathname.startsWith("/tickets/")
+    ? pathname.endsWith("/new")
+      ? "Tạo ticket"
+      : "Chi tiết ticket"
+    : pathname.startsWith("/tickets")
+      ? "Tickets"
+      : pathname.startsWith("/departments")
+        ? "Phòng ban"
+        : pathname.startsWith("/users")
+          ? "Người dùng"
+          : "Tổng quan";
 
   function handleLogout() {
     logout();
@@ -56,9 +69,10 @@ export function DashboardHeader({
             <Menu className="size-4" />
           </Button>
 
-          <div className="hidden h-10 min-w-80 items-center gap-2 rounded-lg border bg-muted/55 px-3 text-sm text-muted-foreground shadow-inner shadow-white/40 lg:flex">
-            <Search className="size-4 text-teal-700" />
-            <span>Tìm kiếm và lọc nhanh trong trang Tickets</span>
+          <div className="hidden items-center gap-2 text-sm lg:flex">
+            <span className="text-muted-foreground">Workspace</span>
+            <ChevronRight className="size-3.5 text-muted-foreground/60" />
+            <span className="font-semibold text-foreground">{currentPage}</span>
           </div>
 
           <div className="min-w-0 lg:hidden">

@@ -9,6 +9,7 @@ import {
   ShieldCheck,
   TicketCheck,
   TrendingUp,
+  FilePlus2,
 } from "lucide-react";
 import Link from "next/link";
 import type { CSSProperties } from "react";
@@ -170,17 +171,16 @@ export default function DashboardPage() {
         </div>
       </section>
 
-      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+      <section className="grid overflow-hidden rounded-2xl border bg-card shadow-sm md:grid-cols-2 xl:grid-cols-4 xl:divide-x">
         {statCards.map((card, index) => {
           const Icon = card.icon;
 
           return (
-            <Card
+            <div
               key={card.label}
-              className="motion-card border-white/80 bg-card/95 shadow-sm shadow-slate-200/60"
+              className="motion-card border-b p-5 last:border-b-0 md:nth-[odd]:border-r md:nth-[-n+2]:border-b xl:border-b-0 xl:border-r-0"
               style={{ "--motion-index": index } as CSSProperties}
             >
-              <CardHeader>
                 <div className="flex items-start justify-between gap-3">
                   <div>
                     <CardDescription>{card.label}</CardDescription>
@@ -192,13 +192,10 @@ export default function DashboardPage() {
                     <Icon className="size-5" />
                   </div>
                 </div>
-              </CardHeader>
-              <CardContent className="pt-0">
-                <p className="text-xs leading-5 text-muted-foreground">
+                <p className="mt-5 text-xs leading-5 text-muted-foreground">
                   {card.detail}
                 </p>
-              </CardContent>
-            </Card>
+            </div>
           );
         })}
       </section>
@@ -246,12 +243,18 @@ export default function DashboardPage() {
               ))}
             </div>
           ) : (
-            <div className="grid min-h-56 place-items-center text-center">
-              <div>
+            <div className="grid min-h-64 place-items-center px-4 text-center">
+              <div className="max-w-sm">
+                <div className="mx-auto grid size-12 place-items-center rounded-xl bg-teal-50 text-teal-800">
+                  <FilePlus2 className="size-5" />
+                </div>
                 <p className="font-medium">Chưa có ticket nào</p>
                 <p className="mt-1 text-sm text-muted-foreground">
                   Tạo ticket đầu tiên để bắt đầu theo dõi luồng hỗ trợ.
                 </p>
+                <Button asChild size="sm" className="mt-4">
+                  <Link href="/tickets/new">Tạo ticket đầu tiên</Link>
+                </Button>
               </div>
             </div>
           )}

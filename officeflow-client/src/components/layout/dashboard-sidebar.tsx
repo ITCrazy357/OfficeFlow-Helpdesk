@@ -1,6 +1,6 @@
 "use client";
 
-import { Building2, LayoutDashboard, TicketCheck, Users, X } from "lucide-react";
+import { Building2, CircleCheck, LayoutDashboard, TicketCheck, Users, X } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
@@ -146,9 +146,14 @@ export function DashboardSidebar({
           <BrandBlock />
         </div>
         <SidebarNav userRole={userRole} />
-        <div className="m-3 mt-auto rounded-lg border bg-card p-4 text-xs leading-relaxed text-muted-foreground shadow-sm">
-          <p className="font-semibold text-foreground">OfficeFlow API</p>
-          <p className="mt-1">Bearer token authentication</p>
+        <div className="m-3 mt-auto flex items-center gap-3 rounded-lg border bg-card p-3 text-xs text-muted-foreground shadow-sm">
+          <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-emerald-50 text-emerald-700">
+            <CircleCheck className="size-4" />
+          </span>
+          <div>
+            <p className="font-semibold text-foreground">Hệ thống sẵn sàng</p>
+            <p className="mt-0.5">Không gian làm việc nội bộ</p>
+          </div>
         </div>
       </aside>
 

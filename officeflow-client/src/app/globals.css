@@ -102,7 +102,18 @@ body {
   background:
     linear-gradient(180deg, #f7faf9 0%, #f2f6f4 100%);
   text-rendering: optimizeLegibility;
+  min-height: 100dvh;
 }
+
+:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--ring) 55%, transparent);
+  outline-offset: 2px;
+}
+
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #c4d1cd; border: 3px solid transparent; border-radius: 999px; background-clip: padding-box; }
+::-webkit-scrollbar-thumb:hover { background-color: #91a6a0; }
 
 a {
   text-decoration: none;

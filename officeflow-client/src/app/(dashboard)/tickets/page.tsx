@@ -10,6 +10,7 @@ import {
   Plus,
   Search,
   SlidersHorizontal,
+  Inbox,
 } from "lucide-react";
 import Link from "next/link";
 
@@ -405,19 +406,24 @@ export default function TicketsPage() {
                 <TicketsMobileList tickets={tickets} />
               </>
             ) : (
-              <div className="grid min-h-64 place-items-center text-center">
-                <div>
+              <div className="grid min-h-72 place-items-center px-4 text-center">
+                <div className="max-w-md">
+                  <div className="mx-auto mb-4 grid size-12 place-items-center rounded-xl bg-teal-50 text-teal-800">
+                    <Inbox className="size-5" />
+                  </div>
                   <p className="font-medium">Chưa có ticket phù hợp</p>
                   <p className="mt-1 max-w-md text-sm text-muted-foreground">
                     Thử đổi bộ lọc hoặc tạo một ticket mới để bắt đầu luồng hỗ
                     trợ.
                   </p>
-                  <div className="mt-4">
-                    <Button asChild className="bg-teal-950 hover:bg-teal-900">
-                      <Link href="/tickets/new">
-                        <Plus className="size-4" />
-                        Tạo ticket
-                      </Link>
+                  <div className="mt-4 flex flex-col justify-center gap-2 sm:flex-row">
+                    {hasActiveFilter ? (
+                      <Button type="button" variant="outline" onClick={handleClearFilters}>
+                        Xóa bộ lọc
+                      </Button>
+                    ) : null}
+                    <Button asChild>
+                      <Link href="/tickets/new"><Plus className="size-4" />Tạo ticket</Link>
                     </Button>
                   </div>
                 </div>
