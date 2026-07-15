@@ -11,6 +11,7 @@ import { UsersService } from './users.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { Roles } from '../common/decorators/roles.decorator';
 import { RolesGuard } from '../common/guards/roles.guard';
+import { Message } from '../common/decorators/message.decorator';
 
 @ApiTags('Users')
 @ApiBearerAuth()
@@ -21,6 +22,7 @@ export class UsersController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.ADMIN)
   @Get()
+  @Message('Get users successfully')
   @ApiOperation({ summary: 'Get all users' })
   @ApiResponse({ status: 200, description: 'Get users successfully' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })

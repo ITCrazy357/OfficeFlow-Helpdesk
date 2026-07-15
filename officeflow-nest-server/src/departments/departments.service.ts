@@ -18,10 +18,6 @@ export class DepartmentsService {
       },
     });
 
-    return {
-      success: true,
-      message: 'Get departments successfully',
-      data: departments,
-    };
+    return departments;
   }
 }

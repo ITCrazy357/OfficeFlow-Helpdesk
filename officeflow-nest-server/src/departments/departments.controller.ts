@@ -7,6 +7,8 @@ import {
   ApiResponse,
   ApiTags,
 } from '@nestjs/swagger';
+import { HttpCode, HttpStatus } from '@nestjs/common';
+import { Message } from '../common/decorators/message.decorator';
 
 @ApiTags('Departments')
 @ApiBearerAuth()
@@ -16,6 +18,7 @@ export class DepartmentsController {
 
   @UseGuards(JwtAuthGuard)
   @Get()
+  @Message('Get departments successfully')
   @ApiOperation({ summary: 'Get all departments' })
   @ApiResponse({ status: 200, description: 'Get departments successfully' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })

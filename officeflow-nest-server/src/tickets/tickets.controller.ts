@@ -36,6 +36,9 @@ import { UpdateTicketStatusDto } from './dto/update-ticket-status.dto';
 import { AssignTicketDto } from './dto/assign-ticket.dto';
 import { GetTicketsQueryDto } from './dto/get-tickets-query.dto';
 
+import { HttpCode, HttpStatus } from '@nestjs/common';
+import { Message } from '../common/decorators/message.decorator';
+
 @ApiTags('Tickets')
 @ApiBearerAuth()
 @Controller('tickets')
@@ -44,6 +47,7 @@ export class TicketsController {
 
   @UseGuards(JwtAuthGuard)
   @Get()
+  @Message('Get tickets successfully')
   @ApiOperation({ summary: 'Get tickets with pagination, search and filters' })
   @ApiQuery({ name: 'page', required: false, example: 1 })
   @ApiQuery({ name: 'limit', required: false, example: 10 })
@@ -62,6 +66,8 @@ export class TicketsController {
 
   @UseGuards(JwtAuthGuard)
   @Post()
+  @HttpCode(HttpStatus.CREATED)
+  @Message('Create ticket successfully')
   @ApiOperation({ summary: 'Create a new ticket' })
   @ApiBody({ type: CreateTicketDto })
   @ApiResponse({ status: 201, description: 'Create ticket successfully' })
@@ -75,6 +81,8 @@ export class TicketsController {
 
   @UseGuards(JwtAuthGuard)
   @Get(':id')
+  @HttpCode(HttpStatus.OK)
+  @Message('Get ticket detail successfully')
   @ApiOperation({ summary: 'Get ticket detail by ID' })
   @ApiParam({ name: 'id', example: 1 })
   @ApiResponse({ status: 200, description: 'Get ticket detail successfully' })
@@ -90,6 +98,8 @@ export class TicketsController {
 
   @UseGuards(JwtAuthGuard)
   @Patch(':id')
+  @HttpCode(HttpStatus.OK)
+  @Message('Update ticket successfully')
   @ApiOperation({ summary: 'Update ticket information' })
   @ApiParam({ name: 'id', example: 1 })
   @ApiBody({ type: UpdateTicketDto })
@@ -108,6 +118,8 @@ export class TicketsController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.ADMIN, UserRole.IT_STAFF)
   @Patch(':id/status')
+  @HttpCode(HttpStatus.OK)
+  @Message('Update ticket status successfully')
   @ApiOperation({ summary: 'Update ticket status' })
   @ApiParam({ name: 'id', example: 1 })
   @ApiBody({ type: UpdateTicketStatusDto })
@@ -136,6 +148,8 @@ export class TicketsController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.ADMIN, UserRole.IT_STAFF)
   @Patch(':id/assign')
+  @HttpCode(HttpStatus.OK)
+  @Message('Assign ticket successfully')
   @ApiOperation({ summary: 'Assign ticket to IT staff or admin' })
   @ApiParam({ name: 'id', example: 1 })
   @ApiBody({ type: AssignTicketDto })
@@ -156,6 +170,8 @@ export class TicketsController {
 
   @UseGuards(JwtAuthGuard)
   @Delete(':id')
+  @HttpCode(HttpStatus.OK)
+  @Message('Delete ticket successfully')
   @ApiOperation({ summary: 'Delete ticket' })
   @ApiParam({ name: 'id', example: 1 })
   @ApiResponse({ status: 200, description: 'Delete ticket successfully' })

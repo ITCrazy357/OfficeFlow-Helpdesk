@@ -118,9 +118,7 @@ export class TicketsService {
     ]);
 
     return {
-      success: true,
-      message: 'Get tickets successfully',
-      data: tickets,
+      items: tickets,
       pagination: {
         page,
         limit,
@@ -155,11 +153,7 @@ export class TicketsService {
       },
     });
 
-    return {
-      success: true,
-      message: 'Create ticket successfully',
-      data: ticket,
-    };
+    return ticket;
   }
 
   async getById(id: number, currentUser: CurrentUser) {
@@ -222,24 +216,20 @@ export class TicketsService {
     }
 
     return {
-      success: true,
-      message: 'Get ticket successfully',
-      data: {
-        id: ticket.id,
-        title: ticket.title,
-        description: ticket.description,
-        status: ticket.status,
-        priority: ticket.priority,
-        createdAt: ticket.createdAt,
-        updatedAt: ticket.updatedAt,
-        createdBy: {
-          id: ticket.createdBy.id,
-          name: ticket.createdBy.name,
-          email: ticket.createdBy.email,
-        },
-        assignedTo: ticket.assignedTo,
-        category: ticket.category,
+      id: ticket.id,
+      title: ticket.title,
+      description: ticket.description,
+      status: ticket.status,
+      priority: ticket.priority,
+      createdAt: ticket.createdAt,
+      updatedAt: ticket.updatedAt,
+      createdBy: {
+        id: ticket.createdBy.id,
+        name: ticket.createdBy.name,
+        email: ticket.createdBy.email,
       },
+      assignedTo: ticket.assignedTo,
+      category: ticket.category,
     };
   }
 
@@ -321,11 +311,7 @@ export class TicketsService {
       },
     });
 
-    return {
-      success: true,
-      message: 'Update ticket successfully',
-      data: updatedTicket,
-    };
+    return updatedTicket;
   }
 
   async updateStatus(
@@ -387,11 +373,7 @@ export class TicketsService {
       },
     });
 
-    return {
-      success: true,
-      message: 'Update ticket status successfully',
-      data: updateTicket,
-    };
+    return updateTicket;
   }
 
   async assign(
@@ -472,11 +454,7 @@ export class TicketsService {
       },
     });
 
-    return {
-      success: true,
-      message: 'Assign ticket successfully',
-      data: updatedTicket,
-    };
+    return updatedTicket;
   }
 
   async remove(id: number, currentUser: CurrentUser) {
@@ -493,20 +471,20 @@ export class TicketsService {
       throw new NotFoundException('Ticket not found');
     }
 
-    if (
+    const canDelete =
       currentUser.role === UserRole.ADMIN ||
       (currentUser.role === UserRole.EMPLOYEE &&
-        ticket.status === TicketStatus.OPEN &&
-        ticket.createdById === currentUser.userId)
-    ) {
-      await this.prisma.ticket.delete({
-        where: { id },
-      });
+        ticket.createdById === currentUser.userId &&
+        ticket.status === TicketStatus.OPEN);
+
+    if (!canDelete) {
+      throw new ForbiddenException('Forbidden');
     }
 
-    return {
-      success: true,
-      message: 'Delete ticket successfully',
-    };
+    await this.prisma.ticket.delete({
+      where: { id },
+    });
+
+    return { id };
   }
 }

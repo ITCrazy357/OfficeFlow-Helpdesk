@@ -56,11 +56,7 @@ export class AuthService {
       },
     });
 
-    return {
-      success: true,
-      message: 'Register successfully',
-      data: user,
-    };
+    return user;
   }
   //Login function to authenticate user and return access token
   async login(loginDto: LoginDto) {
@@ -92,17 +88,13 @@ export class AuthService {
     const accessToken = this.jwtService.sign(payload);
 
     return {
-      success: true,
-      message: 'Login successfully',
-      data: {
-        accessToken,
-        user: {
-          id: user.id,
-          name: user.name,
-          email: user.email,
-          role: user.role,
-          isActive: user.isActive,
-        },
+      accessToken,
+      user: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        isActive: user.isActive,
       },
     };
   }
@@ -131,10 +123,6 @@ export class AuthService {
       throw new NotFoundException('User not found');
     }
 
-    return {
-      success: true,
-      message: 'Get current user successfully',
-      data: user,
-    };
+    return user;
   }
 }

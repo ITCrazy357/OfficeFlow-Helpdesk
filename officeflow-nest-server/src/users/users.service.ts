@@ -26,10 +26,6 @@ export class UsersService {
       },
     });
 
-    return {
-      success: true,
-      message: 'Get users successfully',
-      data: users,
-    };
+    return users;
   }
 }
