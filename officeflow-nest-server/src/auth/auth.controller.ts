@@ -1,35 +1,47 @@
-import { Body, Controller, Get, Post, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Post, UseGuards } from '@nestjs/common';
+import {
+  ApiBearerAuth,
+  ApiBody,
+  ApiOperation,
+  ApiResponse,
+  ApiTags,
+} from '@nestjs/swagger';
 
 import { AuthService } from './auth.service';
-import { RegisterDto } from './dto/register.dto';
-import { LoginDto } from './dto/login.dto';
 import { JwtAuthGuard } from './jwt-auth.guard';
+import { LoginDto } from './dto/login.dto';
+import { RegisterDto } from './dto/register.dto';
+import { CurrentUser } from '../common/decorators/current-user.decorator';
 
-import {CurrentUser} from '../common/decorators/current-user.decorator';
-
-type AuthRequest = Request & {
-  user?: {
-    userId: number;
-    role: string;
-  };
-};
-
+@ApiTags('Auth')
 @Controller('auth')
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
   @Post('register')
+  @ApiOperation({ summary: 'Register a new user' })
+  @ApiBody({ type: RegisterDto })
+  @ApiResponse({ status: 201, description: 'Register successfully' })
+  @ApiResponse({ status: 400, description: 'Email already exists' })
   register(@Body() registerDto: RegisterDto) {
     return this.authService.register(registerDto);
   }
 
   @Post('login')
+  @ApiOperation({ summary: 'Login and get access token' })
+  @ApiBody({ type: LoginDto })
+  @ApiResponse({ status: 201, description: 'Login successfully' })
+  @ApiResponse({ status: 401, description: 'Invalid email or password' })
   login(@Body() loginDto: LoginDto) {
     return this.authService.login(loginDto);
   }
 
   @UseGuards(JwtAuthGuard)
   @Get('me')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Get current logged-in user' })
+  @ApiResponse({ status: 200, description: 'Get current user successfully' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
   me(@CurrentUser('userId') userId: number) {
     return this.authService.getMe(userId);
   }
