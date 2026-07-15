@@ -1,4 +1,3 @@
-import { JwtAuthGuard } from 'src/auth/jwt-auth.guard';
 import { Controller, Get, UseGuards } from '@nestjs/common';
 import { DepartmentsService } from './departments.service';
 import {
@@ -7,7 +6,7 @@ import {
   ApiResponse,
   ApiTags,
 } from '@nestjs/swagger';
-import { HttpCode, HttpStatus } from '@nestjs/common';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { Message } from '../common/decorators/message.decorator';
 
 @ApiTags('Departments')
