@@ -1,9 +1,16 @@
 {
   "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "tsBuildInfoFile": "./dist/tsconfig.build.tsbuildinfo"
+  },
+  "include": [
+    "src/**/*.ts"
+  ],
   "exclude": [
     "node_modules",
     "dist",
     "test",
+    "prisma.config.ts",
     "src/**/*.spec.ts",
     "**/*.e2e-spec.ts"
   ]
