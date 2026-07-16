@@ -10,6 +10,13 @@ import { ResponseInterceptor } from './common/interceptors/response.interceptor'
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
+  const allowedOrigins = [
+    'http://localhost:3000',
+    ...(process.env.FRONTEND_URL ?? '')
+      .split(',')
+      .map((origin) => origin.trim())
+      .filter(Boolean),
+  ];
 
   app.setGlobalPrefix('api', {
     exclude: [{ path: '', method: RequestMethod.GET }],
@@ -28,7 +35,7 @@ async function bootstrap() {
   app.useGlobalInterceptors(new ResponseInterceptor(app.get(Reflector)));
 
   app.enableCors({
-    origin: ['http://localhost:3000'],
+    origin: allowedOrigins,
     credentials: true,
   });
 
