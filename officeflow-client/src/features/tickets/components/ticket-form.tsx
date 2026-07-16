@@ -16,7 +16,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { mockTicketCategories, ticketPriorityOptions } from "../constants";
+import { ticketPriorityOptions } from "../constants";
 import { ticketFormSchema, type TicketFormValues } from "../schemas";
 
 type TicketFormProps = {
@@ -42,7 +42,7 @@ export function TicketForm({
       title: defaultValues?.title ?? "",
       description: defaultValues?.description ?? "",
       priority: defaultValues?.priority ?? "MEDIUM",
-      categoryId: defaultValues?.categoryId ?? "none",
+      categoryId: defaultValues?.categoryId ?? "",
     },
   });
 
@@ -57,10 +57,10 @@ export function TicketForm({
       noValidate
     >
       <div className="grid gap-2">
-        <Label htmlFor="ticket-title">Tiêu đề</Label>
+        <Label htmlFor="ticket-title">Tieu de</Label>
         <Input
           id="ticket-title"
-          placeholder="Ví dụ: Không kết nối được VPN"
+          placeholder="Vi du: Khong ket noi duoc VPN"
           aria-invalid={Boolean(form.formState.errors.title)}
           disabled={isSubmitting}
           {...form.register("title")}
@@ -73,11 +73,11 @@ export function TicketForm({
       </div>
 
       <div className="grid gap-2">
-        <Label htmlFor="ticket-description">Mô tả</Label>
+        <Label htmlFor="ticket-description">Mo ta</Label>
         <Textarea
           id="ticket-description"
           className="min-h-36 resize-y"
-          placeholder="Mô tả vấn đề, thời điểm xảy ra và tác động hiện tại"
+          placeholder="Mo ta van de, thoi diem xay ra va tac dong hien tai"
           aria-invalid={Boolean(form.formState.errors.description)}
           disabled={isSubmitting}
           {...form.register("description")}
@@ -91,7 +91,7 @@ export function TicketForm({
 
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="grid gap-2">
-          <Label>Độ ưu tiên</Label>
+          <Label>Do uu tien</Label>
           <Controller
             control={form.control}
             name="priority"
@@ -102,7 +102,7 @@ export function TicketForm({
                 disabled={isSubmitting}
               >
                 <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Chọn độ ưu tiên" />
+                  <SelectValue placeholder="Chon do uu tien" />
                 </SelectTrigger>
                 <SelectContent>
                   {ticketPriorityOptions.map((priority) => (
@@ -117,33 +117,25 @@ export function TicketForm({
         </div>
 
         <div className="grid gap-2">
-          <Label>Danh mục</Label>
-          <Controller
-            control={form.control}
-            name="categoryId"
-            render={({ field }) => (
-              <Select
-                value={field.value ?? "none"}
-                onValueChange={field.onChange}
-                disabled={isSubmitting}
-              >
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Chọn danh mục" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">Không chọn</SelectItem>
-                  {mockTicketCategories.map((category) => (
-                    <SelectItem
-                      key={category.id}
-                      value={String(category.id)}
-                    >
-                      {category.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            )}
+          <Label htmlFor="ticket-category-id">Category ID</Label>
+          <Input
+            id="ticket-category-id"
+            type="number"
+            min={1}
+            placeholder="Tuy chon, vi du: 3"
+            aria-invalid={Boolean(form.formState.errors.categoryId)}
+            disabled={isSubmitting}
+            {...form.register("categoryId")}
           />
+          <p className="text-xs text-muted-foreground">
+            Backend hien chua co API danh sach category, nen client chi gui
+            categoryId neu ban da biet ID.
+          </p>
+          {form.formState.errors.categoryId?.message ? (
+            <p className="text-xs font-medium text-destructive">
+              {form.formState.errors.categoryId.message}
+            </p>
+          ) : null}
         </div>
       </div>
 
@@ -161,12 +153,12 @@ export function TicketForm({
             onClick={onCancel}
             disabled={isSubmitting}
           >
-            Hủy
+            Huy
           </Button>
         ) : null}
         <Button type="submit" disabled={isSubmitting}>
           <Save className="size-4" />
-          {isSubmitting ? "Đang lưu..." : submitLabel}
+          {isSubmitting ? "Dang luu..." : submitLabel}
         </Button>
       </div>
     </form>

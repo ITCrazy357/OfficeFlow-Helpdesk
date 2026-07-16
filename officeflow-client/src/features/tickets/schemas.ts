@@ -12,16 +12,20 @@ export const ticketFormSchema = z.object({
     .trim()
     .min(10, "Mô tả ít nhất 10 ký tự"),
   priority: z.enum(["LOW", "MEDIUM", "HIGH", "URGENT"]),
-  categoryId: z.string().optional(),
+  categoryId: z
+    .string()
+    .trim()
+    .optional()
+    .refine(
+      (value) => !value || (Number.isInteger(Number(value)) && Number(value) > 0),
+      "Category ID phai la so nguyen lon hon 0",
+    ),
 });
 
 export type TicketFormValues = z.infer<typeof ticketFormSchema>;
 
 export function toTicketPayload(values: TicketFormValues): CreateTicketInput {
-  const categoryId =
-    values.categoryId && values.categoryId !== "none"
-      ? Number(values.categoryId)
-      : undefined;
+  const categoryId = values.categoryId ? Number(values.categoryId) : undefined;
 
   return {
     title: values.title.trim(),

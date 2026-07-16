@@ -23,6 +23,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { TicketStatusBadge } from "@/features/tickets/components/ticket-badges";
+import { useDbHealth, useHealth } from "@/features/system/hooks";
 import { useTickets } from "@/features/tickets/hooks";
 import { getApiErrorMessage } from "@/lib/axios";
 
@@ -85,6 +86,8 @@ export default function DashboardPage() {
     status: "IN_PROGRESS",
   });
   const resolvedQuery = useTickets({ page: 1, limit: 1, status: "RESOLVED" });
+  const healthQuery = useHealth();
+  const dbHealthQuery = useDbHealth();
 
   const queries = [
     latestQuery,
@@ -104,7 +107,7 @@ export default function DashboardPage() {
     return <ErrorCard error={failedQuery.error} />;
   }
 
-  const latestTickets = latestQuery.data?.data ?? [];
+  const latestTickets = latestQuery.data?.items ?? [];
   const total = totalQuery.data?.pagination.totalItems ?? 0;
   const open = openQuery.data?.pagination.totalItems ?? 0;
   const inProgress = progressQuery.data?.pagination.totalItems ?? 0;
@@ -169,6 +172,35 @@ export default function DashboardPage() {
             </Button>
           </div>
         </div>
+      </section>
+
+      <section className="grid gap-4 md:grid-cols-2">
+        <Card className="shadow-sm motion-panel">
+          <CardHeader>
+            <CardDescription>API health</CardDescription>
+            <CardTitle>
+              {healthQuery.isLoading
+                ? "Dang kiem tra"
+                : healthQuery.isError
+                  ? "Khong ket noi"
+                  : healthQuery.data?.status === "ok"
+                    ? "Dang hoat dong"
+                    : "Khong ro trang thai"}
+            </CardTitle>
+          </CardHeader>
+        </Card>
+        <Card className="shadow-sm motion-panel">
+          <CardHeader>
+            <CardDescription>Database health</CardDescription>
+            <CardTitle>
+              {dbHealthQuery.isLoading
+                ? "Dang kiem tra"
+                : dbHealthQuery.isError
+                  ? "Khong ket noi"
+                  : `${dbHealthQuery.data?.length ?? 0} departments`}
+            </CardTitle>
+          </CardHeader>
+        </Card>
       </section>
 
       <section className="grid overflow-hidden rounded-2xl border bg-card shadow-sm md:grid-cols-2 xl:grid-cols-4 xl:divide-x">

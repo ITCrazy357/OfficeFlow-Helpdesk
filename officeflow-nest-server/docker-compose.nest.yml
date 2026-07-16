@@ -20,8 +20,8 @@ services:
 
   nest-api:
     build:
-      context: officeflow-nest-server
-      dockerfile: src/Dockerfile
+      context: ./officeflow-nest-server
+      dockerfile: Dockerfile
     container_name: officeflow_nest_api
     restart: always
     ports:

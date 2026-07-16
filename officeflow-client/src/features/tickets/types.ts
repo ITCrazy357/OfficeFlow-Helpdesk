@@ -62,5 +62,5 @@ export type AssignTicketInput = {
 };
 
 export type DeleteTicketResponse = {
-  message: string;
+  id: number;
 };

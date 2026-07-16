@@ -59,14 +59,6 @@ export const ticketPriorityOptions: Array<{
   },
 ];
 
-export const mockTicketCategories = [
-  { id: 1, name: "Hardware" },
-  { id: 2, name: "Software" },
-  { id: 3, name: "Network" },
-  { id: 4, name: "Account" },
-  { id: 5, name: "Other" },
-];
-
 export function getStatusMeta(status: TicketStatus) {
   return ticketStatusOptions.find((item) => item.value === status);
 }

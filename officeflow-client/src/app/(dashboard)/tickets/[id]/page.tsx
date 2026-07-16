@@ -382,7 +382,7 @@ export default function TicketDetailPage() {
                     priority: ticket.priority,
                     categoryId: ticket.category?.id
                       ? String(ticket.category.id)
-                      : "none",
+                      : "",
                   }}
                   submitLabel="Lưu thay đổi"
                   isSubmitting={updateTicket.isPending}

@@ -7,10 +7,10 @@ import {
   ChevronLeft,
   ChevronRight,
   Filter,
+  Inbox,
   Plus,
   Search,
   SlidersHorizontal,
-  Inbox,
 } from "lucide-react";
 import Link from "next/link";
 
@@ -43,7 +43,6 @@ import {
   TicketStatusBadge,
 } from "@/features/tickets/components/ticket-badges";
 import {
-  mockTicketCategories,
   ticketPriorityOptions,
   ticketStatusOptions,
 } from "@/features/tickets/constants";
@@ -60,7 +59,6 @@ const PAGE_SIZE = 10;
 
 type StatusFilter = "ALL" | TicketStatus;
 type PriorityFilter = "ALL" | TicketPriority;
-type CategoryFilter = "ALL" | string;
 
 function formatDateTime(value: string) {
   const date = new Date(value);
@@ -81,13 +79,13 @@ function TicketsTable({ tickets }: { tickets: Ticket[] }) {
       <TableHeader>
         <TableRow>
           <TableHead className="w-20">ID</TableHead>
-          <TableHead>Tiêu đề</TableHead>
-          <TableHead>Trạng thái</TableHead>
-          <TableHead>Ưu tiên</TableHead>
-          <TableHead>Người tạo</TableHead>
-          <TableHead>Người xử lý</TableHead>
-          <TableHead>Danh mục</TableHead>
-          <TableHead>Ngày tạo</TableHead>
+          <TableHead>Tieu de</TableHead>
+          <TableHead>Trang thai</TableHead>
+          <TableHead>Uu tien</TableHead>
+          <TableHead>Nguoi tao</TableHead>
+          <TableHead>Nguoi xu ly</TableHead>
+          <TableHead>Category</TableHead>
+          <TableHead>Ngay tao</TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
@@ -188,7 +186,7 @@ export default function TicketsPage() {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("ALL");
   const [priorityFilter, setPriorityFilter] =
     useState<PriorityFilter>("ALL");
-  const [categoryFilter, setCategoryFilter] = useState<CategoryFilter>("ALL");
+  const [categoryFilter, setCategoryFilter] = useState("");
 
   const params = useMemo<GetTicketsParams>(
     () => ({
@@ -198,7 +196,7 @@ export default function TicketsPage() {
       status: statusFilter === "ALL" ? undefined : statusFilter,
       priority: priorityFilter === "ALL" ? undefined : priorityFilter,
       categoryId:
-        categoryFilter === "ALL" ? undefined : Number(categoryFilter),
+        categoryFilter.trim() === "" ? undefined : Number(categoryFilter),
     }),
     [categoryFilter, keyword, page, priorityFilter, statusFilter],
   );
@@ -217,11 +215,11 @@ export default function TicketsPage() {
     setKeyword("");
     setStatusFilter("ALL");
     setPriorityFilter("ALL");
-    setCategoryFilter("ALL");
+    setCategoryFilter("");
     setPage(1);
   }
 
-  const tickets = data?.data ?? [];
+  const tickets = data?.items ?? [];
   const pagination = data?.pagination;
   const totalPages = Math.max(pagination?.totalPages ?? 1, 1);
   const currentPage = pagination?.page ?? page;
@@ -231,7 +229,7 @@ export default function TicketsPage() {
     Boolean(keyword) ||
     statusFilter !== "ALL" ||
     priorityFilter !== "ALL" ||
-    categoryFilter !== "ALL";
+    categoryFilter.trim() !== "";
 
   return (
     <div className="grid gap-6 motion-enter">
@@ -243,14 +241,14 @@ export default function TicketsPage() {
           </div>
           <h1 className="text-2xl font-semibold tracking-normal">Tickets</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Quản lý yêu cầu hỗ trợ nội bộ theo đúng quyền backend.
+            Quan ly ticket theo dung quyen va filter backend hien co.
           </p>
         </div>
 
         <Button asChild className="bg-teal-950 hover:bg-teal-900">
           <Link href="/tickets/new">
             <Plus className="size-4" />
-            Tạo ticket
+            Tao ticket
           </Link>
         </Button>
       </section>
@@ -260,16 +258,17 @@ export default function TicketsPage() {
           <div className="flex items-center gap-2">
             <SlidersHorizontal className="size-4 text-muted-foreground" />
             <div>
-              <CardTitle>Bộ lọc</CardTitle>
+              <CardTitle>Bo loc</CardTitle>
               <CardDescription>
-                Tìm kiếm theo tiêu đề, mô tả, trạng thái và độ ưu tiên.
+                Backend ho tro keyword, status, priority, categoryId va phan
+                trang.
               </CardDescription>
             </div>
           </div>
         </CardHeader>
         <CardContent className="pt-0">
           <form
-            className="grid gap-3 xl:grid-cols-[1fr_180px_180px_180px_auto]"
+            className="grid gap-3 xl:grid-cols-[1fr_180px_180px_160px_auto]"
             onSubmit={handleSearch}
           >
             <div className="relative">
@@ -278,7 +277,7 @@ export default function TicketsPage() {
                 value={searchInput}
                 onChange={(event) => setSearchInput(event.target.value)}
                 className="pl-8"
-                placeholder="Tìm theo tiêu đề hoặc mô tả"
+                placeholder="Tim theo tieu de hoac mo ta"
               />
             </div>
 
@@ -290,10 +289,10 @@ export default function TicketsPage() {
               }}
             >
               <SelectTrigger className="w-full">
-                <SelectValue placeholder="Trạng thái" />
+                <SelectValue placeholder="Trang thai" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="ALL">Tất cả trạng thái</SelectItem>
+                <SelectItem value="ALL">Tat ca trang thai</SelectItem>
                 {ticketStatusOptions.map((status) => (
                   <SelectItem key={status.value} value={status.value}>
                     {status.label}
@@ -310,10 +309,10 @@ export default function TicketsPage() {
               }}
             >
               <SelectTrigger className="w-full">
-                <SelectValue placeholder="Ưu tiên" />
+                <SelectValue placeholder="Uu tien" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="ALL">Tất cả ưu tiên</SelectItem>
+                <SelectItem value="ALL">Tat ca uu tien</SelectItem>
                 {ticketPriorityOptions.map((priority) => (
                   <SelectItem key={priority.value} value={priority.value}>
                     {priority.label}
@@ -322,29 +321,20 @@ export default function TicketsPage() {
               </SelectContent>
             </Select>
 
-            <Select
+            <Input
+              type="number"
+              min={1}
               value={categoryFilter}
-              onValueChange={(value) => {
-                setCategoryFilter(value as CategoryFilter);
+              onChange={(event) => {
+                setCategoryFilter(event.target.value);
                 setPage(1);
               }}
-            >
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder="Danh mục" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="ALL">Tất cả danh mục</SelectItem>
-                {mockTicketCategories.map((category) => (
-                  <SelectItem key={category.id} value={String(category.id)}>
-                    {category.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+              placeholder="Category ID"
+            />
 
             <div className="flex gap-2">
               <Button type="submit" disabled={isFetching}>
-                Tìm
+                Tim
               </Button>
               {hasActiveFilter ? (
                 <Button
@@ -353,7 +343,7 @@ export default function TicketsPage() {
                   onClick={handleClearFilters}
                   disabled={isFetching}
                 >
-                  Xóa
+                  Xoa
                 </Button>
               ) : null}
             </div>
@@ -371,13 +361,13 @@ export default function TicketsPage() {
             </div>
             <div className="grid gap-3">
               <div>
-                <CardTitle>Không thể tải danh sách tickets</CardTitle>
+                <CardTitle>Khong the tai danh sach tickets</CardTitle>
                 <CardDescription className="mt-1">
-                  {getApiErrorMessage(error, "Không thể tải danh sách tickets.")}
+                  {getApiErrorMessage(error, "Khong the tai danh sach tickets.")}
                 </CardDescription>
               </div>
               <Button type="button" variant="outline" onClick={() => refetch()}>
-                Thử lại
+                Thu lai
               </Button>
             </div>
           </CardContent>
@@ -387,12 +377,12 @@ export default function TicketsPage() {
           <CardHeader className="border-b">
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
               <div>
-                <CardTitle>Danh sách tickets</CardTitle>
+                <CardTitle>Danh sach tickets</CardTitle>
                 <CardDescription>
                   {pagination
                     ? `${pagination.totalItems} ticket`
-                    : "Không có dữ liệu phân trang"}
-                  {isFetching ? " / Đang cập nhật" : ""}
+                    : "Khong co du lieu phan trang"}
+                  {isFetching ? " / Dang cap nhat" : ""}
                 </CardDescription>
               </div>
             </div>
@@ -411,19 +401,26 @@ export default function TicketsPage() {
                   <div className="mx-auto mb-4 grid size-12 place-items-center rounded-xl bg-teal-50 text-teal-800">
                     <Inbox className="size-5" />
                   </div>
-                  <p className="font-medium">Chưa có ticket phù hợp</p>
+                  <p className="font-medium">Chua co ticket phu hop</p>
                   <p className="mt-1 max-w-md text-sm text-muted-foreground">
-                    Thử đổi bộ lọc hoặc tạo một ticket mới để bắt đầu luồng hỗ
-                    trợ.
+                    Thu doi bo loc hoac tao mot ticket moi de bat dau luong ho
+                    tro.
                   </p>
                   <div className="mt-4 flex flex-col justify-center gap-2 sm:flex-row">
                     {hasActiveFilter ? (
-                      <Button type="button" variant="outline" onClick={handleClearFilters}>
-                        Xóa bộ lọc
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={handleClearFilters}
+                      >
+                        Xoa bo loc
                       </Button>
                     ) : null}
                     <Button asChild>
-                      <Link href="/tickets/new"><Plus className="size-4" />Tạo ticket</Link>
+                      <Link href="/tickets/new">
+                        <Plus className="size-4" />
+                        Tao ticket
+                      </Link>
                     </Button>
                   </div>
                 </div>
@@ -445,7 +442,7 @@ export default function TicketsPage() {
             disabled={!canGoPrevious || isFetching}
           >
             <ChevronLeft className="size-4" />
-            Trước
+            Truoc
           </Button>
           <Button
             type="button"

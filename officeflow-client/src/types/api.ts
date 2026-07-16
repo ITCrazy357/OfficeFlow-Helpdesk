@@ -1,15 +1,15 @@
 export type ApiResponse<T> = {
   success: boolean;
+  statusCode: number;
   message: string;
   data: T;
-  status?: number;
   errors?: unknown;
 };
 
 export type ApiErrorResponse = {
   success?: false;
+  statusCode?: number;
   message?: string;
-  status?: number;
   error?: unknown;
   errors?: unknown;
 };
@@ -22,7 +22,7 @@ export type Pagination = {
 };
 
 export type PaginatedData<T> = {
-  data: T[];
+  items: T[];
   pagination: Pagination;
 };
 
