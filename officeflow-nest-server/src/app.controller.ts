@@ -29,8 +29,6 @@ export class AppController {
   @Get('db-health')
   @Message('Database connected successfully')
   async getDbHealth() {
-    const departments = await this.prisma.department.findMany();
-
-    return departments;
+    await this.prisma.$queryRaw`SELECT 1`;
   }
 }
