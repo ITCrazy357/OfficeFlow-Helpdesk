@@ -10,8 +10,6 @@ import { JwtAuthGuard } from './jwt-auth.guard';
   imports: [
     JwtModule.registerAsync({
       useFactory: () => {
-        process.loadEnvFile?.();
-
         const secret = process.env.JWT_ACCESS_SECRET;
 
         if (!secret) {

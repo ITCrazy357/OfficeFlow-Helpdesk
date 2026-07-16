@@ -3,10 +3,6 @@ import { PrismaClient } from '@prisma/client';
 import { PrismaMariaDb } from '@prisma/adapter-mariadb';
 
 function getDatabaseUrl() {
-  if (!process.env.DATABASE_URL) {
-    process.loadEnvFile?.();
-  }
-
   const databaseUrl = process.env.DATABASE_URL;
 
   if (!databaseUrl) {
