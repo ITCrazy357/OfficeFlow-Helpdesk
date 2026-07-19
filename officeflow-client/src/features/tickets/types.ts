@@ -9,6 +9,21 @@ export type TicketStatus =
 
 export type TicketPriority = "LOW" | "MEDIUM" | "HIGH" | "URGENT";
 
+export type TicketHistoryAction =
+  | "CREATE"
+  | "UPDATE"
+  | "STATUS_CHANGED"
+  | "ASSIGNED"
+  | "COMMENTED"
+  | "DELETED";
+
+export type TicketUser = {
+  id: number;
+  name: string;
+  email: string;
+  role?: string;
+};
+
 export type Ticket = {
   id: number;
   title: string;
@@ -17,16 +32,8 @@ export type Ticket = {
   priority: TicketPriority;
   createdAt: string;
   updatedAt: string;
-  createdBy?: {
-    id: number;
-    name: string;
-    email: string;
-  };
-  assignedTo?: {
-    id: number;
-    name: string;
-    email: string;
-  } | null;
+  createdBy?: TicketUser;
+  assignedTo?: TicketUser | null;
   category?: {
     id: number;
     name: string;
@@ -61,6 +68,27 @@ export type AssignTicketInput = {
   assignedToId: number;
 };
 
-export type DeleteTicketResponse = {
+export type CreateTicketCommentInput = {
+  content: string;
+};
+
+export type TicketComment = {
   id: number;
+  content: string;
+  createdAt: string;
+  author: TicketUser;
+};
+
+export type TicketHistory = {
+  id: number;
+  action: TicketHistoryAction;
+  oldValue?: string | null;
+  newValue?: string | null;
+  createdAt: string;
+  user: TicketUser;
+};
+
+export type DeleteTicketResponse = {
+  id?: number;
+  message?: string;
 };

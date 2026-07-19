@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowLeft, Sparkles } from "lucide-react";
+import { ArrowLeft, CircleCheck, FilePlus2, Sparkles } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { CSSProperties } from "react";
@@ -50,6 +50,10 @@ export default function NewTicketPage() {
               Quay lại
             </Link>
           </Button>
+          <div className="mb-2 inline-flex items-center gap-2 rounded-full border bg-muted/60 px-3 py-1 text-xs font-medium text-muted-foreground">
+            <FilePlus2 className="size-3.5" />
+            Ticket mới
+          </div>
           <h1 className="text-2xl font-semibold tracking-normal">
             Tạo ticket mới
           </h1>
@@ -79,25 +83,38 @@ export default function NewTicketPage() {
 
         <aside className="grid gap-4 self-start">
           {[
-            "Mô tả lỗi, thời điểm xảy ra và mức độ ảnh hưởng.",
-            "Chọn độ ưu tiên phù hợp để đội IT sắp xếp xử lý.",
-            "Ticket mới sẽ ở trạng thái Mở sau khi tạo.",
-          ].map((item, index) => (
-            <Card
-              key={item}
-              className="motion-card bg-card/95 shadow-sm"
-              style={{ "--motion-index": index } as CSSProperties}
-            >
-              <CardContent className="flex gap-3 pt-0">
-                <div className="grid size-9 shrink-0 place-items-center rounded-lg bg-teal-950/5 text-teal-950">
-                  <Sparkles className="size-4" />
-                </div>
-                <p className="text-sm leading-6 text-muted-foreground">
-                  {item}
-                </p>
-              </CardContent>
-            </Card>
-          ))}
+            {
+              icon: Sparkles,
+              text: "Mô tả lỗi, thời điểm xảy ra và mức độ ảnh hưởng.",
+            },
+            {
+              icon: CircleCheck,
+              text: "Chọn độ ưu tiên phù hợp để đội IT sắp xếp xử lý.",
+            },
+            {
+              icon: FilePlus2,
+              text: "Ticket mới sẽ ở trạng thái Mở sau khi tạo.",
+            },
+          ].map((item, index) => {
+            const Icon = item.icon;
+
+            return (
+              <Card
+                key={item.text}
+                className="motion-card bg-card/95 shadow-sm"
+                style={{ "--motion-index": index } as CSSProperties}
+              >
+                <CardContent className="flex gap-3 pt-0">
+                  <div className="grid size-9 shrink-0 place-items-center rounded-lg bg-teal-950/5 text-teal-950">
+                    <Icon className="size-4" />
+                  </div>
+                  <p className="text-sm leading-6 text-muted-foreground">
+                    {item.text}
+                  </p>
+                </CardContent>
+              </Card>
+            );
+          })}
         </aside>
       </div>
     </div>

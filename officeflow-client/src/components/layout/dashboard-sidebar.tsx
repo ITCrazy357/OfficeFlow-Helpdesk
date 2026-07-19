@@ -1,6 +1,13 @@
 "use client";
 
-import { Building2, CircleCheck, LayoutDashboard, TicketCheck, Users, X } from "lucide-react";
+import {
+  Building2,
+  CircleCheck,
+  LayoutDashboard,
+  TicketCheck,
+  Users,
+  X,
+} from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
@@ -121,7 +128,7 @@ function SidebarNav({
                 <span
                   className={cn(
                     "mt-0.5 block truncate text-xs font-normal",
-                    active ? "text-white/72" : "text-muted-foreground",
+                    active ? "text-white/75" : "text-muted-foreground",
                   )}
                 >
                   {item.description}

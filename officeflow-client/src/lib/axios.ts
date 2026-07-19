@@ -1,6 +1,6 @@
 import axios from "axios";
 import { getAccessToken, removeAccessToken } from "./token";
-import { ApiErrorResponse } from "../types/api";
+import type { ApiErrorResponse } from "@/types/api";
 
 const DEFAULT_API_TIMEOUT_MS = 70000;
 const configuredApiTimeout = Number(process.env.NEXT_PUBLIC_API_TIMEOUT_MS);

@@ -1,7 +1,7 @@
 "use client";
 
 import type { CSSProperties } from "react";
-import { AlertCircle, Building2 } from "lucide-react";
+import { AlertCircle, Building2, Layers3 } from "lucide-react";
 
 import {
   Card,
@@ -90,16 +90,22 @@ export default function DepartmentsPage() {
             Departments
           </h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Danh sách phòng ban lấy trực tiếp từ backend.
+            Danh sách phòng ban đang được dùng trong hệ thống.
           </p>
         </div>
       </section>
 
       <section className="grid gap-4 sm:grid-cols-3">
-        <Card className="motion-card shadow-sm">
+        <Card
+          className="motion-card shadow-sm"
+          style={{ "--motion-index": 0 } as CSSProperties}
+        >
           <CardHeader>
             <CardDescription>Tổng phòng ban</CardDescription>
-            <CardTitle className="text-3xl">{departments.length}</CardTitle>
+            <CardTitle className="flex items-center gap-2 text-3xl">
+              {departments.length}
+              <Layers3 className="size-5 text-teal-800" />
+            </CardTitle>
           </CardHeader>
         </Card>
       </section>
@@ -145,7 +151,7 @@ export default function DepartmentsPage() {
               <div>
                 <p className="font-medium">Chưa có department</p>
                 <p className="mt-1 text-sm text-muted-foreground">
-                  Chạy seed backend để tạo IT, HR, Finance, Marketing.
+                  Chạy seed dữ liệu để tạo IT, HR, Finance, Marketing.
                 </p>
               </div>
             </div>

@@ -86,7 +86,7 @@ export default function RegisterPage() {
           <div>
             <CardTitle className="text-2xl">Tạo tài khoản</CardTitle>
             <CardDescription>
-              Tài khoản mới sẽ được tạo với vai trò EMPLOYEE theo backend.
+              Tài khoản mới sẽ được tạo với vai trò nhân viên mặc định.
             </CardDescription>
           </div>
         </CardHeader>
@@ -102,7 +102,7 @@ export default function RegisterPage() {
               <Input
                 id="name"
                 autoComplete="name"
-                placeholder="Nguyen Van A"
+                placeholder="Nguyễn Văn A"
                 aria-invalid={Boolean(nameError)}
                 disabled={registerMutation.isPending}
                 {...form.register("name")}
@@ -162,8 +162,8 @@ export default function RegisterPage() {
                 {...form.register("departmentId")}
               />
               <p className="text-xs text-muted-foreground">
-                API departments yêu cầu đăng nhập, nên register chỉ nhập ID nếu
-                đã biết.
+                API departments yêu cầu đăng nhập, nên register chỉ nhập ID khi
+                đã biết phòng ban phù hợp.
               </p>
               {departmentError ? (
                 <p className="text-xs font-medium text-destructive">

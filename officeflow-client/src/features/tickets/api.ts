@@ -1,21 +1,35 @@
 import { api } from "@/lib/axios";
-import type { ApiResponse, PaginatedResponse } from "@/types/api";
+import type { ApiResponse, Pagination } from "@/types/api";
 import type {
+  CreateTicketCommentInput,
   CreateTicketInput,
   DeleteTicketResponse,
   AssignTicketInput,
   GetTicketsParams,
   Ticket,
+  TicketComment,
+  TicketHistory,
   UpdateTicketInput,
   UpdateTicketStatusInput,
 } from "./types";
 
+type BackendTicketsData = {
+  data?: Ticket[];
+  items?: Ticket[];
+  pagination: Pagination;
+};
+
 export async function getTicketsApi(params: GetTicketsParams = {}) {
-  const res = await api.get<PaginatedResponse<Ticket>>("/tickets", {
+  const res = await api.get<ApiResponse<BackendTicketsData>>("/tickets", {
     params,
   });
 
-  return res.data.data;
+  const payload = res.data.data;
+
+  return {
+    items: payload.items ?? payload.data ?? [],
+    pagination: payload.pagination,
+  };
 }
 
 export async function getTicketApi(id: number) {
@@ -57,6 +71,34 @@ export async function assignTicketApi(id: number, input: AssignTicketInput) {
 export async function deleteTicketApi(id: number) {
   const res = await api.delete<ApiResponse<DeleteTicketResponse>>(
     `/tickets/${id}`,
+  );
+
+  return res.data.data;
+}
+
+export async function getTicketCommentsApi(id: number) {
+  const res = await api.get<ApiResponse<TicketComment[]>>(
+    `/tickets/${id}/comments`,
+  );
+
+  return res.data.data;
+}
+
+export async function addTicketCommentApi(
+  id: number,
+  input: CreateTicketCommentInput,
+) {
+  const res = await api.post<ApiResponse<TicketComment>>(
+    `/tickets/${id}/comments`,
+    input,
+  );
+
+  return res.data.data;
+}
+
+export async function getTicketHistoryApi(id: number) {
+  const res = await api.get<ApiResponse<TicketHistory[]>>(
+    `/tickets/${id}/history`,
   );
 
   return res.data.data;

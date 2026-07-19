@@ -4,7 +4,12 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { Prisma, TicketStatus, UserRole } from '@prisma/client';
+import {
+  Prisma,
+  TicketStatus,
+  UserRole,
+  TicketHistoryAction,
+} from '@prisma/client';
 
 import { PrismaService } from '../prisma/prisma.service';
 //DTO
@@ -13,6 +18,8 @@ import { UpdateTicketDto } from './dto/update-ticket.dto';
 import { UpdateTicketStatusDto } from './dto/update-ticket-status.dto';
 import { AssignTicketDto } from './dto/assign-ticket.dto';
 import { GetTicketsQueryDto } from './dto/get-tickets-query.dto';
+
+import { CreateTicketCommentDto } from './dto/create-ticket-comment.dto';
 
 type CurrentUser = {
   userId: number;
@@ -153,10 +160,17 @@ export class TicketsService {
       },
     });
 
+    await this.createHistory({
+      ticketId: ticket.id,
+      userId: currentUser.userId,
+      action: TicketHistoryAction.CREATE,
+      newValue: ticket.title,
+    });
+
     return ticket;
   }
 
-  async getById(id: number, currentUser: CurrentUser) {
+  async canGetById(id: number, currentUser: CurrentUser) {
     const ticket = await this.prisma.ticket.findUnique({
       where: { id },
       select: {
@@ -311,6 +325,14 @@ export class TicketsService {
       },
     });
 
+    await this.createHistory({
+      ticketId: id,
+      userId: currentUser.userId,
+      action: TicketHistoryAction.UPDATE,
+      oldValue: ticket.title,
+      newValue: updatedTicket.title,
+    });
+
     return updatedTicket;
   }
 
@@ -330,6 +352,7 @@ export class TicketsService {
       where: { id },
       select: {
         id: true,
+        status: true,
       },
     });
 
@@ -373,6 +396,14 @@ export class TicketsService {
       },
     });
 
+    await this.createHistory({
+      ticketId: id,
+      userId: currentUser.userId,
+      action: TicketHistoryAction.STATUS_CHANGED,
+      oldValue: ticket.status,
+      newValue: updateTicket.status,
+    });
+
     return updateTicket;
   }
 
@@ -392,6 +423,7 @@ export class TicketsService {
       where: { id },
       select: {
         id: true,
+        assignedToId: true,
       },
     });
 
@@ -454,6 +486,14 @@ export class TicketsService {
       },
     });
 
+    await this.createHistory({
+      ticketId: id,
+      userId: currentUser.userId,
+      action: TicketHistoryAction.ASSIGNED,
+      oldValue: ticket.assignedToId ? String(ticket.assignedToId) : undefined,
+      newValue: String(assignTicketDto.assignedToId),
+    });
+
     return updatedTicket;
   }
 
@@ -486,5 +526,157 @@ export class TicketsService {
     });
 
     return { id };
+  }
+
+  //Cho phép ADMIN, IT_STAFF và MANAGER(có cùng phòng ban vói người tạo ra ticket) truy cập vào ticket
+  private async canAccessTicket(ticketId: number, currentUser: CurrentUser) {
+    const ticket = await this.prisma.ticket.findUnique({
+      where: { id: ticketId },
+      select: {
+        id: true,
+        createdById: true,
+        createdBy: {
+          select: {
+            departmentId: true,
+          },
+        },
+      },
+    });
+
+    if (!ticket) {
+      throw new NotFoundException('Ticket not found');
+    }
+
+    if (
+      currentUser.role === UserRole.ADMIN ||
+      currentUser.role === UserRole.IT_STAFF
+    ) {
+      return ticket;
+    }
+
+    if (currentUser.role === UserRole.MANAGER) {
+      const manager = await this.prisma.user.findUnique({
+        where: { id: currentUser.userId },
+        select: { departmentId: true },
+      });
+
+      if (!manager?.departmentId) {
+        throw new ForbiddenException('Forbidden');
+      }
+
+      if (ticket.createdBy.departmentId !== manager.departmentId) {
+        throw new ForbiddenException('Forbidden');
+      }
+      return ticket;
+    }
+    throw new ForbiddenException('Forbidden');
+  }
+
+  //Tạo lịch sử ticket
+  private async createHistory(params: {
+    ticketId: number;
+    userId: number;
+    action: TicketHistoryAction;
+    oldValue?: string;
+    newValue?: string;
+  }) {
+    return this.prisma.ticketHistory.create({
+      data: {
+        ticketId: params.ticketId,
+        userId: params.userId,
+        action: params.action,
+        oldValue: params.oldValue,
+        newValue: params.newValue,
+      },
+    });
+  }
+
+  //Them comments
+
+  async addComment(
+    ticketId: number,
+    createCommentDto: CreateTicketCommentDto,
+    currentUser: CurrentUser,
+  ) {
+    await this.canAccessTicket(ticketId, currentUser);
+
+    const comment = await this.prisma.ticketComment.create({
+      data: {
+        ticketId,
+        authorId: currentUser.userId,
+        content: createCommentDto.content,
+      },
+      select: {
+        id: true,
+        content: true,
+        createdAt: true,
+        author: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            role: true,
+          },
+        },
+      },
+    });
+
+    await this.createHistory({
+      ticketId,
+      userId: currentUser.userId,
+      action: TicketHistoryAction.COMMENTED,
+      newValue: comment.content,
+    });
+    return comment;
+  }
+
+  // Lấy nội dung comment
+  async getComments(ticketId: number, currentUser: CurrentUser) {
+    await this.canAccessTicket(ticketId, currentUser);
+
+    const comments = await this.prisma.ticketComment.findMany({
+      where: { id: ticketId },
+      select: {
+        id: true,
+        content: true,
+        createdAt: true,
+        author: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            role: true,
+          },
+        },
+      },
+    });
+
+    return comments;
+  }
+
+  //Lấy lịch sử comment
+  async getHistory(ticketId: number, currentUser: CurrentUser) {
+    await this.canAccessTicket(ticketId, currentUser);
+
+    const histories = await this.prisma.ticketHistory.findMany({
+      where: { ticketId },
+      select: {
+        id: true,
+        action: true,
+        oldValue: true,
+        newValue: true,
+        createdAt: true,
+        user: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            role: true,
+          },
+        },
+      },
+    });
+
+    return histories;
   }
 }

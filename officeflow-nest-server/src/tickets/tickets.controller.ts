@@ -39,12 +39,15 @@ import { GetTicketsQueryDto } from './dto/get-tickets-query.dto';
 import { HttpCode, HttpStatus } from '@nestjs/common';
 import { Message } from '../common/decorators/message.decorator';
 
+import { CreateTicketCommentDto } from './dto/create-ticket-comment.dto';
+
 @ApiTags('Tickets')
 @ApiBearerAuth()
 @Controller('tickets')
 export class TicketsController {
   constructor(private readonly ticketsService: TicketsService) {}
 
+  // Lấy ticket và các param
   @UseGuards(JwtAuthGuard)
   @Get()
   @Message('Get tickets successfully')
@@ -64,6 +67,7 @@ export class TicketsController {
     return this.ticketsService.getTickets(currentUser, query);
   }
 
+  //tạo ticket
   @UseGuards(JwtAuthGuard)
   @Post()
   @HttpCode(HttpStatus.CREATED)
@@ -79,6 +83,7 @@ export class TicketsController {
     return this.ticketsService.create(createTicketDto, currentUser);
   }
 
+  //Lấy chi tiết ticket
   @UseGuards(JwtAuthGuard)
   @Get(':id')
   @HttpCode(HttpStatus.OK)
@@ -93,9 +98,10 @@ export class TicketsController {
     @Param('id', ParseIntPipe) id: number,
     @CurrentUser() currentUser: CurrentUserPayload,
   ) {
-    return this.ticketsService.getById(id, currentUser);
+    return this.ticketsService.canGetById(id, currentUser);
   }
 
+  //update ticket
   @UseGuards(JwtAuthGuard)
   @Patch(':id')
   @HttpCode(HttpStatus.OK)
@@ -115,6 +121,7 @@ export class TicketsController {
     return this.ticketsService.update(id, updateTicketDto, currentUser);
   }
 
+  //Update status
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.ADMIN, UserRole.IT_STAFF)
   @Patch(':id/status')
@@ -145,6 +152,7 @@ export class TicketsController {
     );
   }
 
+  //Thêm người xử lý vào ticket
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.ADMIN, UserRole.IT_STAFF)
   @Patch(':id/assign')
@@ -168,6 +176,7 @@ export class TicketsController {
     return this.ticketsService.assign(id, assignTicketDto, currentUser);
   }
 
+  //Delete
   @UseGuards(JwtAuthGuard)
   @Delete(':id')
   @HttpCode(HttpStatus.OK)
@@ -183,5 +192,59 @@ export class TicketsController {
     @CurrentUser() currentUser: CurrentUserPayload,
   ) {
     return this.ticketsService.remove(id, currentUser);
+  }
+
+  //Add comment
+  @UseGuards(JwtAuthGuard)
+  @Post(':id/comments')
+  @HttpCode(HttpStatus.CREATED)
+  @Message('Add ticket comment successfully')
+  @ApiOperation({ summary: 'Add a comment to a ticket' })
+  @ApiParam({ name: 'id', example: 1 })
+  @ApiBody({ type: CreateTicketCommentDto })
+  @ApiResponse({ status: 201, description: 'Add ticket comment successfully' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Forbidden' })
+  @ApiResponse({ status: 404, description: 'Ticket not found' })
+  addComment(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() createCommentDto: CreateTicketCommentDto,
+    @CurrentUser() currentUser: CurrentUserPayload,
+  ) {
+    return this.ticketsService.addComment(id, createCommentDto, currentUser);
+  }
+
+  //Lấy ticket có comment
+  @UseGuards(JwtAuthGuard)
+  @Get(':id/comments')
+  @HttpCode(HttpStatus.OK)
+  @Message('Get ticket comments successfully')
+  @ApiOperation({ summary: 'Get comments of a ticket' })
+  @ApiParam({ name: 'id', example: 1 })
+  @ApiResponse({ status: 200, description: 'Get ticket comments successfully' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Forbidden' })
+  getComments(
+    @Param('id', ParseIntPipe) id: number,
+    @CurrentUser() currentUser: CurrentUserPayload,
+  ) {
+    return this.ticketsService.getComments(id, currentUser);
+  }
+
+  //lấy lịch sử theo ticket
+  @UseGuards(JwtAuthGuard)
+  @Get(':id/history')
+  @HttpCode(HttpStatus.OK)
+  @Message('Get ticket history successfully')
+  @ApiOperation({ summary: 'Get history of a ticket' })
+  @ApiParam({ name: 'id', example: 1 })
+  @ApiResponse({ status: 200, description: 'Get ticket history successfully' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Forbidden' })
+  getHistory(
+    @Param('id', ParseIntPipe) id: number,
+    @CurrentUser() currentUser: CurrentUserPayload,
+  ) {
+    return this.ticketsService.getHistory(id, currentUser);
   }
 }

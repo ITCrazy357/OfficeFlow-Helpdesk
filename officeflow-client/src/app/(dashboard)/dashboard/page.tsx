@@ -4,12 +4,14 @@ import {
   AlertCircle,
   ArrowRight,
   Clock,
+  Database,
+  FilePlus2,
   Inbox,
   Plus,
+  Server,
   ShieldCheck,
   TicketCheck,
   TrendingUp,
-  FilePlus2,
 } from "lucide-react";
 import Link from "next/link";
 import type { CSSProperties } from "react";
@@ -89,7 +91,7 @@ export default function DashboardPage() {
   const healthQuery = useHealth();
   const dbHealthQuery = useDbHealth();
 
-  const queries = [
+  const ticketQueries = [
     latestQuery,
     totalQuery,
     openQuery,
@@ -97,11 +99,11 @@ export default function DashboardPage() {
     resolvedQuery,
   ];
 
-  if (queries.some((query) => query.isLoading)) {
+  if (ticketQueries.some((query) => query.isLoading)) {
     return <DashboardSkeleton />;
   }
 
-  const failedQuery = queries.find((query) => query.isError);
+  const failedQuery = ticketQueries.find((query) => query.isError);
 
   if (failedQuery) {
     return <ErrorCard error={failedQuery.error} />;
@@ -153,8 +155,8 @@ export default function DashboardPage() {
               Dashboard
             </h1>
             <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
-              Theo dõi sức khỏe luồng hỗ trợ, số lượng ticket theo trạng thái
-              và các yêu cầu mới nhất từ backend OfficeFlow.
+              Theo dõi sức khỏe API, kết nối database và số lượng ticket theo
+              trạng thái trong OfficeFlow.
             </p>
           </div>
           <div className="flex flex-col gap-2 sm:flex-row">
@@ -177,28 +179,51 @@ export default function DashboardPage() {
       <section className="grid gap-4 md:grid-cols-2">
         <Card className="shadow-sm motion-panel">
           <CardHeader>
-            <CardDescription>API health</CardDescription>
-            <CardTitle>
-              {healthQuery.isLoading
-                ? "Dang kiem tra"
-                : healthQuery.isError
-                  ? "Khong ket noi"
-                  : healthQuery.data?.status === "ok"
-                    ? "Dang hoat dong"
-                    : "Khong ro trang thai"}
-            </CardTitle>
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <CardDescription>API health</CardDescription>
+                <CardTitle>
+                  {healthQuery.isLoading
+                    ? "Đang kiểm tra"
+                    : healthQuery.isError
+                      ? "Không kết nối"
+                      : healthQuery.data?.ok
+                        ? "Đang hoạt động"
+                        : "Không rõ trạng thái"}
+                </CardTitle>
+              </div>
+              <div className="grid size-10 place-items-center rounded-xl bg-teal-950/5 text-teal-950">
+                <Server className="size-5" />
+              </div>
+            </div>
+            {healthQuery.data?.message ? (
+              <CardDescription>{healthQuery.data.message}</CardDescription>
+            ) : null}
           </CardHeader>
         </Card>
+
         <Card className="shadow-sm motion-panel">
           <CardHeader>
-            <CardDescription>Database health</CardDescription>
-            <CardTitle>
-              {dbHealthQuery.isLoading
-                ? "Dang kiem tra"
-                : dbHealthQuery.isError
-                  ? "Khong ket noi"
-                  : `${dbHealthQuery.data?.length ?? 0} departments`}
-            </CardTitle>
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <CardDescription>Database health</CardDescription>
+                <CardTitle>
+                  {dbHealthQuery.isLoading
+                    ? "Đang kiểm tra"
+                    : dbHealthQuery.isError
+                      ? "Không kết nối"
+                      : dbHealthQuery.data?.ok
+                        ? "Đã kết nối"
+                        : "Không rõ trạng thái"}
+                </CardTitle>
+              </div>
+              <div className="grid size-10 place-items-center rounded-xl bg-teal-950/5 text-teal-950">
+                <Database className="size-5" />
+              </div>
+            </div>
+            {dbHealthQuery.data?.message ? (
+              <CardDescription>{dbHealthQuery.data.message}</CardDescription>
+            ) : null}
           </CardHeader>
         </Card>
       </section>
@@ -213,20 +238,20 @@ export default function DashboardPage() {
               className="motion-card border-b p-5 last:border-b-0 md:nth-[odd]:border-r md:nth-[-n+2]:border-b xl:border-b-0 xl:border-r-0"
               style={{ "--motion-index": index } as CSSProperties}
             >
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <CardDescription>{card.label}</CardDescription>
-                    <CardTitle className="mt-2 text-3xl font-semibold">
-                      {card.value}
-                    </CardTitle>
-                  </div>
-                  <div className="grid size-10 place-items-center rounded-xl bg-teal-950/5 text-teal-950">
-                    <Icon className="size-5" />
-                  </div>
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <CardDescription>{card.label}</CardDescription>
+                  <CardTitle className="mt-2 text-3xl font-semibold">
+                    {card.value}
+                  </CardTitle>
                 </div>
-                <p className="mt-5 text-xs leading-5 text-muted-foreground">
-                  {card.detail}
-                </p>
+                <div className="grid size-10 place-items-center rounded-xl bg-teal-950/5 text-teal-950">
+                  <Icon className="size-5" />
+                </div>
+              </div>
+              <p className="mt-5 text-xs leading-5 text-muted-foreground">
+                {card.detail}
+              </p>
             </div>
           );
         })}
@@ -238,7 +263,7 @@ export default function DashboardPage() {
             <div>
               <CardTitle>Ticket mới nhất</CardTitle>
               <CardDescription>
-                5 ticket gần đây nhất theo dữ liệu backend.
+                5 ticket gần đây nhất trong hệ thống.
               </CardDescription>
             </div>
             <Button asChild variant="outline" size="sm">

@@ -7,6 +7,11 @@ import {
   CalendarClock,
   CheckCircle2,
   Edit3,
+  History,
+  Loader2,
+  MessageSquareText,
+  SendHorizontal,
+  ShieldAlert,
   Trash2,
   UserCircle,
   UserPlus,
@@ -30,6 +35,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 import { useMe } from "@/features/auth/hooks";
 import type { AuthUser } from "@/features/auth/types";
 import {
@@ -39,9 +45,12 @@ import {
 import { TicketForm } from "@/features/tickets/components/ticket-form";
 import { ticketStatusOptions } from "@/features/tickets/constants";
 import {
+  useAddTicketComment,
   useAssignTicket,
   useDeleteTicket,
   useTicket,
+  useTicketComments,
+  useTicketHistory,
   useUpdateTicket,
   useUpdateTicketStatus,
 } from "@/features/tickets/hooks";
@@ -49,7 +58,11 @@ import {
   toTicketPayload,
   type TicketFormValues,
 } from "@/features/tickets/schemas";
-import type { Ticket, TicketStatus } from "@/features/tickets/types";
+import type {
+  Ticket,
+  TicketHistoryAction,
+  TicketStatus,
+} from "@/features/tickets/types";
 import { useUsers } from "@/features/users/hooks";
 import { getApiErrorMessage } from "@/lib/axios";
 
@@ -82,6 +95,14 @@ function canChangeStatus(user: AuthUser | undefined) {
   return user?.role === "ADMIN" || user?.role === "IT_STAFF";
 }
 
+function canUseDiscussion(user: AuthUser | undefined) {
+  return (
+    user?.role === "ADMIN" ||
+    user?.role === "IT_STAFF" ||
+    user?.role === "MANAGER"
+  );
+}
+
 function canDeleteTicket(user: AuthUser | undefined, ticket: Ticket) {
   if (!user) {
     return false;
@@ -93,6 +114,19 @@ function canDeleteTicket(user: AuthUser | undefined, ticket: Ticket) {
       ticket.createdBy?.id === user.id &&
       ticket.status === "OPEN")
   );
+}
+
+function getHistoryActionLabel(action: TicketHistoryAction) {
+  const labels: Record<TicketHistoryAction, string> = {
+    CREATE: "Tạo ticket",
+    UPDATE: "Cập nhật ticket",
+    STATUS_CHANGED: "Đổi trạng thái",
+    ASSIGNED: "Gán người xử lý",
+    COMMENTED: "Bình luận",
+    DELETED: "Xóa ticket",
+  };
+
+  return labels[action] ?? action;
 }
 
 function DetailSkeleton() {
@@ -153,17 +187,24 @@ export default function TicketDetailPage() {
     Number.isInteger(rawTicketId) && rawTicketId > 0 ? rawTicketId : 0;
   const ticketQuery = useTicket(ticketId, ticketId > 0);
   const { data: user } = useMe();
+  const allowDiscussion = canUseDiscussion(user);
+  const commentsQuery = useTicketComments(ticketId, ticketId > 0 && allowDiscussion);
+  const historyQuery = useTicketHistory(ticketId, ticketId > 0 && allowDiscussion);
   const usersQuery = useUsers(user?.role === "ADMIN");
   const updateTicket = useUpdateTicket();
   const updateStatus = useUpdateTicketStatus();
   const assignTicket = useAssignTicket();
   const deleteTicket = useDeleteTicket();
+  const addComment = useAddTicketComment();
   const [isEditing, setIsEditing] = useState(false);
   const [manualAssigneeId, setManualAssigneeId] = useState("");
+  const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
+  const [commentContent, setCommentContent] = useState("");
   const [formError, setFormError] = useState<string | null>(null);
   const [statusError, setStatusError] = useState<string | null>(null);
   const [assignError, setAssignError] = useState<string | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [commentError, setCommentError] = useState<string | null>(null);
 
   if (!ticketId) {
     return (
@@ -256,7 +297,7 @@ export default function TicketDetailPage() {
       setManualAssigneeId("");
     } catch (error) {
       setAssignError(
-        getApiErrorMessage(error, "Không thể assign ticket. Vui lòng thử lại."),
+        getApiErrorMessage(error, "Không thể gán ticket. Vui lòng thử lại."),
       );
     }
   }
@@ -264,16 +305,35 @@ export default function TicketDetailPage() {
   async function handleDelete() {
     setDeleteError(null);
 
-    if (!window.confirm("Xóa ticket này? Hành động này không thể hoàn tác.")) {
-      return;
-    }
-
     try {
       await deleteTicket.mutateAsync(ticket.id);
       router.replace("/tickets");
     } catch (error) {
       setDeleteError(
         getApiErrorMessage(error, "Không thể xóa ticket. Vui lòng thử lại."),
+      );
+    }
+  }
+
+  async function handleAddComment() {
+    const content = commentContent.trim();
+
+    setCommentError(null);
+
+    if (content.length < 10) {
+      setCommentError("Bình luận cần ít nhất 10 ký tự.");
+      return;
+    }
+
+    try {
+      await addComment.mutateAsync({
+        id: ticket.id,
+        input: { content },
+      });
+      setCommentContent("");
+    } catch (error) {
+      setCommentError(
+        getApiErrorMessage(error, "Không thể gửi bình luận. Vui lòng thử lại."),
       );
     }
   }
@@ -333,7 +393,7 @@ export default function TicketDetailPage() {
             <Button
               type="button"
               variant="destructive"
-              onClick={handleDelete}
+              onClick={() => setIsDeleteConfirmOpen((value) => !value)}
               disabled={deleteTicket.isPending}
             >
               <Trash2 className="size-4" />
@@ -347,6 +407,42 @@ export default function TicketDetailPage() {
         <div className="rounded-lg border border-destructive/25 bg-destructive/10 px-3 py-2 text-sm font-medium text-destructive motion-toast">
           {deleteError}
         </div>
+      ) : null}
+
+      {isDeleteConfirmOpen ? (
+        <Card className="border-destructive/25 bg-destructive/5 motion-panel">
+          <CardContent className="flex flex-col gap-4 pt-0 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex gap-3">
+              <div className="grid size-10 shrink-0 place-items-center rounded-lg bg-destructive/10 text-destructive">
+                <ShieldAlert className="size-5" />
+              </div>
+              <div>
+                <CardTitle>Xác nhận xóa ticket</CardTitle>
+                <CardDescription className="mt-1">
+                  Hành động này không thể hoàn tác.
+                </CardDescription>
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setIsDeleteConfirmOpen(false)}
+                disabled={deleteTicket.isPending}
+              >
+                Hủy
+              </Button>
+              <Button
+                type="button"
+                variant="destructive"
+                onClick={handleDelete}
+                disabled={deleteTicket.isPending}
+              >
+                Xác nhận xóa
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
       ) : null}
 
       <div className="grid gap-6 lg:grid-cols-[1fr_360px]">
@@ -364,6 +460,109 @@ export default function TicketDetailPage() {
               </p>
             </CardContent>
           </Card>
+
+          {allowDiscussion ? (
+            <Card className="shadow-sm motion-panel">
+              <CardHeader className="border-b">
+                <div className="flex items-center gap-2">
+                  <MessageSquareText className="size-4 text-muted-foreground" />
+                  <div>
+                    <CardTitle>Trao đổi</CardTitle>
+                    <CardDescription>
+                      Ghi nhận thêm thông tin xử lý cho ticket này.
+                    </CardDescription>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent className="pt-0">
+                <div className="grid gap-3">
+                  <Textarea
+                    value={commentContent}
+                    onChange={(event) => setCommentContent(event.target.value)}
+                    placeholder="Nhập cập nhật xử lý, thông tin đã kiểm tra hoặc câu hỏi cần làm rõ"
+                    disabled={addComment.isPending}
+                  />
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                    <p className="text-xs text-muted-foreground">
+                      Tối thiểu 10 ký tự.
+                    </p>
+                    <Button
+                      type="button"
+                      onClick={handleAddComment}
+                      disabled={addComment.isPending}
+                    >
+                      {addComment.isPending ? (
+                        <Loader2 className="size-4 animate-spin" />
+                      ) : (
+                        <SendHorizontal className="size-4" />
+                      )}
+                      Gửi bình luận
+                    </Button>
+                  </div>
+                  {commentError ? (
+                    <p className="text-sm font-medium text-destructive">
+                      {commentError}
+                    </p>
+                  ) : null}
+                </div>
+
+                <div className="mt-5 grid gap-3">
+                  {commentsQuery.isLoading ? (
+                    Array.from({ length: 3 }).map((_, index) => (
+                      <div
+                        key={index}
+                        className="h-20 rounded-lg bg-muted motion-shimmer"
+                      />
+                    ))
+                  ) : commentsQuery.isError ? (
+                    <div className="rounded-lg border border-destructive/20 bg-destructive/5 p-3">
+                      <p className="text-sm font-medium text-destructive">
+                        Không thể tải bình luận.
+                      </p>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="mt-3"
+                        onClick={() => commentsQuery.refetch()}
+                      >
+                        Thử lại
+                      </Button>
+                    </div>
+                  ) : commentsQuery.data?.length ? (
+                    commentsQuery.data.map((comment) => (
+                      <div
+                        key={comment.id}
+                        className="motion-card rounded-lg border bg-muted/20 p-3 transition-colors hover:bg-muted/35"
+                      >
+                        <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+                          <p className="text-sm font-semibold">
+                            {comment.author.name}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            {formatDateTime(comment.createdAt)}
+                          </p>
+                        </div>
+                        <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-foreground">
+                          {comment.content}
+                        </p>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="rounded-lg border border-dashed p-5 text-center">
+                      <MessageSquareText className="mx-auto size-5 text-muted-foreground" />
+                      <p className="mt-2 text-sm font-medium">
+                        Chưa có bình luận
+                      </p>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        Gửi cập nhật đầu tiên để lưu lại trao đổi xử lý.
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          ) : null}
 
           {isEditing && allowEdit ? (
             <Card className="shadow-sm motion-panel">
@@ -434,7 +633,7 @@ export default function TicketDetailPage() {
               <CardHeader className="border-b">
                 <CardTitle>Cập nhật trạng thái</CardTitle>
                 <CardDescription>
-                  Chỉ ADMIN và IT_STAFF có quyền đổi trạng thái.
+                  ADMIN và IT_STAFF có quyền đổi trạng thái.
                 </CardDescription>
               </CardHeader>
               <CardContent className="grid gap-3 pt-0">
@@ -466,29 +665,38 @@ export default function TicketDetailPage() {
           {allowStatusChange ? (
             <Card className="shadow-sm motion-panel">
               <CardHeader className="border-b">
-                <CardTitle>Assign ticket</CardTitle>
+                <CardTitle>Gán người xử lý</CardTitle>
                 <CardDescription>
-                  Gán ticket cho ADMIN hoặc IT_STAFF theo API hiện có.
+                  Chỉ ADMIN hoặc IT_STAFF mới có quyền gán ticket.
                 </CardDescription>
               </CardHeader>
               <CardContent className="grid gap-3 pt-0">
                 {user?.role === "ADMIN" ? (
-                  <Select
-                    value={ticket.assignedTo?.id ? String(ticket.assignedTo.id) : ""}
-                    onValueChange={(value) => handleAssign(Number(value))}
-                    disabled={assignTicket.isPending || usersQuery.isLoading}
-                  >
-                    <SelectTrigger className="w-full">
-                      <SelectValue placeholder="Chọn người xử lý" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {staffUsers.map((staff) => (
-                        <SelectItem key={staff.id} value={String(staff.id)}>
-                          {staff.name} / {staff.role}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <>
+                    <Select
+                      value={
+                        ticket.assignedTo?.id ? String(ticket.assignedTo.id) : ""
+                      }
+                      onValueChange={(value) => handleAssign(Number(value))}
+                      disabled={assignTicket.isPending || usersQuery.isLoading}
+                    >
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder="Chọn người xử lý" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {staffUsers.map((staff) => (
+                          <SelectItem key={staff.id} value={String(staff.id)}>
+                            {staff.name} / {staff.role}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    {staffUsers.length === 0 && !usersQuery.isLoading ? (
+                      <p className="text-xs text-muted-foreground">
+                        Chưa có ADMIN hoặc IT_STAFF trong danh sách users.
+                      </p>
+                    ) : null}
+                  </>
                 ) : (
                   <div className="flex gap-2">
                     <Input
@@ -520,12 +728,82 @@ export default function TicketDetailPage() {
             </Card>
           ) : null}
 
+          {allowDiscussion ? (
+            <Card className="shadow-sm motion-panel">
+              <CardHeader className="border-b">
+                <div className="flex items-center gap-2">
+                  <History className="size-4 text-muted-foreground" />
+                  <div>
+                    <CardTitle>Lịch sử ticket</CardTitle>
+                    <CardDescription>
+                      Các thay đổi được ghi nhận tự động.
+                    </CardDescription>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent className="pt-0">
+                {historyQuery.isLoading ? (
+                  <div className="grid gap-3">
+                    {Array.from({ length: 4 }).map((_, index) => (
+                      <div
+                        key={index}
+                        className="h-16 rounded-lg bg-muted motion-shimmer"
+                      />
+                    ))}
+                  </div>
+                ) : historyQuery.isError ? (
+                  <div className="rounded-lg border border-destructive/20 bg-destructive/5 p-3">
+                    <p className="text-sm font-medium text-destructive">
+                      Không thể tải lịch sử.
+                    </p>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="mt-3"
+                      onClick={() => historyQuery.refetch()}
+                    >
+                      Thử lại
+                    </Button>
+                  </div>
+                ) : historyQuery.data?.length ? (
+                  <div className="grid gap-4">
+                    {historyQuery.data.map((item) => (
+                      <div key={item.id} className="relative pl-5">
+                        <span className="absolute left-0 top-1.5 size-2.5 rounded-full bg-teal-800" />
+                        <p className="text-sm font-semibold">
+                          {getHistoryActionLabel(item.action)}
+                        </p>
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          {item.user.name} / {formatDateTime(item.createdAt)}
+                        </p>
+                        {item.oldValue || item.newValue ? (
+                          <p className="mt-2 rounded-lg bg-muted/45 px-3 py-2 text-xs leading-5 text-muted-foreground">
+                            {item.oldValue ? `${item.oldValue} → ` : ""}
+                            {item.newValue ?? ""}
+                          </p>
+                        ) : null}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="rounded-lg border border-dashed p-4 text-center">
+                    <History className="mx-auto size-5 text-muted-foreground" />
+                    <p className="mt-2 text-sm font-medium">
+                      Chưa có lịch sử
+                    </p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          ) : null}
+
           <Card className="bg-teal-950 text-white shadow-sm">
             <CardContent className="pt-0">
               <p className="text-sm font-semibold">Phân quyền hiện tại</p>
               <p className="mt-2 text-sm leading-6 text-white/75">
-                EMPLOYEE chỉ xem ticket của mình. ADMIN và IT_STAFF có thể xử
-                lý trạng thái và assign ticket.
+                EMPLOYEE chỉ xem và chỉnh ticket của mình khi còn mở. ADMIN và
+                IT_STAFF có thể xử lý trạng thái và gán ticket.
               </p>
             </CardContent>
           </Card>

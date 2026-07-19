@@ -1,7 +1,7 @@
 "use client";
 
 import type { CSSProperties } from "react";
-import { AlertCircle, Shield, Users } from "lucide-react";
+import { AlertCircle, Shield, UserCheck, Users } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import {
@@ -72,7 +72,7 @@ export default function UsersPage() {
           <div>
             <CardTitle>Không có quyền truy cập</CardTitle>
             <CardDescription className="mt-1">
-              Backend chỉ cho ADMIN gọi danh sách users.
+              Chỉ ADMIN có quyền xem danh sách người dùng.
             </CardDescription>
           </div>
         </CardContent>
@@ -118,7 +118,7 @@ export default function UsersPage() {
           </div>
           <h1 className="text-2xl font-semibold tracking-normal">Users</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Danh sách tài khoản trả về từ API ADMIN-only.
+            Danh sách tài khoản nội bộ và trạng thái hoạt động.
           </p>
         </div>
       </section>
@@ -136,7 +136,12 @@ export default function UsersPage() {
           >
             <CardHeader>
               <CardDescription>{label}</CardDescription>
-              <CardTitle className="text-3xl">{value}</CardTitle>
+              <CardTitle className="flex items-center gap-2 text-3xl">
+                {value}
+                {index === 1 ? (
+                  <UserCheck className="size-5 text-teal-800" />
+                ) : null}
+              </CardTitle>
             </CardHeader>
           </Card>
         ))}
@@ -186,7 +191,7 @@ export default function UsersPage() {
                             : "border-red-200 bg-red-50 text-red-700"
                         }
                       >
-                        {user.isActive ? "Active" : "Inactive"}
+                        {user.isActive ? "Đang hoạt động" : "Đã khóa"}
                       </Badge>
                     </TableCell>
                     <TableCell>{formatDate(user.createdAt)}</TableCell>
@@ -199,7 +204,7 @@ export default function UsersPage() {
               <div>
                 <p className="font-medium">Chưa có user</p>
                 <p className="mt-1 text-sm text-muted-foreground">
-                  Seed backend hoặc đăng ký tài khoản mới để có dữ liệu.
+                  Chạy seed dữ liệu hoặc đăng ký tài khoản mới để có dữ liệu.
                 </p>
               </div>
             </div>

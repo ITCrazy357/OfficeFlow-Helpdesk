@@ -1,8 +1,11 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
+  addTicketCommentApi,
   assignTicketApi,
   createTicketApi,
   deleteTicketApi,
+  getTicketCommentsApi,
+  getTicketHistoryApi,
   getTicketApi,
   getTicketsApi,
   updateTicketApi,
@@ -10,6 +13,7 @@ import {
 } from "./api";
 import type {
   AssignTicketInput,
+  CreateTicketCommentInput,
   CreateTicketInput,
   GetTicketsParams,
   UpdateTicketInput,
@@ -20,6 +24,8 @@ export const ticketsQueryKeys = {
   all: ["tickets"] as const,
   list: (params: GetTicketsParams) => [...ticketsQueryKeys.all, params] as const,
   detail: (id: number) => [...ticketsQueryKeys.all, "detail", id] as const,
+  comments: (id: number) => [...ticketsQueryKeys.detail(id), "comments"] as const,
+  history: (id: number) => [...ticketsQueryKeys.detail(id), "history"] as const,
 };
 
 export function useTickets(params: GetTicketsParams = {}) {
@@ -33,6 +39,24 @@ export function useTicket(id: number, enabled = true) {
   return useQuery({
     queryKey: ticketsQueryKeys.detail(id),
     queryFn: () => getTicketApi(id),
+    enabled,
+    retry: false,
+  });
+}
+
+export function useTicketComments(id: number, enabled = true) {
+  return useQuery({
+    queryKey: ticketsQueryKeys.comments(id),
+    queryFn: () => getTicketCommentsApi(id),
+    enabled,
+    retry: false,
+  });
+}
+
+export function useTicketHistory(id: number, enabled = true) {
+  return useQuery({
+    queryKey: ticketsQueryKeys.history(id),
+    queryFn: () => getTicketHistoryApi(id),
     enabled,
     retry: false,
   });
@@ -56,8 +80,11 @@ export function useUpdateTicket() {
   return useMutation({
     mutationFn: ({ id, input }: { id: number; input: UpdateTicketInput }) =>
       updateTicketApi(id, input),
-    onSuccess: (ticket) => {
+    onSuccess: (ticket, variables) => {
       queryClient.invalidateQueries({ queryKey: ticketsQueryKeys.all });
+      queryClient.invalidateQueries({
+        queryKey: ticketsQueryKeys.history(variables.id),
+      });
       queryClient.setQueryData(ticketsQueryKeys.detail(ticket.id), ticket);
     },
   });
@@ -74,8 +101,11 @@ export function useUpdateTicketStatus() {
       id: number;
       input: UpdateTicketStatusInput;
     }) => updateTicketStatusApi(id, input),
-    onSuccess: (ticket) => {
+    onSuccess: (ticket, variables) => {
       queryClient.invalidateQueries({ queryKey: ticketsQueryKeys.all });
+      queryClient.invalidateQueries({
+        queryKey: ticketsQueryKeys.history(variables.id),
+      });
       queryClient.setQueryData(ticketsQueryKeys.detail(ticket.id), ticket);
     },
   });
@@ -92,8 +122,11 @@ export function useAssignTicket() {
       id: number;
       input: AssignTicketInput;
     }) => assignTicketApi(id, input),
-    onSuccess: (ticket) => {
+    onSuccess: (ticket, variables) => {
       queryClient.invalidateQueries({ queryKey: ticketsQueryKeys.all });
+      queryClient.invalidateQueries({
+        queryKey: ticketsQueryKeys.history(variables.id),
+      });
       queryClient.setQueryData(ticketsQueryKeys.detail(ticket.id), ticket);
     },
   });
@@ -106,6 +139,28 @@ export function useDeleteTicket() {
     mutationFn: (id: number) => deleteTicketApi(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ticketsQueryKeys.all });
+    },
+  });
+}
+
+export function useAddTicketComment() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({
+      id,
+      input,
+    }: {
+      id: number;
+      input: CreateTicketCommentInput;
+    }) => addTicketCommentApi(id, input),
+    onSuccess: (_comment, variables) => {
+      queryClient.invalidateQueries({
+        queryKey: ticketsQueryKeys.comments(variables.id),
+      });
+      queryClient.invalidateQueries({
+        queryKey: ticketsQueryKeys.history(variables.id),
+      });
     },
   });
 }

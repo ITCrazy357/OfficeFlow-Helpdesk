@@ -77,7 +77,7 @@ export default function LoginPage() {
             Quản lý yêu cầu hỗ trợ nội bộ gọn gàng hơn.
           </h1>
           <p className="mt-5 max-w-lg text-base leading-7 text-slate-600">
-            Giao diện client đọc đúng API backend hiện có, hỗ trợ tạo ticket,
+            Giao diện client kết nối đúng hệ thống hiện có, hỗ trợ tạo ticket,
             theo dõi tiến độ và xử lý theo vai trò đăng nhập.
           </p>
 
