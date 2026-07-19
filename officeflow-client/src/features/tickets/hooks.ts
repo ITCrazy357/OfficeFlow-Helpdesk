@@ -16,6 +16,7 @@ import type {
   CreateTicketCommentInput,
   CreateTicketInput,
   GetTicketsParams,
+  TicketComment,
   UpdateTicketInput,
   UpdateTicketStatusInput,
 } from "./types";
@@ -154,7 +155,14 @@ export function useAddTicketComment() {
       id: number;
       input: CreateTicketCommentInput;
     }) => addTicketCommentApi(id, input),
-    onSuccess: (_comment, variables) => {
+    onSuccess: (comment, variables) => {
+      queryClient.setQueryData<TicketComment[]>(
+        ticketsQueryKeys.comments(variables.id),
+        (current) => (current ? [...current, comment] : [comment]),
+      );
+      queryClient.invalidateQueries({
+        queryKey: ticketsQueryKeys.detail(variables.id),
+      });
       queryClient.invalidateQueries({
         queryKey: ticketsQueryKeys.comments(variables.id),
       });

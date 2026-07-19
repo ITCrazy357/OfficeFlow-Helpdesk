@@ -1,5 +1,6 @@
 "use client";
 
+import type { CSSProperties } from "react";
 import { useState } from "react";
 import {
   AlertCircle,
@@ -95,11 +96,16 @@ function canChangeStatus(user: AuthUser | undefined) {
   return user?.role === "ADMIN" || user?.role === "IT_STAFF";
 }
 
-function canUseDiscussion(user: AuthUser | undefined) {
+function canUseDiscussion(user: AuthUser | undefined, ticket?: Ticket) {
+  if (!user) {
+    return false;
+  }
+
   return (
-    user?.role === "ADMIN" ||
-    user?.role === "IT_STAFF" ||
-    user?.role === "MANAGER"
+    user.role === "ADMIN" ||
+    user.role === "IT_STAFF" ||
+    user.role === "MANAGER" ||
+    (user.role === "EMPLOYEE" && ticket?.createdBy?.id === user.id)
   );
 }
 
@@ -187,9 +193,15 @@ export default function TicketDetailPage() {
     Number.isInteger(rawTicketId) && rawTicketId > 0 ? rawTicketId : 0;
   const ticketQuery = useTicket(ticketId, ticketId > 0);
   const { data: user } = useMe();
-  const allowDiscussion = canUseDiscussion(user);
-  const commentsQuery = useTicketComments(ticketId, ticketId > 0 && allowDiscussion);
-  const historyQuery = useTicketHistory(ticketId, ticketId > 0 && allowDiscussion);
+  const allowDiscussion = canUseDiscussion(user, ticketQuery.data);
+  const commentsQuery = useTicketComments(
+    ticketId,
+    ticketId > 0 && allowDiscussion,
+  );
+  const historyQuery = useTicketHistory(
+    ticketId,
+    ticketId > 0 && allowDiscussion,
+  );
   const usersQuery = useUsers(user?.role === "ADMIN");
   const updateTicket = useUpdateTicket();
   const updateStatus = useUpdateTicketStatus();
@@ -240,6 +252,9 @@ export default function TicketDetailPage() {
     usersQuery.data?.filter(
       (item) => item.role === "ADMIN" || item.role === "IT_STAFF",
     ) ?? [];
+  const comments = commentsQuery.data ?? [];
+  const historyItems =
+    historyQuery.data?.filter((item) => item.action !== "COMMENTED") ?? [];
 
   async function handleUpdate(values: TicketFormValues) {
     setFormError(null);
@@ -529,11 +544,12 @@ export default function TicketDetailPage() {
                         Thử lại
                       </Button>
                     </div>
-                  ) : commentsQuery.data?.length ? (
-                    commentsQuery.data.map((comment) => (
+                  ) : comments.length ? (
+                    comments.map((comment, index) => (
                       <div
                         key={comment.id}
                         className="motion-card rounded-lg border bg-muted/20 p-3 transition-colors hover:bg-muted/35"
+                        style={{ "--motion-index": index } as CSSProperties}
                       >
                         <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
                           <p className="text-sm font-semibold">
@@ -766,9 +782,9 @@ export default function TicketDetailPage() {
                       Thử lại
                     </Button>
                   </div>
-                ) : historyQuery.data?.length ? (
+                ) : historyItems.length ? (
                   <div className="grid gap-4">
-                    {historyQuery.data.map((item) => (
+                    {historyItems.map((item) => (
                       <div key={item.id} className="relative pl-5">
                         <span className="absolute left-0 top-1.5 size-2.5 rounded-full bg-teal-800" />
                         <p className="text-sm font-semibold">

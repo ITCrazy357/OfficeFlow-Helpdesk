@@ -554,6 +554,13 @@ export class TicketsService {
       return ticket;
     }
 
+    if (
+      currentUser.role === UserRole.EMPLOYEE &&
+      ticket.createdById === currentUser.userId
+    ) {
+      return ticket;
+    }
+
     if (currentUser.role === UserRole.MANAGER) {
       const manager = await this.prisma.user.findUnique({
         where: { id: currentUser.userId },
@@ -635,7 +642,10 @@ export class TicketsService {
     await this.canAccessTicket(ticketId, currentUser);
 
     const comments = await this.prisma.ticketComment.findMany({
-      where: { id: ticketId },
+      where: { ticketId },
+      orderBy: {
+        createdAt: 'asc',
+      },
       select: {
         id: true,
         content: true,
@@ -660,6 +670,9 @@ export class TicketsService {
 
     const histories = await this.prisma.ticketHistory.findMany({
       where: { ticketId },
+      orderBy: {
+        createdAt: 'asc',
+      },
       select: {
         id: true,
         action: true,
