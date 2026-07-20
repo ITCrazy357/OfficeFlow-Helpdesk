@@ -1,0 +1,4 @@
+-- AlterTable
+ALTER TABLE `tickets` ADD COLUMN `dueAt` DATETIME(3) NULL,
+    ADD COLUMN `isOverdue` BOOLEAN NOT NULL DEFAULT false,
+    ADD COLUMN `resolveAt` DATETIME(3) NULL;
