@@ -20,6 +20,7 @@ import { AssignTicketDto } from './dto/assign-ticket.dto';
 import { GetTicketsQueryDto } from './dto/get-tickets-query.dto';
 
 import { CreateTicketCommentDto } from './dto/create-ticket-comment.dto';
+import { calculateDueAt } from './ticket-sla.util';
 
 type CurrentUser = {
   userId: number;
@@ -68,6 +69,10 @@ export class TicketsService {
       where.categoryId = query.categoryId;
     }
 
+    if (typeof query.isOverdue === 'boolean') {
+      where.isOverdue = query.isOverdue;
+    }
+
     if (query.keyword) {
       where.OR = [
         {
@@ -97,6 +102,9 @@ export class TicketsService {
           description: true,
           status: true,
           priority: true,
+          dueAt: true,
+          resolveAt: true,
+          isOverdue: true,
           createdAt: true,
           updatedAt: true,
           createdBy: {
@@ -121,6 +129,7 @@ export class TicketsService {
           },
         },
       }),
+
       this.prisma.ticket.count({ where }),
     ]);
 
@@ -136,6 +145,8 @@ export class TicketsService {
   }
 
   async create(createTicketDto: CreateTicketDto, currentUser: CurrentUser) {
+    const dueAt = calculateDueAt(createTicketDto.priority);
+
     const ticket = await this.prisma.ticket.create({
       data: {
         title: createTicketDto.title,
@@ -143,6 +154,7 @@ export class TicketsService {
         priority: createTicketDto.priority,
         categoryId: createTicketDto.categoryId,
         createdById: currentUser.userId,
+        dueAt,
       },
       select: {
         id: true,
@@ -150,6 +162,9 @@ export class TicketsService {
         description: true,
         status: true,
         priority: true,
+        dueAt: true,
+        resolveAt: true,
+        isOverdue: true,
         createdAt: true,
         category: {
           select: {
@@ -179,6 +194,9 @@ export class TicketsService {
         description: true,
         status: true,
         priority: true,
+        dueAt: true,
+        resolveAt: true,
+        isOverdue: true,
         createdById: true,
         createdAt: true,
         updatedAt: true,
@@ -260,6 +278,11 @@ export class TicketsService {
         description: true,
         status: true,
         priority: true,
+        createdAt: true,
+        updatedAt: true,
+        dueAt: true,
+        resolveAt: true,
+        isOverdue: true,
         createdById: true,
         assignedToId: true,
         categoryId: true,
@@ -341,6 +364,12 @@ export class TicketsService {
     updateStatusDto: UpdateTicketStatusDto,
     currentUser: CurrentUser,
   ) {
+    const nextStatus = updateStatusDto.status;
+
+    const shouldSetResolveAt =
+      nextStatus === TicketStatus.RESOLVED ||
+      nextStatus === TicketStatus.CLOSED;
+
     if (
       currentUser.role !== UserRole.ADMIN &&
       currentUser.role !== UserRole.IT_STAFF
@@ -364,6 +393,7 @@ export class TicketsService {
       where: { id },
       data: {
         status: updateStatusDto.status,
+        resolveAt: shouldSetResolveAt ? new Date() : null,
       },
       select: {
         id: true,
@@ -371,6 +401,9 @@ export class TicketsService {
         description: true,
         status: true,
         priority: true,
+        dueAt: true,
+        resolveAt: true,
+        isOverdue: true,
         createdAt: true,
         updatedAt: true,
         createdBy: {
@@ -461,6 +494,9 @@ export class TicketsService {
         description: true,
         status: true,
         priority: true,
+        dueAt: true,
+        resolveAt: true,
+        isOverdue: true,
         createdAt: true,
         updatedAt: true,
         createdBy: {

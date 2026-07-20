@@ -94,6 +94,10 @@ model Ticket {
   status      TicketStatus   @default(OPEN)
   priority    TicketPriority @default(MEDIUM)
 
+  dueAt     DateTime? // Hạn xử lý
+  resolveAt DateTime? // Thòi điểm xủ lý xong
+  isOverdue Boolean   @default(false) // Đã quá hạn hay chưa
+
   createdById Int
   createdBy   User @relation("TicketCreator", fields: [createdById], references: [id])
 

@@ -4,9 +4,11 @@ import type { CSSProperties } from "react";
 import { useState } from "react";
 import {
   AlertCircle,
+  AlertTriangle,
   ArrowLeft,
   CalendarClock,
   CheckCircle2,
+  Clock3,
   Edit3,
   History,
   Loader2,
@@ -41,10 +43,16 @@ import { useMe } from "@/features/auth/hooks";
 import type { AuthUser } from "@/features/auth/types";
 import {
   TicketPriorityBadge,
+  TicketSlaBadge,
   TicketStatusBadge,
 } from "@/features/tickets/components/ticket-badges";
 import { TicketForm } from "@/features/tickets/components/ticket-form";
-import { ticketStatusOptions } from "@/features/tickets/constants";
+import {
+  getSlaMeta,
+  getTicketDueAt,
+  getTicketSlaState,
+  ticketStatusOptions,
+} from "@/features/tickets/constants";
 import {
   useAddTicketComment,
   useAssignTicket,
@@ -67,7 +75,11 @@ import type {
 import { useUsers } from "@/features/users/hooks";
 import { getApiErrorMessage } from "@/lib/axios";
 
-function formatDateTime(value: string) {
+function formatDateTime(value?: string | null) {
+  if (!value) {
+    return "-";
+  }
+
   const date = new Date(value);
 
   if (Number.isNaN(date.getTime())) {
@@ -255,6 +267,9 @@ export default function TicketDetailPage() {
   const comments = commentsQuery.data ?? [];
   const historyItems =
     historyQuery.data?.filter((item) => item.action !== "COMMENTED") ?? [];
+  const dueAt = getTicketDueAt(ticket);
+  const slaState = getTicketSlaState(ticket);
+  const slaMeta = getSlaMeta(slaState);
 
   async function handleUpdate(values: TicketFormValues) {
     setFormError(null);
@@ -365,6 +380,20 @@ export default function TicketDetailPage() {
       icon: CheckCircle2,
     },
     {
+      label: "Hạn xử lý",
+      value: formatDateTime(dueAt),
+      icon: Clock3,
+    },
+    ...(ticket.resolveAt
+      ? [
+          {
+            label: "Hoàn tất lúc",
+            value: formatDateTime(ticket.resolveAt),
+            icon: CheckCircle2,
+          },
+        ]
+      : []),
+    {
       label: "Ngày tạo",
       value: formatDateTime(ticket.createdAt),
       icon: CalendarClock,
@@ -384,6 +413,7 @@ export default function TicketDetailPage() {
           <div className="flex flex-wrap items-center gap-2">
             <TicketStatusBadge status={ticket.status} />
             <TicketPriorityBadge priority={ticket.priority} />
+            <TicketSlaBadge ticket={ticket} />
           </div>
           <h1 className="mt-3 max-w-4xl text-2xl font-semibold tracking-normal sm:text-3xl">
             #{ticket.id} {ticket.title}
@@ -455,6 +485,44 @@ export default function TicketDetailPage() {
               >
                 Xác nhận xóa
               </Button>
+            </div>
+          </CardContent>
+        </Card>
+      ) : null}
+
+      {slaState === "OVERDUE" || slaState === "DUE_SOON" ? (
+        <Card
+          className={
+            slaState === "OVERDUE"
+              ? "border-red-200 bg-red-50 text-red-950 shadow-sm motion-panel"
+              : "border-amber-200 bg-amber-50 text-amber-950 shadow-sm motion-panel"
+          }
+        >
+          <CardContent className="flex items-start gap-3 pt-0">
+            <div
+              className={
+                slaState === "OVERDUE"
+                  ? "grid size-10 shrink-0 place-items-center rounded-lg bg-red-100 text-red-700"
+                  : "grid size-10 shrink-0 place-items-center rounded-lg bg-amber-100 text-amber-700"
+              }
+            >
+              <AlertTriangle className="size-5" />
+            </div>
+            <div>
+              <CardTitle>
+                {slaState === "OVERDUE"
+                  ? "Ticket đã quá hạn SLA"
+                  : "Ticket sắp quá hạn SLA"}
+              </CardTitle>
+              <CardDescription
+                className={
+                  slaState === "OVERDUE"
+                    ? "mt-1 text-red-800"
+                    : "mt-1 text-amber-800"
+                }
+              >
+                {slaMeta.description} Hạn xử lý: {formatDateTime(dueAt)}.
+              </CardDescription>
             </div>
           </CardContent>
         </Card>
@@ -619,6 +687,17 @@ export default function TicketDetailPage() {
               </CardDescription>
             </CardHeader>
             <CardContent className="grid gap-3 pt-0">
+              <div className="flex items-center justify-between gap-3 rounded-lg border bg-muted/20 p-3">
+                <div>
+                  <p className="text-xs font-medium text-muted-foreground">
+                    SLA
+                  </p>
+                  <p className="mt-1 text-sm font-semibold">
+                    {slaMeta.description}
+                  </p>
+                </div>
+                <TicketSlaBadge ticket={ticket} />
+              </div>
               {metaItems.map((item) => {
                 const Icon = item.icon;
 

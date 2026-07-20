@@ -9,6 +9,13 @@ export type TicketStatus =
 
 export type TicketPriority = "LOW" | "MEDIUM" | "HIGH" | "URGENT";
 
+export type TicketSlaState =
+  | "NO_DEADLINE"
+  | "ON_TRACK"
+  | "DUE_SOON"
+  | "OVERDUE"
+  | "DONE";
+
 export type TicketHistoryAction =
   | "CREATE"
   | "UPDATE"
@@ -30,6 +37,10 @@ export type Ticket = {
   description: string;
   status: TicketStatus;
   priority: TicketPriority;
+  dueAt?: string | null;
+  dueDate?: string | null;
+  resolveAt?: string | null;
+  isOverdue?: boolean;
   createdAt: string;
   updatedAt: string;
   createdBy?: TicketUser;
@@ -47,6 +58,7 @@ export type GetTicketsParams = {
   status?: TicketStatus;
   priority?: TicketPriority;
   categoryId?: number;
+  isOverdue?: boolean;
 };
 
 export type TicketsList = PaginatedData<Ticket>;

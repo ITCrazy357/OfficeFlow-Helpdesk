@@ -2,7 +2,9 @@
 
 import {
   AlertCircle,
+  AlertTriangle,
   ArrowRight,
+  CheckCircle2,
   Clock,
   Database,
   FilePlus2,
@@ -24,7 +26,12 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { TicketStatusBadge } from "@/features/tickets/components/ticket-badges";
+import {
+  TicketPriorityBadge,
+  TicketSlaBadge,
+  TicketStatusBadge,
+} from "@/features/tickets/components/ticket-badges";
+import { getTicketSlaState } from "@/features/tickets/constants";
 import { useDbHealth, useHealth } from "@/features/system/hooks";
 import { useTickets } from "@/features/tickets/hooks";
 import { getApiErrorMessage } from "@/lib/axios";
@@ -37,7 +44,7 @@ function DashboardSkeleton() {
         <div className="h-4 w-80 max-w-full rounded-full bg-muted motion-shimmer" />
       </div>
       <div className="grid gap-4 md:grid-cols-4">
-        {Array.from({ length: 4 }).map((_, index) => (
+        {Array.from({ length: 7 }).map((_, index) => (
           <Card key={index} className="motion-panel">
             <CardContent className="grid gap-3 pt-0">
               <div className="h-4 w-24 rounded-full bg-muted motion-shimmer" />
@@ -78,6 +85,10 @@ function ErrorCard({ error }: { error: unknown }) {
   );
 }
 
+function isDueSoonTicket(ticket: Parameters<typeof getTicketSlaState>[0]) {
+  return getTicketSlaState(ticket) === "DUE_SOON";
+}
+
 export default function DashboardPage() {
   const latestQuery = useTickets({ page: 1, limit: 5 });
   const totalQuery = useTickets({ page: 1, limit: 1 });
@@ -88,6 +99,13 @@ export default function DashboardPage() {
     status: "IN_PROGRESS",
   });
   const resolvedQuery = useTickets({ page: 1, limit: 1, status: "RESOLVED" });
+  const overdueQuery = useTickets({ page: 1, limit: 1, isOverdue: true });
+  const onTrackQuery = useTickets({ page: 1, limit: 1, isOverdue: false });
+  const slaSnapshotQuery = useTickets({
+    page: 1,
+    limit: 1000,
+    isOverdue: false,
+  });
   const healthQuery = useHealth();
   const dbHealthQuery = useDbHealth();
 
@@ -97,6 +115,9 @@ export default function DashboardPage() {
     openQuery,
     progressQuery,
     resolvedQuery,
+    overdueQuery,
+    onTrackQuery,
+    slaSnapshotQuery,
   ];
 
   if (ticketQueries.some((query) => query.isLoading)) {
@@ -114,6 +135,13 @@ export default function DashboardPage() {
   const open = openQuery.data?.pagination.totalItems ?? 0;
   const inProgress = progressQuery.data?.pagination.totalItems ?? 0;
   const resolved = resolvedQuery.data?.pagination.totalItems ?? 0;
+  const overdue = overdueQuery.data?.pagination.totalItems ?? 0;
+  const dueSoon =
+    slaSnapshotQuery.data?.items.filter(isDueSoonTicket).length ?? 0;
+  const onTrack = Math.max(
+    (onTrackQuery.data?.pagination.totalItems ?? 0) - dueSoon,
+    0,
+  );
 
   const statCards = [
     {
@@ -139,6 +167,24 @@ export default function DashboardPage() {
       value: resolved,
       icon: ShieldCheck,
       detail: "Chờ đóng hoặc xác nhận",
+    },
+    {
+      label: "Quá hạn SLA",
+      value: overdue,
+      icon: AlertTriangle,
+      detail: "Cronjob đã đánh dấu quá hạn",
+    },
+    {
+      label: "Sắp quá hạn",
+      value: dueSoon,
+      icon: Clock,
+      detail: "Còn dưới 24 giờ tới hạn",
+    },
+    {
+      label: "Trong hạn",
+      value: onTrack,
+      icon: CheckCircle2,
+      detail: "Chưa quá hạn và chưa sát hạn",
     },
   ];
 
@@ -288,10 +334,13 @@ export default function DashboardPage() {
                         #{ticket.id} {ticket.title}
                       </p>
                     </div>
-                    <p className="mt-1 line-clamp-1 text-xs text-muted-foreground">
-                      Người tạo: {ticket.createdBy?.name ?? "-"} / Ưu tiên:{" "}
-                      {ticket.priority}
-                    </p>
+                    <div className="mt-2 flex flex-wrap items-center gap-2">
+                      <TicketPriorityBadge priority={ticket.priority} />
+                      <TicketSlaBadge ticket={ticket} />
+                      <span className="text-xs text-muted-foreground">
+                        Người tạo: {ticket.createdBy?.name ?? "-"}
+                      </span>
+                    </div>
                   </div>
                   <div className="px-1">
                     <TicketStatusBadge status={ticket.status} />

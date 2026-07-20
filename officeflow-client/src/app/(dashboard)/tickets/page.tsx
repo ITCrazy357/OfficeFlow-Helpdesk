@@ -6,6 +6,7 @@ import {
   AlertCircle,
   ChevronLeft,
   ChevronRight,
+  Clock3,
   Filter,
   Inbox,
   Plus,
@@ -40,9 +41,12 @@ import {
 } from "@/components/ui/table";
 import {
   TicketPriorityBadge,
+  TicketSlaBadge,
   TicketStatusBadge,
 } from "@/features/tickets/components/ticket-badges";
 import {
+  getTicketDueAt,
+  ticketSlaOptions,
   ticketPriorityOptions,
   ticketStatusOptions,
 } from "@/features/tickets/constants";
@@ -59,8 +63,13 @@ const PAGE_SIZE = 10;
 
 type StatusFilter = "ALL" | TicketStatus;
 type PriorityFilter = "ALL" | TicketPriority;
+type SlaFilter = "ALL" | "ON_TRACK" | "OVERDUE";
 
-function formatDateTime(value: string) {
+function formatDateTime(value?: string | null) {
+  if (!value) {
+    return "-";
+  }
+
   const date = new Date(value);
 
   if (Number.isNaN(date.getTime())) {
@@ -85,6 +94,7 @@ function TicketsTable({ tickets }: { tickets: Ticket[] }) {
           <TableHead>Người tạo</TableHead>
           <TableHead>Người xử lý</TableHead>
           <TableHead>Danh mục</TableHead>
+          <TableHead>Hạn xử lý</TableHead>
           <TableHead>Ngày tạo</TableHead>
         </TableRow>
       </TableHeader>
@@ -116,6 +126,14 @@ function TicketsTable({ tickets }: { tickets: Ticket[] }) {
             <TableCell>{ticket.createdBy?.name ?? "-"}</TableCell>
             <TableCell>{ticket.assignedTo?.name ?? "-"}</TableCell>
             <TableCell>{ticket.category?.name ?? "-"}</TableCell>
+            <TableCell className="min-w-40">
+              <div className="grid gap-1">
+                <TicketSlaBadge ticket={ticket} />
+                <span className="text-xs text-muted-foreground">
+                  {formatDateTime(getTicketDueAt(ticket))}
+                </span>
+              </div>
+            </TableCell>
             <TableCell>{formatDateTime(ticket.createdAt)}</TableCell>
           </TableRow>
         ))}
@@ -150,8 +168,9 @@ function TicketsMobileList({ tickets }: { tickets: Ticket[] }) {
           </p>
           <div className="mt-4 flex flex-wrap items-center gap-2">
             <TicketPriorityBadge priority={ticket.priority} />
+            <TicketSlaBadge ticket={ticket} />
             <span className="text-xs text-muted-foreground">
-              {formatDateTime(ticket.createdAt)}
+              Hạn: {formatDateTime(getTicketDueAt(ticket))}
             </span>
           </div>
         </Link>
@@ -186,6 +205,7 @@ export default function TicketsPage() {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("ALL");
   const [priorityFilter, setPriorityFilter] =
     useState<PriorityFilter>("ALL");
+  const [slaFilter, setSlaFilter] = useState<SlaFilter>("ALL");
   const [categoryFilter, setCategoryFilter] = useState("");
 
   const params = useMemo<GetTicketsParams>(
@@ -195,10 +215,12 @@ export default function TicketsPage() {
       keyword: keyword || undefined,
       status: statusFilter === "ALL" ? undefined : statusFilter,
       priority: priorityFilter === "ALL" ? undefined : priorityFilter,
+      isOverdue:
+        slaFilter === "ALL" ? undefined : slaFilter === "OVERDUE",
       categoryId:
         categoryFilter.trim() === "" ? undefined : Number(categoryFilter),
     }),
-    [categoryFilter, keyword, page, priorityFilter, statusFilter],
+    [categoryFilter, keyword, page, priorityFilter, slaFilter, statusFilter],
   );
 
   const { data, error, isError, isFetching, isLoading, refetch } =
@@ -215,6 +237,7 @@ export default function TicketsPage() {
     setKeyword("");
     setStatusFilter("ALL");
     setPriorityFilter("ALL");
+    setSlaFilter("ALL");
     setCategoryFilter("");
     setPage(1);
   }
@@ -229,6 +252,7 @@ export default function TicketsPage() {
     Boolean(keyword) ||
     statusFilter !== "ALL" ||
     priorityFilter !== "ALL" ||
+    slaFilter !== "ALL" ||
     categoryFilter.trim() !== "";
 
   return (
@@ -237,11 +261,11 @@ export default function TicketsPage() {
         <div>
           <div className="mb-2 inline-flex items-center gap-2 rounded-full border bg-muted/60 px-3 py-1 text-xs font-medium text-muted-foreground">
             <Filter className="size-3.5" />
-            Ticket workspace
+            Không gian ticket
           </div>
           <h1 className="text-2xl font-semibold tracking-normal">Tickets</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Quản lý yêu cầu hỗ trợ theo quyền, trạng thái và độ ưu tiên.
+            Quản lý yêu cầu hỗ trợ theo quyền, trạng thái, độ ưu tiên và hạn SLA.
           </p>
         </div>
 
@@ -260,14 +284,14 @@ export default function TicketsPage() {
             <div>
               <CardTitle>Bộ lọc</CardTitle>
               <CardDescription>
-                Lọc theo từ khóa, trạng thái, độ ưu tiên và danh mục ID.
+                Lọc theo từ khóa, trạng thái, độ ưu tiên, SLA và danh mục ID.
               </CardDescription>
             </div>
           </div>
         </CardHeader>
         <CardContent className="pt-0">
           <form
-            className="grid gap-3 xl:grid-cols-[1fr_180px_180px_160px_auto]"
+            className="grid gap-3 xl:grid-cols-[1fr_170px_170px_150px_150px_auto]"
             onSubmit={handleSearch}
           >
             <div className="relative">
@@ -330,6 +354,26 @@ export default function TicketsPage() {
               }}
               placeholder="Danh mục ID"
             />
+
+            <Select
+              value={slaFilter}
+              onValueChange={(value) => {
+                setSlaFilter(value as SlaFilter);
+                setPage(1);
+              }}
+            >
+              <SelectTrigger className="w-full">
+                <Clock3 className="size-4 text-muted-foreground" />
+                <SelectValue placeholder="SLA" />
+              </SelectTrigger>
+              <SelectContent>
+                {ticketSlaOptions.map((option) => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {option.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
 
             <div className="flex gap-2">
               <Button type="submit" disabled={isFetching}>

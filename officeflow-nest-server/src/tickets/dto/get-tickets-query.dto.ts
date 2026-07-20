@@ -1,6 +1,13 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { Type } from 'class-transformer';
-import { IsEnum, IsInt, IsOptional, IsString, Min } from 'class-validator';
+import { Type, Transform } from 'class-transformer';
+import {
+  IsEnum,
+  IsInt,
+  IsBoolean,
+  IsOptional,
+  IsString,
+  Min,
+} from 'class-validator';
 import { TicketPriority, TicketStatus } from '@prisma/client';
 
 export class GetTicketsQueryDto {
@@ -56,4 +63,13 @@ export class GetTicketsQueryDto {
   @IsInt()
   @Min(1)
   categoryId?: number;
+
+  @ApiPropertyOptional({
+    example: true,
+    description: 'Filter overdue tickets',
+  })
+  @IsOptional()
+  @Transform(({ value }) => value === 'true')
+  @IsBoolean()
+  isOverdue?: boolean;
 }
