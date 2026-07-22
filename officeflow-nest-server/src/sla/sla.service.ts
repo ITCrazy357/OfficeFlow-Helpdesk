@@ -10,7 +10,7 @@ export class SlaService {
 
   constructor(private readonly prisma: PrismaService) {}
 
-  @Cron(CronExpression.EVERY_MINUTE)
+  @Cron(CronExpression.EVERY_30_MINUTES)
   async markOverdueTickets() {
     const now = new Date();
 
