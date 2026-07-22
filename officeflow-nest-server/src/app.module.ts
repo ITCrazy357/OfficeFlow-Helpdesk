@@ -8,6 +8,7 @@ import { DepartmentsModule } from './departments/departments.module';
 import { TicketsModule } from './tickets/tickets.module';
 import { ScheduleModule } from '@nestjs/schedule';
 import { SlaModule } from './sla/sla.module';
+import { DashboardModule } from './dashboard/dashboard.module';
 
 @Module({
   imports: [
@@ -18,6 +19,7 @@ import { SlaModule } from './sla/sla.module';
     DepartmentsModule,
     TicketsModule,
     SlaModule,
+    DashboardModule,
   ],
   controllers: [AppController],
   providers: [AppService],
