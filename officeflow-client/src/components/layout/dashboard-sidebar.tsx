@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  BookOpenText,
   Building2,
   CircleCheck,
   LayoutDashboard,
@@ -41,6 +42,12 @@ const navigationItems: NavigationItem[] = [
     label: "Tickets",
     description: "Yêu cầu hỗ trợ",
     icon: TicketCheck,
+  },
+  {
+    href: "/knowledge",
+    label: "Knowledge",
+    description: "FAQ nội bộ",
+    icon: BookOpenText,
   },
   {
     href: "/departments",
