@@ -1,7 +1,7 @@
 "use client";
 
-import type { CSSProperties, FormEvent } from "react";
-import { useMemo, useState } from "react";
+import type { CSSProperties } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   AlertCircle,
   BookOpenText,
@@ -61,6 +61,7 @@ import type {
 import { getApiErrorMessage } from "@/lib/axios";
 
 const PAGE_SIZE = 8;
+const SEARCH_DEBOUNCE_MS = 400;
 
 type PublishedFilter = "ALL" | "PUBLISHED" | "DRAFT";
 type FormMode = "create" | "edit" | null;
@@ -265,6 +266,21 @@ export default function KnowledgePage() {
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
 
+  useEffect(() => {
+    const timeoutId = window.setTimeout(() => {
+      const nextKeyword = searchInput.trim();
+      const nextTag = tagInput.trim();
+
+      if (nextKeyword !== keyword || nextTag !== tag) {
+        setPage(1);
+        setKeyword(nextKeyword);
+        setTag(nextTag);
+      }
+    }, SEARCH_DEBOUNCE_MS);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [keyword, searchInput, tag, tagInput]);
+
   const params = useMemo<GetKnowledgeArticlesParams>(
     () => ({
       page,
@@ -301,13 +317,6 @@ export default function KnowledgePage() {
     Boolean(tag) ||
     (user?.role === "ADMIN" && publishedFilter !== "ALL");
   const selectedCanMutate = canMutateArticle(user, selectedArticle);
-
-  function handleSearch(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setPage(1);
-    setKeyword(searchInput.trim());
-    setTag(tagInput.trim());
-  }
 
   function handleClearFilters() {
     setSearchInput("");
@@ -432,10 +441,7 @@ export default function KnowledgePage() {
               </div>
             </CardHeader>
             <CardContent className="pt-0">
-              <form
-                className="grid gap-3 xl:grid-cols-[1fr_180px_190px_auto]"
-                onSubmit={handleSearch}
-              >
+              <div className="grid gap-3 xl:grid-cols-[1fr_180px_190px_auto]">
                 <div className="relative">
                   <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
                   <Input
@@ -475,10 +481,13 @@ export default function KnowledgePage() {
                   </Select>
                 ) : null}
 
-                <div className="flex gap-2">
-                  <Button type="submit" disabled={articlesQuery.isFetching}>
-                    Tìm
-                  </Button>
+                <div className="flex items-center gap-2">
+                  {articlesQuery.isFetching ? (
+                    <span className="inline-flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+                      <Loader2 className="size-3.5 animate-spin" />
+                      Đang tìm
+                    </span>
+                  ) : null}
                   {hasActiveFilter ? (
                     <Button
                       type="button"
@@ -490,7 +499,7 @@ export default function KnowledgePage() {
                     </Button>
                   ) : null}
                 </div>
-              </form>
+              </div>
             </CardContent>
           </Card>
 
