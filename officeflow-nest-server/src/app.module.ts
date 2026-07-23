@@ -9,6 +9,7 @@ import { TicketsModule } from './tickets/tickets.module';
 import { ScheduleModule } from '@nestjs/schedule';
 import { SlaModule } from './sla/sla.module';
 import { DashboardModule } from './dashboard/dashboard.module';
+import { KnowledgeModule } from './knowledge/knowledge.module';
 
 @Module({
   imports: [
@@ -20,6 +21,7 @@ import { DashboardModule } from './dashboard/dashboard.module';
     TicketsModule,
     SlaModule,
     DashboardModule,
+    KnowledgeModule,
   ],
   controllers: [AppController],
   providers: [AppService],
