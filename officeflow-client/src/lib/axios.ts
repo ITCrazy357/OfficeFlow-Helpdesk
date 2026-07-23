@@ -14,7 +14,6 @@ export const api = axios.create({
   timeout: apiTimeout,
   headers: {
     Accept: "application/json",
-    "Content-Type": "application/json",
   },
 });
 
