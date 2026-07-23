@@ -20,6 +20,10 @@ export const api = axios.create({
 api.interceptors.request.use((config) => {
   const token = getAccessToken();
 
+  if (typeof FormData !== "undefined" && config.data instanceof FormData) {
+    config.headers.delete("Content-Type");
+  }
+
   if (token) {
     config.headers.set("Authorization", `Bearer ${token}`);
   }
