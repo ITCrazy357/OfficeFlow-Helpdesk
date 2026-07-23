@@ -34,6 +34,8 @@ enum TicketHistoryAction {
   STATUS_CHANGED
   ASSIGNED
   COMMENTED
+  ATTACHMENT_ADDED
+  ATTACHMENT_DELETED
   DELETED
 }
 
@@ -62,6 +64,8 @@ model User {
 
   createdTickets  Ticket[] @relation("TicketCreator")
   assignedTickets Ticket[] @relation("TicketAssignee")
+
+  ticketAttachments TicketAttachment[]
 
   ticketComments  TicketComment[]
   ticketHistories TicketHistory[]
@@ -108,6 +112,8 @@ model Ticket {
   category   TicketCategory? @relation(fields: [categoryId], references: [id])
 
   dueDate DateTime?
+
+  attachments TicketAttachment[]
 
   comments TicketComment[]
 
@@ -160,4 +166,27 @@ model TicketHistory {
   @@index([userId])
   @@index([action])
   @@map("ticket_histories")
+}
+
+model TicketAttachment {
+  id Int @id @default(autoincrement())
+
+  fileName     String
+  fileUrl      String  @db.Text
+  fileType     String?
+  fileSize     Int?
+  publicId     String?
+  resourceType String?
+
+  ticketId Int
+  ticket   Ticket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+
+  uploadedById Int
+  uploadedBy   User @relation(fields: [uploadedById], references: [id])
+
+  createdAt DateTime @default(now())
+
+  @@index([ticketId, createdAt, id])
+  @@index([uploadedById])
+  @@map("ticket_attachments")
 }

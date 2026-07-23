@@ -3,23 +3,31 @@ import {
   Controller,
   Delete,
   Get,
+  HttpCode,
+  HttpStatus,
+  MaxFileSizeValidator,
   Param,
+  ParseFilePipe,
   ParseIntPipe,
   Patch,
   Post,
   Query,
+  UploadedFile,
   UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
 import { UserRole, TicketPriority, TicketStatus } from '@prisma/client';
 import {
   ApiBearerAuth,
   ApiBody,
+  ApiConsumes,
   ApiOperation,
   ApiParam,
   ApiQuery,
   ApiResponse,
   ApiTags,
 } from '@nestjs/swagger';
+import { FileInterceptor } from '@nestjs/platform-express';
 
 import { TicketsService } from './tickets.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
@@ -36,10 +44,11 @@ import { UpdateTicketStatusDto } from './dto/update-ticket-status.dto';
 import { AssignTicketDto } from './dto/assign-ticket.dto';
 import { GetTicketsQueryDto } from './dto/get-tickets-query.dto';
 
-import { HttpCode, HttpStatus } from '@nestjs/common';
 import { Message } from '../common/decorators/message.decorator';
 
 import { CreateTicketCommentDto } from './dto/create-ticket-comment.dto';
+
+const MAX_ATTACHMENT_SIZE_IN_BYTES = 10 * 1024 * 1024;
 
 @ApiTags('Tickets')
 @ApiBearerAuth()
@@ -246,5 +255,102 @@ export class TicketsController {
     @CurrentUser() currentUser: CurrentUserPayload,
   ) {
     return this.ticketsService.getHistory(id, currentUser);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post(':id/attachments')
+  @UseInterceptors(
+    FileInterceptor('file', {
+      limits: { fileSize: MAX_ATTACHMENT_SIZE_IN_BYTES },
+    }),
+  )
+  @HttpCode(HttpStatus.CREATED)
+  @Message('Upload ticket attachment successfully')
+  @ApiOperation({ summary: 'Upload an attachment to a ticket' })
+  @ApiConsumes('multipart/form-data')
+  @ApiParam({ name: 'id', example: 1 })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      required: ['file'],
+      properties: {
+        file: {
+          type: 'string',
+          format: 'binary',
+        },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 201,
+    description: 'Upload ticket attachment successfully',
+  })
+  @ApiResponse({ status: 400, description: 'Invalid or missing file' })
+  @ApiResponse({ status: 413, description: 'Attachment exceeds 10 MB' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Forbidden' })
+  @ApiResponse({ status: 404, description: 'Ticket not found' })
+  uploadAttachment(
+    @Param('id', ParseIntPipe) id: number,
+    @UploadedFile(
+      new ParseFilePipe({
+        fileIsRequired: true,
+        validators: [
+          new MaxFileSizeValidator({
+            maxSize: MAX_ATTACHMENT_SIZE_IN_BYTES,
+            errorMessage: 'Attachment must not exceed 10 MB',
+          }),
+        ],
+      }),
+    )
+    file: Express.Multer.File,
+    @CurrentUser() currentUser: CurrentUserPayload,
+  ) {
+    return this.ticketsService.uploadAttachment(id, file, currentUser);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Get(':id/attachments')
+  @HttpCode(HttpStatus.OK)
+  @Message('Get ticket attachments successfully')
+  @ApiOperation({ summary: 'Get attachments of a ticket' })
+  @ApiParam({ name: 'id', example: 1 })
+  @ApiResponse({
+    status: 200,
+    description: 'Get ticket attachments successfully',
+  })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Forbidden' })
+  @ApiResponse({ status: 404, description: 'Ticket not found' })
+  getAttachments(
+    @Param('id', ParseIntPipe) id: number,
+    @CurrentUser() currentUser: CurrentUserPayload,
+  ) {
+    return this.ticketsService.getAttachments(id, currentUser);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Delete(':id/attachments/:attachmentId')
+  @HttpCode(HttpStatus.OK)
+  @Message('Delete ticket attachment successfully')
+  @ApiOperation({ summary: 'Delete an attachment from a ticket' })
+  @ApiParam({ name: 'id', example: 1 })
+  @ApiParam({ name: 'attachmentId', example: 10 })
+  @ApiResponse({
+    status: 200,
+    description: 'Delete ticket attachment successfully',
+  })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Forbidden' })
+  @ApiResponse({
+    status: 404,
+    description: 'Ticket or attachment not found',
+  })
+  deleteAttachment(
+    @Param('id', ParseIntPipe) id: number,
+    @Param('attachmentId', ParseIntPipe) attachmentId: number,
+    @CurrentUser() currentUser: CurrentUserPayload,
+  ) {
+    return this.ticketsService.deleteAttachment(id, attachmentId, currentUser);
   }
 }

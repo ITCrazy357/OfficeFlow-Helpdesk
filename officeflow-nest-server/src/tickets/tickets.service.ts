@@ -2,6 +2,7 @@ import {
   BadRequestException,
   ForbiddenException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import {
@@ -22,14 +23,51 @@ import { GetTicketsQueryDto } from './dto/get-tickets-query.dto';
 import { CreateTicketCommentDto } from './dto/create-ticket-comment.dto';
 import { calculateDueAt } from './ticket-sla.util';
 
+import {
+  CloudinaryService,
+  type CloudinaryResourceType,
+} from '../cloudinary/cloudinary.service';
+
 type CurrentUser = {
   userId: number;
   role: UserRole;
 };
 
+function resolveCloudinaryResourceType(
+  resourceType: string | null,
+  fileUrl: string,
+): CloudinaryResourceType {
+  if (
+    resourceType === 'image' ||
+    resourceType === 'raw' ||
+    resourceType === 'video'
+  ) {
+    return resourceType;
+  }
+
+  const resourceTypeFromUrl = fileUrl.match(
+    /\/(image|raw|video)\/upload(?:\/|$)/,
+  )?.[1];
+
+  if (
+    resourceTypeFromUrl === 'image' ||
+    resourceTypeFromUrl === 'raw' ||
+    resourceTypeFromUrl === 'video'
+  ) {
+    return resourceTypeFromUrl;
+  }
+
+  return 'image';
+}
+
 @Injectable()
 export class TicketsService {
-  constructor(private readonly prisma: PrismaService) {}
+  private readonly logger = new Logger(TicketsService.name);
+
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly cloudinaryService: CloudinaryService,
+  ) {}
 
   async getTickets(currentUser: CurrentUser, query: GetTicketsQueryDto) {
     const page = query.page || 1;
@@ -540,6 +578,13 @@ export class TicketsService {
         id: true,
         createdById: true,
         status: true,
+        attachments: {
+          select: {
+            fileUrl: true,
+            publicId: true,
+            resourceType: true,
+          },
+        },
       },
     });
 
@@ -556,6 +601,22 @@ export class TicketsService {
     if (!canDelete) {
       throw new ForbiddenException('Forbidden');
     }
+
+    await Promise.all(
+      ticket.attachments.map((attachment) => {
+        if (!attachment.publicId) {
+          return Promise.resolve();
+        }
+
+        return this.cloudinaryService.deleteFile(
+          attachment.publicId,
+          resolveCloudinaryResourceType(
+            attachment.resourceType,
+            attachment.fileUrl,
+          ),
+        );
+      }),
+    );
 
     await this.prisma.ticket.delete({
       where: { id },
@@ -727,5 +788,177 @@ export class TicketsService {
     });
 
     return histories;
+  }
+
+  async uploadAttachment(
+    ticketId: number,
+    file: Express.Multer.File,
+    currentUser: CurrentUser,
+  ) {
+    if (!file) {
+      throw new BadRequestException('File is required');
+    }
+
+    await this.canAccessTicket(ticketId, currentUser);
+
+    const uploadedFile = await this.cloudinaryService.uploadFile(
+      file,
+      'officeflow/ticket-attachments',
+    );
+
+    try {
+      return await this.prisma.$transaction(async (transaction) => {
+        const attachment = await transaction.ticketAttachment.create({
+          data: {
+            ticketId,
+            uploadedById: currentUser.userId,
+            fileName: file.originalname,
+            fileType: file.mimetype,
+            fileSize: file.size,
+            fileUrl: uploadedFile.secureUrl,
+            publicId: uploadedFile.publicId,
+            resourceType: uploadedFile.resourceType,
+          },
+          select: {
+            id: true,
+            fileName: true,
+            fileUrl: true,
+            fileType: true,
+            fileSize: true,
+            createdAt: true,
+            uploadedBy: {
+              select: {
+                id: true,
+                name: true,
+                email: true,
+                role: true,
+              },
+            },
+          },
+        });
+
+        await transaction.ticketHistory.create({
+          data: {
+            ticketId,
+            userId: currentUser.userId,
+            action: TicketHistoryAction.ATTACHMENT_ADDED,
+            newValue: attachment.fileName,
+          },
+        });
+
+        return attachment;
+      });
+    } catch (error) {
+      try {
+        await this.cloudinaryService.deleteFile(
+          uploadedFile.publicId,
+          uploadedFile.resourceType,
+        );
+      } catch (cleanupError) {
+        this.logger.error(
+          `Could not clean up Cloudinary asset ${uploadedFile.publicId}`,
+          cleanupError instanceof Error ? cleanupError.stack : undefined,
+        );
+      }
+
+      throw error;
+    }
+  }
+
+  async getAttachments(ticketId: number, currentUser: CurrentUser) {
+    await this.canAccessTicket(ticketId, currentUser);
+
+    const attachments = await this.prisma.ticketAttachment.findMany({
+      where: { ticketId },
+      select: {
+        id: true,
+        fileName: true,
+        fileUrl: true,
+        fileType: true,
+        fileSize: true,
+        createdAt: true,
+        uploadedBy: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            role: true,
+          },
+        },
+      },
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+    });
+    return attachments;
+  }
+
+  async deleteAttachment(
+    ticketId: number,
+    attachmentId: number,
+    currentUser: CurrentUser,
+  ) {
+    await this.canAccessTicket(ticketId, currentUser);
+
+    const attachment = await this.prisma.ticketAttachment.findUnique({
+      where: {
+        id: attachmentId,
+        ticketId,
+      },
+      select: {
+        fileName: true,
+        fileUrl: true,
+        publicId: true,
+        resourceType: true,
+        uploadedById: true,
+      },
+    });
+
+    if (!attachment) {
+      throw new NotFoundException('Attachment not found');
+    }
+
+    if (currentUser.role === UserRole.MANAGER) {
+      throw new ForbiddenException('Forbidden');
+    }
+
+    if (
+      currentUser.role === UserRole.EMPLOYEE &&
+      attachment.uploadedById !== currentUser.userId
+    ) {
+      throw new ForbiddenException('Forbidden');
+    }
+
+    if (attachment.publicId) {
+      await this.cloudinaryService.deleteFile(
+        attachment.publicId,
+        resolveCloudinaryResourceType(
+          attachment.resourceType,
+          attachment.fileUrl,
+        ),
+      );
+    }
+
+    await this.prisma.$transaction(async (transaction) => {
+      const deleted = await transaction.ticketAttachment.deleteMany({
+        where: {
+          id: attachmentId,
+          ticketId,
+        },
+      });
+
+      if (deleted.count !== 1) {
+        throw new NotFoundException('Attachment not found');
+      }
+
+      await transaction.ticketHistory.create({
+        data: {
+          ticketId,
+          userId: currentUser.userId,
+          action: TicketHistoryAction.ATTACHMENT_DELETED,
+          newValue: attachment.fileName,
+        },
+      });
+    });
+
+    return { id: attachmentId };
   }
 }
