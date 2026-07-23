@@ -46,6 +46,7 @@ import {
   TicketSlaBadge,
   TicketStatusBadge,
 } from "@/features/tickets/components/ticket-badges";
+import { TicketAttachments } from "@/features/tickets/components/ticket-attachments";
 import { TicketForm } from "@/features/tickets/components/ticket-form";
 import {
   getSlaMeta,
@@ -141,6 +142,8 @@ function getHistoryActionLabel(action: TicketHistoryAction) {
     STATUS_CHANGED: "Đổi trạng thái",
     ASSIGNED: "Gán người xử lý",
     COMMENTED: "Bình luận",
+    ATTACHMENT_ADDED: "Thêm tệp đính kèm",
+    ATTACHMENT_DELETED: "Xóa tệp đính kèm",
     DELETED: "Xóa ticket",
   };
 
@@ -543,6 +546,14 @@ export default function TicketDetailPage() {
               </p>
             </CardContent>
           </Card>
+
+          {allowDiscussion ? (
+            <TicketAttachments
+              ticketId={ticket.id}
+              currentUser={user}
+              enabled={allowDiscussion}
+            />
+          ) : null}
 
           {allowDiscussion ? (
             <Card className="shadow-sm motion-panel">

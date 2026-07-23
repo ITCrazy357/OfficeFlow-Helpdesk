@@ -22,6 +22,8 @@ export type TicketHistoryAction =
   | "STATUS_CHANGED"
   | "ASSIGNED"
   | "COMMENTED"
+  | "ATTACHMENT_ADDED"
+  | "ATTACHMENT_DELETED"
   | "DELETED";
 
 export type TicketUser = {
@@ -100,7 +102,21 @@ export type TicketHistory = {
   user: TicketUser;
 };
 
+export type TicketAttachment = {
+  id: number;
+  fileName: string;
+  fileUrl: string;
+  fileType?: string | null;
+  fileSize?: number | null;
+  createdAt: string;
+  uploadedBy: TicketUser;
+};
+
 export type DeleteTicketResponse = {
   id?: number;
   message?: string;
+};
+
+export type DeleteTicketAttachmentResponse = {
+  id: number;
 };

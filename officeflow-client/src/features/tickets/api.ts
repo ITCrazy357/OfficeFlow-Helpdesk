@@ -3,10 +3,12 @@ import type { ApiResponse, Pagination } from "@/types/api";
 import type {
   CreateTicketCommentInput,
   CreateTicketInput,
+  DeleteTicketAttachmentResponse,
   DeleteTicketResponse,
   AssignTicketInput,
   GetTicketsParams,
   Ticket,
+  TicketAttachment,
   TicketComment,
   TicketHistory,
   UpdateTicketInput,
@@ -99,6 +101,37 @@ export async function addTicketCommentApi(
 export async function getTicketHistoryApi(id: number) {
   const res = await api.get<ApiResponse<TicketHistory[]>>(
     `/tickets/${id}/history`,
+  );
+
+  return res.data.data;
+}
+
+export async function getTicketAttachmentsApi(id: number) {
+  const res = await api.get<ApiResponse<TicketAttachment[]>>(
+    `/tickets/${id}/attachments`,
+  );
+
+  return res.data.data;
+}
+
+export async function uploadTicketAttachmentApi(id: number, file: File) {
+  const formData = new FormData();
+  formData.append("file", file);
+
+  const res = await api.post<ApiResponse<TicketAttachment>>(
+    `/tickets/${id}/attachments`,
+    formData,
+  );
+
+  return res.data.data;
+}
+
+export async function deleteTicketAttachmentApi(
+  id: number,
+  attachmentId: number,
+) {
+  const res = await api.delete<ApiResponse<DeleteTicketAttachmentResponse>>(
+    `/tickets/${id}/attachments/${attachmentId}`,
   );
 
   return res.data.data;
