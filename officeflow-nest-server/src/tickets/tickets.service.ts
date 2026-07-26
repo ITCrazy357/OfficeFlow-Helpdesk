@@ -28,6 +28,11 @@ import {
   type CloudinaryResourceType,
 } from '../cloudinary/cloudinary.service';
 
+import { EventEmitter2 } from '@nestjs/event-emitter';
+import { TicketAssignedEvent } from '../notifications/events/ticket-assigned.event';
+import { TicketCommentedEvent } from '../notifications/events/ticket-commented.event';
+import { TicketStatusChangedEvent } from '../notifications/events/ticket-status-changed.event';
+
 type CurrentUser = {
   userId: number;
   role: UserRole;
@@ -67,6 +72,7 @@ export class TicketsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly cloudinaryService: CloudinaryService,
+    private readonly eventEmitter: EventEmitter2,
   ) {}
 
   async getTickets(currentUser: CurrentUser, query: GetTicketsQueryDto) {
@@ -419,7 +425,10 @@ export class TicketsService {
       where: { id },
       select: {
         id: true,
+        title: true,
         status: true,
+        createdById: true,
+        assignedToId: true,
       },
     });
 
@@ -475,6 +484,30 @@ export class TicketsService {
       newValue: updateTicket.status,
     });
 
+    const recipientIds = [ticket.createdById, ticket.assignedToId].filter(
+      (userId): userId is number => Boolean(userId),
+    );
+
+    const actor = await this.prisma.user.findUnique({
+      where: { id: currentUser.userId },
+      select: {
+        name: true,
+      },
+    });
+
+    this.eventEmitter.emit(
+      'ticket.status_changed',
+      new TicketStatusChangedEvent(
+        id,
+        ticket.title,
+        currentUser.userId,
+        actor?.name || 'Someone',
+        ticket.status,
+        updateTicket.status,
+        recipientIds,
+      ),
+    );
+
     return updateTicket;
   }
 
@@ -494,6 +527,7 @@ export class TicketsService {
       where: { id },
       select: {
         id: true,
+        title: true,
         assignedToId: true,
       },
     });
@@ -567,6 +601,25 @@ export class TicketsService {
       oldValue: ticket.assignedToId ? String(ticket.assignedToId) : undefined,
       newValue: String(assignTicketDto.assignedToId),
     });
+
+    const actor = await this.prisma.user.findUnique({
+      where: { id: currentUser.userId },
+      select: {
+        name: true,
+      },
+    });
+
+    if (!actor) throw new NotFoundException('Actor not found');
+
+    this.eventEmitter.emit(
+      'ticket.assigned',
+      new TicketAssignedEvent(
+        id,
+        ticket.title,
+        assignTicketDto.assignedToId,
+        actor.name || 'Someone',
+      ),
+    );
 
     return updatedTicket;
   }
@@ -724,6 +777,33 @@ export class TicketsService {
         },
       },
     });
+
+    const ticket = await this.prisma.ticket.findUnique({
+      where: { id: ticketId },
+      select: {
+        id: true,
+        title: true,
+        createdById: true,
+        assignedToId: true,
+      },
+    });
+
+    if (ticket) {
+      const recipientIds = [ticket.createdById, ticket.assignedToId].filter(
+        (id): id is number => Boolean(id),
+      );
+
+      this.eventEmitter.emit(
+        'ticket.commented',
+        new TicketCommentedEvent(
+          ticket.id,
+          ticket.title,
+          currentUser.userId,
+          comment.author.name,
+          recipientIds,
+        ),
+      );
+    }
 
     await this.createHistory({
       ticketId,

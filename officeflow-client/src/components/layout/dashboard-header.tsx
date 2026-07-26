@@ -6,6 +6,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { useLogout } from "@/features/auth/hooks";
 import type { AuthUser, UserRole } from "@/features/auth/types";
+import { NotificationBell } from "@/features/notifications/components/notification-bell";
 
 type DashboardHeaderProps = {
   user: AuthUser;
@@ -29,6 +30,34 @@ function getInitials(name: string) {
     .toUpperCase();
 }
 
+function getCurrentPageLabel(pathname: string) {
+  if (pathname.startsWith("/tickets/")) {
+    return pathname.endsWith("/new") ? "Tạo ticket" : "Chi tiết ticket";
+  }
+
+  if (pathname.startsWith("/tickets")) {
+    return "Tickets";
+  }
+
+  if (pathname.startsWith("/knowledge")) {
+    return "Knowledge Base";
+  }
+
+  if (pathname.startsWith("/notifications")) {
+    return "Thông báo";
+  }
+
+  if (pathname.startsWith("/departments")) {
+    return "Phòng ban";
+  }
+
+  if (pathname.startsWith("/users")) {
+    return "Người dùng";
+  }
+
+  return "Tổng quan";
+}
+
 export function DashboardHeader({
   user,
   onMenuClick,
@@ -36,18 +65,7 @@ export function DashboardHeader({
   const router = useRouter();
   const pathname = usePathname();
   const logout = useLogout();
-
-  const currentPage = pathname.startsWith("/tickets/")
-    ? pathname.endsWith("/new")
-      ? "Tạo ticket"
-      : "Chi tiết ticket"
-    : pathname.startsWith("/tickets")
-      ? "Tickets"
-      : pathname.startsWith("/departments")
-        ? "Phòng ban"
-        : pathname.startsWith("/users")
-          ? "Người dùng"
-          : "Tổng quan";
+  const currentPage = getCurrentPageLabel(pathname);
 
   function handleLogout() {
     logout();
@@ -86,6 +104,8 @@ export function DashboardHeader({
         </div>
 
         <div className="flex min-w-0 items-center gap-3">
+          <NotificationBell />
+
           <div className="grid size-10 shrink-0 place-items-center rounded-lg bg-teal-950 text-sm font-semibold text-white shadow-sm shadow-teal-950/15">
             {getInitials(user.name) || <UserRound className="size-4" />}
           </div>
