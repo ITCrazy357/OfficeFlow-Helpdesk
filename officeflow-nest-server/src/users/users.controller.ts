@@ -20,7 +20,7 @@ export class UsersController {
   constructor(private readonly usersService: UsersService) {}
 
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserRole.ADMIN)
+  @Roles(UserRole.ADMIN, UserRole.IT_STAFF)
   @Get()
   @Message('Get users successfully')
   @ApiOperation({ summary: 'Get all users' })

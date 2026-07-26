@@ -20,7 +20,6 @@ import {
   Sparkles,
   Trash2,
   UserCircle,
-  UserPlus,
 } from "lucide-react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
@@ -78,7 +77,8 @@ import type {
   TicketHistoryAction,
   TicketStatus,
 } from "@/features/tickets/types";
-import { useUsers } from "@/features/users/hooks";
+import { useItStaffUsers } from "@/features/users/hooks";
+import type { UserListItem } from "@/features/users/types";
 import { getApiErrorMessage } from "@/lib/axios";
 
 function formatDateTime(value?: string | null) {
@@ -105,6 +105,27 @@ function parseKnowledgeTags(tags?: string | null) {
       .map((tag) => tag.trim())
       .filter(Boolean) ?? []
   );
+}
+
+function normalizeSearch(value: string) {
+  return value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
+}
+
+function getStaffSupportingText(staff: UserListItem) {
+  return [staff.email, staff.department?.name].filter(Boolean).join(" / ");
+}
+
+function matchesStaffSearch(staff: UserListItem, keyword: string) {
+  if (!keyword) {
+    return true;
+  }
+
+  return normalizeSearch(
+    [staff.name, staff.email, staff.department?.name].filter(Boolean).join(" "),
+  ).includes(keyword);
 }
 
 function canEditTicket(user: AuthUser | undefined, ticket: Ticket) {
@@ -238,14 +259,14 @@ export default function TicketDetailPage() {
     },
     Boolean(ticketQuery.data?.title && ticketQuery.data.title.length >= 3),
   );
-  const usersQuery = useUsers(user?.role === "ADMIN");
+  const staffUsersQuery = useItStaffUsers(canChangeStatus(user));
   const updateTicket = useUpdateTicket();
   const updateStatus = useUpdateTicketStatus();
   const assignTicket = useAssignTicket();
   const deleteTicket = useDeleteTicket();
   const addComment = useAddTicketComment();
   const [isEditing, setIsEditing] = useState(false);
-  const [manualAssigneeId, setManualAssigneeId] = useState("");
+  const [staffSearch, setStaffSearch] = useState("");
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
   const [commentContent, setCommentContent] = useState("");
   const [formError, setFormError] = useState<string | null>(null);
@@ -284,10 +305,20 @@ export default function TicketDetailPage() {
   const allowEdit = canEditTicket(user, ticket);
   const allowStatusChange = canChangeStatus(user);
   const allowDelete = canDeleteTicket(user, ticket);
-  const staffUsers =
-    usersQuery.data?.filter(
-      (item) => item.role === "ADMIN" || item.role === "IT_STAFF",
-    ) ?? [];
+  const staffUsers = staffUsersQuery.data ?? [];
+  const normalizedStaffSearch = normalizeSearch(staffSearch.trim());
+  const visibleStaffUsers = staffUsers.filter((staff) =>
+    matchesStaffSearch(staff, normalizedStaffSearch),
+  );
+  const selectedStaff = ticket.assignedTo?.id
+    ? staffUsers.find((staff) => staff.id === ticket.assignedTo?.id)
+    : undefined;
+  const selectStaffUsers =
+    selectedStaff &&
+    !visibleStaffUsers.some((staff) => staff.id === selectedStaff.id)
+      ? [selectedStaff, ...visibleStaffUsers]
+      : visibleStaffUsers;
+  const selectedStaffValue = selectedStaff ? String(selectedStaff.id) : "";
   const comments = commentsQuery.data ?? [];
   const historyItems =
     historyQuery.data?.filter((item) => item.action !== "COMMENTED") ?? [];
@@ -349,7 +380,6 @@ export default function TicketDetailPage() {
         id: ticket.id,
         input: { assignedToId },
       });
-      setManualAssigneeId("");
     } catch (error) {
       setAssignError(
         getApiErrorMessage(error, "Không thể gán ticket. Vui lòng thử lại."),
@@ -799,54 +829,94 @@ export default function TicketDetailPage() {
                 </CardDescription>
               </CardHeader>
               <CardContent className="grid gap-3 pt-0">
-                {user?.role === "ADMIN" ? (
+                {allowStatusChange ? (
                   <>
-                    <Select
-                      value={
-                        ticket.assignedTo?.id ? String(ticket.assignedTo.id) : ""
+                    {staffUsersQuery.isLoading ? (
+                      <div className="grid gap-2">
+                        <div className="h-10 rounded-lg bg-muted motion-shimmer" />
+                        <div className="h-10 rounded-lg bg-muted motion-shimmer" />
+                      </div>
+                    ) : null}
+                    {staffUsersQuery.isError ? (
+                      <div className="rounded-lg border border-destructive/20 bg-destructive/5 p-3">
+                        <p className="text-sm font-medium text-destructive">
+                          Không thể tải danh sách nhân viên IT.
+                        </p>
+                        <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                          {getApiErrorMessage(
+                            staffUsersQuery.error,
+                            "Vui lòng thử lại sau.",
+                          )}
+                        </p>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="mt-3"
+                          onClick={() => staffUsersQuery.refetch()}
+                        >
+                          Thử lại
+                        </Button>
+                      </div>
+                    ) : null}
+                    <Input
+                      value={staffSearch}
+                      onChange={(event) => setStaffSearch(event.target.value)}
+                      placeholder="Tìm theo tên, email hoặc phòng ban"
+                      disabled={
+                        assignTicket.isPending ||
+                        staffUsersQuery.isLoading ||
+                        staffUsersQuery.isError ||
+                        staffUsers.length === 0
                       }
+                    />
+                    <Select
+                      value={selectedStaffValue}
                       onValueChange={(value) => handleAssign(Number(value))}
-                      disabled={assignTicket.isPending || usersQuery.isLoading}
+                      disabled={
+                        assignTicket.isPending ||
+                        staffUsersQuery.isLoading ||
+                        staffUsersQuery.isError ||
+                        staffUsers.length === 0
+                      }
                     >
                       <SelectTrigger className="w-full">
-                        <SelectValue placeholder="Chọn người xử lý" />
+                        <SelectValue placeholder="Chọn nhân viên IT" />
                       </SelectTrigger>
                       <SelectContent>
-                        {staffUsers.map((staff) => (
+                        {selectStaffUsers.map((staff) => (
                           <SelectItem key={staff.id} value={String(staff.id)}>
-                            {staff.name} / {staff.role}
+                            <div className="grid gap-0.5">
+                              <span className="font-medium">{staff.name}</span>
+                              <span className="text-xs text-muted-foreground">
+                                {getStaffSupportingText(staff) ||
+                                  "Chưa có email hoặc phòng ban"}
+                              </span>
+                            </div>
                           </SelectItem>
                         ))}
+                        {selectStaffUsers.length === 0 ? (
+                          <div className="px-3 py-6 text-center text-sm text-muted-foreground">
+                            Không tìm thấy nhân viên IT phù hợp.
+                          </div>
+                        ) : null}
                       </SelectContent>
                     </Select>
-                    {staffUsers.length === 0 && !usersQuery.isLoading ? (
+                    {assignTicket.isPending ? (
+                      <p className="flex items-center gap-2 text-xs text-muted-foreground">
+                        <Loader2 className="size-3.5 animate-spin" />
+                        Đang gán người xử lý...
+                      </p>
+                    ) : null}
+                    {staffUsers.length === 0 &&
+                    !staffUsersQuery.isLoading &&
+                    !staffUsersQuery.isError ? (
                       <p className="text-xs text-muted-foreground">
-                        Chưa có ADMIN hoặc IT_STAFF trong danh sách users.
+                        Chưa có nhân viên IT đang hoạt động trong danh sách users.
                       </p>
                     ) : null}
                   </>
-                ) : (
-                  <div className="flex gap-2">
-                    <Input
-                      type="number"
-                      min={1}
-                      value={manualAssigneeId}
-                      onChange={(event) =>
-                        setManualAssigneeId(event.target.value)
-                      }
-                      placeholder="Nhập assignedToId"
-                      disabled={assignTicket.isPending}
-                    />
-                    <Button
-                      type="button"
-                      onClick={() => handleAssign(Number(manualAssigneeId))}
-                      disabled={assignTicket.isPending}
-                    >
-                      <UserPlus className="size-4" />
-                      Gán
-                    </Button>
-                  </div>
-                )}
+                ) : null}
                 {assignError ? (
                   <p className="text-sm font-medium text-destructive">
                     {assignError}
