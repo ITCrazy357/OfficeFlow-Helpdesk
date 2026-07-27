@@ -7,6 +7,7 @@ import type {
   DeleteTicketResponse,
   AssignTicketInput,
   GetTicketsParams,
+  LinkTicketAssetInput,
   Ticket,
   TicketAttachment,
   TicketComment,
@@ -134,5 +135,22 @@ export async function deleteTicketAttachmentApi(
     `/tickets/${id}/attachments/${attachmentId}`,
   );
 
+  return res.data.data;
+}
+
+export async function linkTicketAssetApi(
+  id: number,
+  input: LinkTicketAssetInput,
+) {
+  const res = await api.patch<ApiResponse<Ticket>>(
+    `/tickets/${id}/asset`,
+    input,
+  );
+
+  return res.data.data;
+}
+
+export async function unlinkTicketAssetApi(id: number) {
+  const res = await api.delete<ApiResponse<Ticket>>(`/tickets/${id}/asset`);
   return res.data.data;
 }

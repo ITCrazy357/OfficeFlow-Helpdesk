@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { assetsQueryKeys } from "@/features/assets/hooks";
 import {
   addTicketCommentApi,
   assignTicketApi,
@@ -10,6 +11,8 @@ import {
   getTicketHistoryApi,
   getTicketApi,
   getTicketsApi,
+  linkTicketAssetApi,
+  unlinkTicketAssetApi,
   updateTicketApi,
   updateTicketStatusApi,
   uploadTicketAttachmentApi,
@@ -19,6 +22,7 @@ import type {
   CreateTicketCommentInput,
   CreateTicketInput,
   GetTicketsParams,
+  LinkTicketAssetInput,
   TicketAttachment,
   TicketComment,
   UpdateTicketInput,
@@ -240,6 +244,42 @@ export function useDeleteTicketAttachment() {
       queryClient.invalidateQueries({
         queryKey: ticketsQueryKeys.history(variables.id),
       });
+    },
+  });
+}
+
+export function useLinkTicketAsset() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({
+      id,
+      input,
+    }: {
+      id: number;
+      input: LinkTicketAssetInput;
+    }) => linkTicketAssetApi(id, input),
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ticketsQueryKeys.all });
+      queryClient.invalidateQueries({
+        queryKey: ticketsQueryKeys.detail(variables.id),
+      });
+      queryClient.invalidateQueries({ queryKey: assetsQueryKeys.all });
+    },
+  });
+}
+
+export function useUnlinkTicketAsset() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (id: number) => unlinkTicketAssetApi(id),
+    onSuccess: (_, id) => {
+      queryClient.invalidateQueries({ queryKey: ticketsQueryKeys.all });
+      queryClient.invalidateQueries({
+        queryKey: ticketsQueryKeys.detail(id),
+      });
+      queryClient.invalidateQueries({ queryKey: assetsQueryKeys.all });
     },
   });
 }

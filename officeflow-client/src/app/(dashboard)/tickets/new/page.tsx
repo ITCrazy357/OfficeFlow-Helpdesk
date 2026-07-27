@@ -15,7 +15,12 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { TicketForm } from "@/features/tickets/components/ticket-form";
-import { useCreateTicket } from "@/features/tickets/hooks";
+import { CreateTicketAssetSelector } from "@/features/assets/components/create-ticket-asset-selector";
+import { useMe } from "@/features/auth/hooks";
+import {
+  useCreateTicket,
+  useLinkTicketAsset,
+} from "@/features/tickets/hooks";
 import {
   toTicketPayload,
   type TicketFormValues,
@@ -24,14 +29,30 @@ import { getApiErrorMessage } from "@/lib/axios";
 
 export default function NewTicketPage() {
   const router = useRouter();
+  const { data: user } = useMe();
   const createTicket = useCreateTicket();
+  const linkTicketAsset = useLinkTicketAsset();
   const [formError, setFormError] = useState<string | null>(null);
+  const [selectedAssetId, setSelectedAssetId] = useState("");
 
   async function handleSubmit(values: TicketFormValues) {
     setFormError(null);
 
     try {
       const ticket = await createTicket.mutateAsync(toTicketPayload(values));
+
+      if (selectedAssetId) {
+        try {
+          await linkTicketAsset.mutateAsync({
+            id: ticket.id,
+            input: { assetId: Number(selectedAssetId) },
+          });
+        } catch {
+          router.push(`/tickets/${ticket.id}?assetLink=failed`);
+          return;
+        }
+      }
+
       router.push(`/tickets/${ticket.id}`);
     } catch (error) {
       setFormError(
@@ -74,7 +95,9 @@ export default function NewTicketPage() {
           <CardContent className="pt-0">
             <TicketForm
               submitLabel="Tạo ticket"
-              isSubmitting={createTicket.isPending}
+              isSubmitting={
+                createTicket.isPending || linkTicketAsset.isPending
+              }
               error={formError}
               onSubmit={handleSubmit}
             />
@@ -82,6 +105,13 @@ export default function NewTicketPage() {
         </Card>
 
         <aside className="grid gap-4 self-start">
+          <CreateTicketAssetSelector
+            currentUser={user}
+            value={selectedAssetId}
+            onValueChange={setSelectedAssetId}
+            disabled={createTicket.isPending || linkTicketAsset.isPending}
+          />
+
           {[
             {
               icon: Sparkles,

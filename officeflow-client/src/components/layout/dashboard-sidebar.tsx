@@ -2,6 +2,7 @@
 
 import {
   BookOpenText,
+  Boxes,
   Building2,
   CircleCheck,
   LayoutDashboard,
@@ -42,6 +43,12 @@ const navigationItems: NavigationItem[] = [
     label: "Tickets",
     description: "Yêu cầu hỗ trợ",
     icon: TicketCheck,
+  },
+  {
+    href: "/assets",
+    label: "Quản lý tài sản",
+    description: "Thiết bị nội bộ",
+    icon: Boxes,
   },
   {
     href: "/knowledge",

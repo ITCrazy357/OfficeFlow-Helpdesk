@@ -22,7 +22,7 @@ import {
   UserCircle,
 } from "lucide-react";
 import Link from "next/link";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -44,6 +44,7 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { useMe } from "@/features/auth/hooks";
 import type { AuthUser } from "@/features/auth/types";
+import { TicketAssetPanel } from "@/features/assets/components/ticket-asset-panel";
 import { useSuggestKnowledgeArticles } from "@/features/knowledge/hooks";
 import {
   TicketPriorityBadge,
@@ -238,6 +239,7 @@ function ErrorCard({
 export default function TicketDetailPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const rawTicketId = Number(params.id);
   const ticketId =
     Number.isInteger(rawTicketId) && rawTicketId > 0 ? rawTicketId : 0;
@@ -509,6 +511,13 @@ export default function TicketDetailPage() {
         </div>
       ) : null}
 
+      {searchParams.get("assetLink") === "failed" ? (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-medium text-amber-900 motion-toast">
+          Ticket đã được tạo nhưng chưa thể liên kết tài sản. Bạn có thể thử
+          lại tại mục Tài sản liên quan bên dưới.
+        </div>
+      ) : null}
+
       {isDeleteConfirmOpen ? (
         <Card className="border-destructive/25 bg-destructive/5 motion-panel">
           <CardContent className="flex flex-col gap-4 pt-0 sm:flex-row sm:items-center sm:justify-between">
@@ -605,6 +614,10 @@ export default function TicketDetailPage() {
               currentUser={user}
               enabled={allowDiscussion}
             />
+          ) : null}
+
+          {allowDiscussion ? (
+            <TicketAssetPanel ticket={ticket} currentUser={user} />
           ) : null}
 
           {allowDiscussion ? (

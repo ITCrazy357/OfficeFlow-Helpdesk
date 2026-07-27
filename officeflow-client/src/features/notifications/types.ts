@@ -5,7 +5,9 @@ export type NotificationType =
   | "TICKET_COMMENTED"
   | "TICKET_STATUS_CHANGED"
   | "TICKET_OVERDUE"
-  | "KNOWLEDGE_PUBLISHED";
+  | "KNOWLEDGE_PUBLISHED"
+  | "ASSET_ASSIGNED"
+  | "ASSET_RETURNED";
 
 export type NotificationItem = {
   id: number;

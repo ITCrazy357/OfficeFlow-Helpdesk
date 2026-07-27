@@ -1,6 +1,8 @@
 import {
   AlertTriangle,
   BookOpenText,
+  PackageCheck,
+  PackageMinus,
   MessageSquareText,
   RefreshCw,
   TicketCheck,
@@ -45,6 +47,18 @@ export const notificationMeta: Record<NotificationType, NotificationMeta> = {
     icon: BookOpenText,
     tone: "border-emerald-200 bg-emerald-50 text-emerald-800",
     iconTone: "bg-emerald-50 text-emerald-700 ring-emerald-100",
+  },
+  ASSET_ASSIGNED: {
+    label: "Tài sản được cấp",
+    icon: PackageCheck,
+    tone: "border-sky-200 bg-sky-50 text-sky-800",
+    iconTone: "bg-sky-50 text-sky-700 ring-sky-100",
+  },
+  ASSET_RETURNED: {
+    label: "Tài sản đã thu hồi",
+    icon: PackageMinus,
+    tone: "border-amber-200 bg-amber-50 text-amber-800",
+    iconTone: "bg-amber-50 text-amber-700 ring-amber-100",
   },
 };
 

@@ -1,4 +1,5 @@
 import type { PaginatedData } from "@/types/api";
+import type { AssetStatus, AssetType } from "@/features/assets/types";
 
 export type TicketStatus =
   | "OPEN"
@@ -51,6 +52,18 @@ export type Ticket = {
     id: number;
     name: string;
   } | null;
+  asset?: TicketAsset | null;
+};
+
+export type TicketAsset = {
+  id: number;
+  assetTag: string;
+  name: string;
+  type: AssetType;
+  status: AssetStatus;
+  brand?: string | null;
+  model?: string | null;
+  serialNumber?: string | null;
 };
 
 export type GetTicketsParams = {
@@ -80,6 +93,10 @@ export type UpdateTicketStatusInput = {
 
 export type AssignTicketInput = {
   assignedToId: number;
+};
+
+export type LinkTicketAssetInput = {
+  assetId: number;
 };
 
 export type CreateTicketCommentInput = {
