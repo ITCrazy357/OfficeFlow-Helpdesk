@@ -39,7 +39,7 @@ export class NotificationsService {
     });
   }
 
-  async createMany(params: {
+  async createdMany(params: {
     userIds: number[];
     type: NotificationType;
     title: string;

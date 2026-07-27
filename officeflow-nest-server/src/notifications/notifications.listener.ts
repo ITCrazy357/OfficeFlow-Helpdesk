@@ -29,7 +29,7 @@ export class NotificationsListener {
       (id) => id !== event.commentAuthorId,
     );
 
-    await this.notificationsService.createMany({
+    await this.notificationsService.createdMany({
       userIds: recipientIds,
       type: NotificationType.TICKET_COMMENTED,
       title: 'New ticket comment',
@@ -44,7 +44,7 @@ export class NotificationsListener {
       (id) => id !== event.changedById,
     );
 
-    await this.notificationsService.createMany({
+    await this.notificationsService.createdMany({
       userIds: recipientIds,
       type: NotificationType.TICKET_STATUS_CHANGED,
       title: 'Ticket status changed',
@@ -55,7 +55,7 @@ export class NotificationsListener {
 
   @OnEvent('ticket.overdue')
   async handleTicketOverdueEvent(event: TicketOverdueEvent) {
-    await this.notificationsService.createMany({
+    await this.notificationsService.createdMany({
       userIds: event.recipientIds,
       type: NotificationType.TICKET_OVERDUE,
       title: 'Ticket overdue',
