@@ -16,7 +16,7 @@ import {
   UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
-import { UserRole, TicketPriority, TicketStatus } from '@prisma/client';
+import { FileInterceptor } from '@nestjs/platform-express';
 import {
   ApiBearerAuth,
   ApiBody,
@@ -27,26 +27,25 @@ import {
   ApiResponse,
   ApiTags,
 } from '@nestjs/swagger';
-import { FileInterceptor } from '@nestjs/platform-express';
+import { TicketPriority, TicketStatus, UserRole } from '@prisma/client';
 
-import { TicketsService } from './tickets.service';
+import { TicketsService, type TicketAttachmentFile } from './tickets.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
-import { RolesGuard } from '../common/guards/roles.guard';
-import { Roles } from '../common/decorators/roles.decorator';
 import {
   CurrentUser,
   type CurrentUserPayload,
 } from '../common/decorators/current-user.decorator';
-
-import { CreateTicketDto } from './dto/create-ticket.dto';
-import { UpdateTicketDto } from './dto/update-ticket.dto';
-import { UpdateTicketStatusDto } from './dto/update-ticket-status.dto';
-import { AssignTicketDto } from './dto/assign-ticket.dto';
-import { GetTicketsQueryDto } from './dto/get-tickets-query.dto';
-
 import { Message } from '../common/decorators/message.decorator';
+import { Roles } from '../common/decorators/roles.decorator';
+import { RolesGuard } from '../common/guards/roles.guard';
 
+import { AssignTicketDto } from './dto/assign-ticket.dto';
 import { CreateTicketCommentDto } from './dto/create-ticket-comment.dto';
+import { CreateTicketDto } from './dto/create-ticket.dto';
+import { GetTicketsQueryDto } from './dto/get-tickets-query.dto';
+import { LinkTicketAssetDto } from './dto/link-ticket-asset.dto';
+import { UpdateTicketStatusDto } from './dto/update-ticket-status.dto';
+import { UpdateTicketDto } from './dto/update-ticket.dto';
 
 const MAX_ATTACHMENT_SIZE_IN_BYTES = 10 * 1024 * 1024;
 
@@ -303,7 +302,7 @@ export class TicketsController {
         ],
       }),
     )
-    file: Express.Multer.File,
+    file: TicketAttachmentFile,
     @CurrentUser() currentUser: CurrentUserPayload,
   ) {
     return this.ticketsService.uploadAttachment(id, file, currentUser);
@@ -352,5 +351,28 @@ export class TicketsController {
     @CurrentUser() currentUser: CurrentUserPayload,
   ) {
     return this.ticketsService.deleteAttachment(id, attachmentId, currentUser);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Patch(':id/asset')
+  @Message('Link asset to ticket successfully')
+  @ApiOperation({ summary: 'Link an asset to a ticket' })
+  linkAsset(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() linkTicketAssetDto: LinkTicketAssetDto,
+    @CurrentUser() currentUser: CurrentUserPayload,
+  ) {
+    return this.ticketsService.linkAsset(id, linkTicketAssetDto, currentUser);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Delete(':id/asset')
+  @Message('Unlink asset from ticket successfully')
+  @ApiOperation({ summary: 'Remove asset link from a ticket' })
+  unlinkAsset(
+    @Param('id', ParseIntPipe) id: number,
+    @CurrentUser() currentUser: CurrentUserPayload,
+  ) {
+    return this.ticketsService.unlinkAsset(id, currentUser);
   }
 }

@@ -1,12 +1,14 @@
 import { Injectable } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
-import { Notification, NotificationType } from '@prisma/client';
+import { NotificationType } from '@prisma/client';
 
 import { NotificationsService } from './notifications.service';
+import { AssetAssignedEvent } from './events/asset-assigned.event';
+import { AssetReturnedEvent } from './events/asset-returned.event';
 import { TicketAssignedEvent } from './events/ticket-assigned.event';
 import { TicketCommentedEvent } from './events/ticket-commented.event';
-import { TicketStatusChangedEvent } from './events/ticket-status-changed.event';
 import { TicketOverdueEvent } from './events/ticket-overdue.event';
+import { TicketStatusChangedEvent } from './events/ticket-status-changed.event';
 
 @Injectable()
 export class NotificationsListener {
@@ -61,6 +63,32 @@ export class NotificationsListener {
       title: 'Ticket overdue',
       message: `Ticket "${event.ticketTitle}" has passed its SLA deadline`,
       targetUrl: `/tickets/${event.ticketId}`,
+    });
+  }
+
+  @OnEvent('asset.assigned')
+  async handleAssetAssignedEvent(event: AssetAssignedEvent) {
+    await this.notificationsService.create({
+      userId: event.assignedToId,
+      type: NotificationType.ASSET_ASSIGNED,
+      title: 'Asset assigned to you',
+      message:
+        `${event.assignedByName} assigned ` +
+        `${event.assetName} (${event.assetTag}) to you.`,
+      targetUrl: `/assets/${event.assetId}`,
+    });
+  }
+
+  @OnEvent('asset.returned')
+  async handleAssetReturnedEvent(event: AssetReturnedEvent) {
+    await this.notificationsService.create({
+      userId: event.previousAssignedToId,
+      type: NotificationType.ASSET_RETURNED,
+      title: 'Asset returned',
+      message:
+        `${event.returnedByName} recorded the return of ` +
+        `${event.assetName} (${event.assetTag}).`,
+      targetUrl: '/assets',
     });
   }
 }

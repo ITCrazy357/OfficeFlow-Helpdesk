@@ -1,18 +1,19 @@
 import { Module } from '@nestjs/common';
+import { EventEmitterModule } from '@nestjs/event-emitter';
+import { ScheduleModule } from '@nestjs/schedule';
+
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
-
-import { PrismaModule } from './prisma/prisma.module';
+import { AssetsModule } from './assets/assets.module';
 import { AuthModule } from './auth/auth.module';
-import { UsersModule } from './users/users.module';
-import { DepartmentsModule } from './departments/departments.module';
-import { TicketsModule } from './tickets/tickets.module';
-import { ScheduleModule } from '@nestjs/schedule';
-import { SlaModule } from './sla/sla.module';
 import { DashboardModule } from './dashboard/dashboard.module';
+import { DepartmentsModule } from './departments/departments.module';
 import { KnowledgeModule } from './knowledge/knowledge.module';
-import { EventEmitterModule } from '@nestjs/event-emitter';
 import { NotificationsModule } from './notifications/notifications.module';
+import { PrismaModule } from './prisma/prisma.module';
+import { SlaModule } from './sla/sla.module';
+import { TicketsModule } from './tickets/tickets.module';
+import { UsersModule } from './users/users.module';
 
 @Module({
   imports: [
@@ -27,6 +28,7 @@ import { NotificationsModule } from './notifications/notifications.module';
     DashboardModule,
     KnowledgeModule,
     NotificationsModule,
+    AssetsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

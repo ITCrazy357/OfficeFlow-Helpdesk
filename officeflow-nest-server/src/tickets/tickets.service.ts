@@ -5,38 +5,40 @@ import {
   Logger,
   NotFoundException,
 } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import {
-  Prisma,
+  type Prisma,
+  TicketHistoryAction,
   TicketStatus,
   UserRole,
-  TicketHistoryAction,
 } from '@prisma/client';
-
-import { PrismaService } from '../prisma/prisma.service';
-//DTO
-import { CreateTicketDto } from './dto/create-ticket.dto';
-import { UpdateTicketDto } from './dto/update-ticket.dto';
-import { UpdateTicketStatusDto } from './dto/update-ticket-status.dto';
-import { AssignTicketDto } from './dto/assign-ticket.dto';
-import { GetTicketsQueryDto } from './dto/get-tickets-query.dto';
-
-import { CreateTicketCommentDto } from './dto/create-ticket-comment.dto';
-import { calculateDueAt } from './ticket-sla.util';
+import type { Request } from 'express';
+import type {} from 'multer';
 
 import {
   CloudinaryService,
   type CloudinaryResourceType,
 } from '../cloudinary/cloudinary.service';
-
-import { EventEmitter2 } from '@nestjs/event-emitter';
 import { TicketAssignedEvent } from '../notifications/events/ticket-assigned.event';
 import { TicketCommentedEvent } from '../notifications/events/ticket-commented.event';
 import { TicketStatusChangedEvent } from '../notifications/events/ticket-status-changed.event';
+import { PrismaService } from '../prisma/prisma.service';
+
+import { AssignTicketDto } from './dto/assign-ticket.dto';
+import { CreateTicketCommentDto } from './dto/create-ticket-comment.dto';
+import { CreateTicketDto } from './dto/create-ticket.dto';
+import { GetTicketsQueryDto } from './dto/get-tickets-query.dto';
+import { LinkTicketAssetDto } from './dto/link-ticket-asset.dto';
+import { UpdateTicketStatusDto } from './dto/update-ticket-status.dto';
+import { UpdateTicketDto } from './dto/update-ticket.dto';
+import { calculateDueAt } from './ticket-sla.util';
 
 type CurrentUser = {
   userId: number;
   role: UserRole;
 };
+
+export type TicketAttachmentFile = NonNullable<Request['file']>;
 
 function resolveCloudinaryResourceType(
   resourceType: string | null,
@@ -171,6 +173,18 @@ export class TicketsService {
               name: true,
             },
           },
+          asset: {
+            select: {
+              id: true,
+              assetTag: true,
+              name: true,
+              type: true,
+              status: true,
+              brand: true,
+              model: true,
+              serialNumber: true,
+            },
+          },
         },
       }),
 
@@ -265,6 +279,18 @@ export class TicketsService {
             name: true,
           },
         },
+        asset: {
+          select: {
+            id: true,
+            assetTag: true,
+            name: true,
+            type: true,
+            status: true,
+            brand: true,
+            model: true,
+            serialNumber: true,
+          },
+        },
       },
     });
 
@@ -306,6 +332,7 @@ export class TicketsService {
       },
       assignedTo: ticket.assignedTo,
       category: ticket.category,
+      asset: ticket.asset,
     };
   }
 
@@ -872,7 +899,7 @@ export class TicketsService {
 
   async uploadAttachment(
     ticketId: number,
-    file: Express.Multer.File,
+    file: TicketAttachmentFile,
     currentUser: CurrentUser,
   ) {
     if (!file) {
@@ -1040,5 +1067,72 @@ export class TicketsService {
     });
 
     return { id: attachmentId };
+  }
+
+  async linkAsset(
+    ticketId: number,
+    linkTicketAssetDto: LinkTicketAssetDto,
+    currentUser: CurrentUser,
+  ) {
+    const [, asset] = await Promise.all([
+      this.canGetById(ticketId, currentUser),
+      this.prisma.asset.findUnique({
+        where: {
+          id: linkTicketAssetDto.assetId,
+        },
+        select: {
+          id: true,
+          assignedToId: true,
+        },
+      }),
+    ]);
+
+    if (!asset) {
+      throw new NotFoundException('Asset not found');
+    }
+
+    const canManage =
+      currentUser.role === UserRole.ADMIN ||
+      currentUser.role === UserRole.IT_STAFF;
+
+    // Users without asset-management access can only link their own asset.
+    if (!canManage && asset.assignedToId !== currentUser.userId) {
+      throw new ForbiddenException(
+        'You may only link an asset assigned to you',
+      );
+    }
+
+    return this.prisma.ticket.update({
+      where: {
+        id: ticketId,
+      },
+      data: {
+        assetId: asset.id,
+      },
+      include: {
+        asset: {
+          select: {
+            id: true,
+            assetTag: true,
+            name: true,
+            type: true,
+            status: true,
+          },
+        },
+      },
+    });
+  }
+
+  async unlinkAsset(ticketId: number, currentUser: CurrentUser) {
+    await this.canGetById(ticketId, currentUser);
+
+    return this.prisma.ticket.update({
+      where: {
+        id: ticketId,
+      },
+      data: {
+        assetId: null,
+      },
+    });
   }
 }

@@ -45,6 +45,28 @@ enum NotificationType {
   TICKET_STATUS_CHANGED
   TICKET_OVERDUE
   KNOWLEDGE_PUBLISHED
+  ASSET_ASSIGNED
+  ASSET_RETURNED
+}
+
+enum AssetType {
+  LAPTOP
+  DESKTOP
+  MONITOR
+  PRINTER
+  PHONE
+  TABLET
+  NETWORK_DEVICE
+  ACCESSORY
+  OTHER
+}
+
+enum AssetStatus {
+  AVAILABLE
+  ASSIGNED
+  MAINTENANCE
+  RETIRED
+  LOST
 }
 
 model Department {
@@ -81,6 +103,12 @@ model User {
   knowledgeArticles KnowledgeArticle[]
 
   notifications Notification[]
+
+  currentAssets Asset[] @relation("CurrentAssetAssignee")
+
+  assetAssignmentsReceived AssetAssignment[] @relation("AssetAssignmentsReceived")
+
+  assetAssignmentsCreated AssetAssignment[] @relation("AssetAssignmentsCreated")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -123,6 +151,9 @@ model Ticket {
   categoryId Int?
   category   TicketCategory? @relation(fields: [categoryId], references: [id])
 
+  assetId Int?
+  asset   Asset? @relation(fields: [assetId], references: [id], onDelete: SetNull)
+
   dueDate DateTime?
 
   attachments TicketAttachment[]
@@ -140,6 +171,7 @@ model Ticket {
   @@index([assignedToId])
   @@index([createdById])
   @@index([categoryId])
+  @@index([assetId])
   @@map("tickets")
 }
 
@@ -244,4 +276,57 @@ model Notification {
   @@index([type])
   @@index([createdAt])
   @@map("notifications")
+}
+
+model Asset {
+  id       Int         @id @default(autoincrement())
+  assetTag String      @unique
+  name     String
+  type     AssetType
+  status   AssetStatus @default(AVAILABLE)
+
+  brand        String?
+  model        String?
+  serialNumber String? @unique
+
+  purchaseDate  DateTime?
+  warrantyUntil DateTime?
+  notes         String?   @db.Text
+
+  assignedToId Int?
+  assignedTo   User? @relation("CurrentAssetAssignee", fields: [assignedToId], references: [id], onDelete: SetNull)
+
+  assignments AssetAssignment[]
+  tickets     Ticket[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([type])
+  @@index([status])
+  @@index([assignedToId])
+  @@index([createdAt])
+}
+
+model AssetAssignment {
+  id Int @id @default(autoincrement())
+
+  assetId Int
+  asset   Asset @relation(fields: [assetId], references: [id], onDelete: Cascade)
+
+  assignedToId Int
+  assignedTo   User @relation("AssetAssignmentsReceived", fields: [assignedToId], references: [id])
+
+  assignedById Int
+  assignedBy   User @relation("AssetAssignmentsCreated", fields: [assignedById], references: [id])
+
+  assignedAt DateTime  @default(now())
+  returnedAt DateTime?
+
+  returnNotes String? @db.Text
+
+  @@index([assetId])
+  @@index([assignedToId])
+  @@index([assignedById])
+  @@index([returnedAt])
 }

@@ -19,11 +19,9 @@ import {
 
 import { NotificationsService } from './notifications.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
-import {
-  CurrentUser,
-  CurrentUserPayload,
-} from '../common/decorators/current-user.decorator';
+import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { Message } from '../common/decorators/message.decorator';
+
 import { GetNotificationsQueryDto } from './dto/get-notifications-query.dto';
 
 @ApiTags('Notifications')

@@ -20,9 +20,12 @@ export class GetNotificationsQueryDto {
   @ApiPropertyOptional({ example: false })
   @IsOptional()
   @Transform(({ value }) => {
-    if (value === 'true') return true;
-    if (value === 'false') return false;
-    return value;
+    const normalizedValue: unknown = value;
+
+    if (normalizedValue === 'true') return true;
+    if (normalizedValue === 'false') return false;
+
+    return normalizedValue;
   })
   @IsBoolean()
   isRead?: boolean;

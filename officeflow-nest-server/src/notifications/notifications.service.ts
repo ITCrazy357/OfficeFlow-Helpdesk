@@ -1,16 +1,16 @@
 import {
+  ForbiddenException,
   Injectable,
   NotFoundException,
-  ForbiddenException,
 } from '@nestjs/common';
-import { NotificationType, Prisma } from '@prisma/client';
+import { NotificationType, type Prisma } from '@prisma/client';
 
 import { PrismaService } from '../prisma/prisma.service';
 import { GetNotificationsQueryDto } from './dto/get-notifications-query.dto';
 
 @Injectable()
 export class NotificationsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService) {}
 
   async create(params: {
     userId: number;

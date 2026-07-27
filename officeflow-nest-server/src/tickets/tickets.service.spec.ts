@@ -1,3 +1,4 @@
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { Test, TestingModule } from '@nestjs/testing';
 import {
   Prisma,
@@ -44,6 +45,10 @@ const mockCloudinaryService = {
   deleteFile: jest.fn(),
 };
 
+const mockEventEmitter = {
+  emit: jest.fn(),
+};
+
 describe('TicketsService', () => {
   let service: TicketsService;
 
@@ -65,6 +70,10 @@ describe('TicketsService', () => {
         {
           provide: CloudinaryService,
           useValue: mockCloudinaryService,
+        },
+        {
+          provide: EventEmitter2,
+          useValue: mockEventEmitter,
         },
       ],
     }).compile();
