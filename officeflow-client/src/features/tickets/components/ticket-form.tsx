@@ -16,6 +16,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { getTicketCategoryLabel } from "@/features/ticket-categories/constants";
 import { useTicketCategories } from "@/features/ticket-categories/hooks";
 import { ticketPriorityOptions } from "../constants";
 import { ticketFormSchema, type TicketFormValues } from "../schemas";
@@ -184,7 +185,7 @@ export function TicketForm({
                             key={category.id}
                             value={String(category.id)}
                           >
-                            {category.name}
+                            {getTicketCategoryLabel(category.name)}
                           </SelectItem>
                         ))}
                       </SelectContent>

@@ -35,6 +35,7 @@ import {
   TicketSlaBadge,
   TicketStatusBadge,
 } from "@/features/tickets/components/ticket-badges";
+import { getTicketCategoryLabel } from "@/features/ticket-categories/constants";
 import { getPriorityMeta, getStatusMeta } from "@/features/tickets/constants";
 import {
   useDashboardSlaOverview,
@@ -364,7 +365,7 @@ export default function DashboardPage() {
       ?.slice()
       .sort((a, b) => b.total - a.total)
       .map((item) => ({
-        label: item.categoryName ?? "Chưa phân loại",
+        label: getTicketCategoryLabel(item.categoryName),
         value: item.total,
         color: "bg-teal-600",
       })) ?? [];

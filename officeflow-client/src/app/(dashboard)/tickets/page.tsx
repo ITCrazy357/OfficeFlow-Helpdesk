@@ -44,6 +44,7 @@ import {
   TicketSlaBadge,
   TicketStatusBadge,
 } from "@/features/tickets/components/ticket-badges";
+import { getTicketCategoryLabel } from "@/features/ticket-categories/constants";
 import {
   getTicketDueAt,
   ticketSlaOptions,
@@ -125,7 +126,11 @@ function TicketsTable({ tickets }: { tickets: Ticket[] }) {
             </TableCell>
             <TableCell>{ticket.createdBy?.name ?? "-"}</TableCell>
             <TableCell>{ticket.assignedTo?.name ?? "-"}</TableCell>
-            <TableCell>{ticket.category?.name ?? "-"}</TableCell>
+            <TableCell>
+              {ticket.category
+                ? getTicketCategoryLabel(ticket.category.name)
+                : "-"}
+            </TableCell>
             <TableCell className="min-w-40">
               <div className="grid gap-1">
                 <TicketSlaBadge ticket={ticket} />

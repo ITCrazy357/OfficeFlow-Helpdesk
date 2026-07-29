@@ -6,6 +6,7 @@ import {
   Building2,
   CircleCheck,
   LayoutDashboard,
+  Tags,
   TicketCheck,
   Users,
   X,
@@ -67,6 +68,13 @@ const navigationItems: NavigationItem[] = [
     label: "Users",
     description: "Tài khoản",
     icon: Users,
+    roles: ["ADMIN"],
+  },
+  {
+    href: "/ticket-categories",
+    label: "Danh mục ticket",
+    description: "Phân loại yêu cầu",
+    icon: Tags,
     roles: ["ADMIN"],
   },
 ];
