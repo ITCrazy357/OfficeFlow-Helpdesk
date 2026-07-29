@@ -78,7 +78,7 @@ model Department {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  @@map("departments")
+  @@map("Departments")
 }
 
 model User {
@@ -116,7 +116,7 @@ model User {
   @@index([departmentId])
   @@index([role])
   @@index([isActive])
-  @@map("users")
+  @@map("Users")
 }
 
 model TicketCategory {
@@ -128,7 +128,7 @@ model TicketCategory {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  @@map("ticket_categories")
+  @@map("Ticket_categories")
 }
 
 model Ticket {
@@ -172,7 +172,7 @@ model Ticket {
   @@index([createdById])
   @@index([categoryId])
   @@index([assetId])
-  @@map("tickets")
+  @@map("Tickets")
 }
 
 model TicketComment {
@@ -189,7 +189,7 @@ model TicketComment {
 
   @@index([ticketId])
   @@index([authorId])
-  @@map("ticket_comments")
+  @@map("Ticket_comments")
 }
 
 model TicketHistory {
@@ -209,7 +209,7 @@ model TicketHistory {
   @@index([ticketId])
   @@index([userId])
   @@index([action])
-  @@map("ticket_histories")
+  @@map("Ticket_histories")
 }
 
 model TicketAttachment {
@@ -232,7 +232,7 @@ model TicketAttachment {
 
   @@index([ticketId, createdAt, id])
   @@index([uploadedById])
-  @@map("ticket_attachments")
+  @@map("Ticket_attachments")
 }
 
 model KnowledgeArticle {
@@ -254,6 +254,7 @@ model KnowledgeArticle {
   @@index([createdById])
   @@index([isPublished])
   @@index([createdAt])
+  @@map("Knowledge_articles")
 }
 
 model Notification {
@@ -275,7 +276,7 @@ model Notification {
   @@index([isRead])
   @@index([type])
   @@index([createdAt])
-  @@map("notifications")
+  @@map("Notifications")
 }
 
 model Asset {
@@ -306,6 +307,7 @@ model Asset {
   @@index([status])
   @@index([assignedToId])
   @@index([createdAt])
+  @@map("Assets")
 }
 
 model AssetAssignment {
@@ -329,4 +331,5 @@ model AssetAssignment {
   @@index([assignedToId])
   @@index([assignedById])
   @@index([returnedAt])
+  @@map("Asset_assignments")
 }
