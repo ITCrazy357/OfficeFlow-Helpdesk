@@ -34,7 +34,7 @@ export class AssetsService {
     );
   }
 
-  private async buildVisibleTicketScope(
+  private async buildTicketScope(
     currentUser: CurrentUserPayload,
   ): Promise<Prisma.TicketWhereInput | undefined> {
     if (this.canManageAssets(currentUser)) {
@@ -215,12 +215,25 @@ export class AssetsService {
             tickets: true,
           },
         },
+        assignedTo: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            department: {
+              select: {
+                id: true,
+                name: true,
+              },
+            },
+          },
+        },
       },
     });
   }
 
   async findOne(id: number, currentUser: CurrentUserPayload) {
-    const ticketScope = await this.buildVisibleTicketScope(currentUser);
+    const ticketScope = await this.buildTicketScope(currentUser);
     const asset = await this.prisma.asset.findUnique({
       where: { id },
       include: {
