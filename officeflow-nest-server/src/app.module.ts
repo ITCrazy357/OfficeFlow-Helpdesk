@@ -14,6 +14,7 @@ import { PrismaModule } from './prisma/prisma.module';
 import { SlaModule } from './sla/sla.module';
 import { TicketsModule } from './tickets/tickets.module';
 import { UsersModule } from './users/users.module';
+import { TicketCategoriesModule } from './ticket-categories/ticket-categories.module';
 
 @Module({
   imports: [
@@ -29,6 +30,7 @@ import { UsersModule } from './users/users.module';
     KnowledgeModule,
     NotificationsModule,
     AssetsModule,
+    TicketCategoriesModule,
   ],
   controllers: [AppController],
   providers: [AppService],

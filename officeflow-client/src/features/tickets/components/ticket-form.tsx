@@ -1,7 +1,7 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { FolderKanban, Save } from "lucide-react";
+import { AlertCircle, FolderKanban, Loader2, Save } from "lucide-react";
 import { Controller, useForm } from "react-hook-form";
 import type { SubmitHandler } from "react-hook-form";
 
@@ -16,6 +16,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { useTicketCategories } from "@/features/ticket-categories/hooks";
 import { ticketPriorityOptions } from "../constants";
 import { ticketFormSchema, type TicketFormValues } from "../schemas";
 
@@ -49,6 +50,9 @@ export function TicketForm({
   const handleSubmit: SubmitHandler<TicketFormValues> = async (values) => {
     await onSubmit(values);
   };
+
+  const categoriesQuery = useTicketCategories();
+  const categories = categoriesQuery.data ?? [];
 
   return (
     <form
@@ -117,24 +121,89 @@ export function TicketForm({
         </div>
 
         <div className="grid gap-2">
-          <Label htmlFor="ticket-category-id">Danh mục ID</Label>
-          <div className="relative">
-            <FolderKanban className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              id="ticket-category-id"
-              type="number"
-              min={1}
-              className="pl-8"
-              placeholder="Tùy chọn, ví dụ: 3"
-              aria-invalid={Boolean(form.formState.errors.categoryId)}
-              disabled={isSubmitting}
-              {...form.register("categoryId")}
-            />
-          </div>
-          <p className="text-xs text-muted-foreground">
-            Backend hiện nhận `categoryId`; chưa có API danh sách category nên
-            chỉ nhập khi bạn đã biết ID.
-          </p>
+          <Label htmlFor="ticket-category-id">Danh mục</Label>
+          {categoriesQuery.isLoading ? (
+            <div className="flex h-10 items-center gap-2 rounded-lg border bg-muted/25 px-3 text-sm text-muted-foreground">
+              <Loader2 className="size-4 animate-spin" />
+              Đang tải danh mục...
+            </div>
+          ) : categoriesQuery.isError ? (
+            <div className="rounded-lg border border-destructive/20 bg-destructive/5 p-3">
+              <div className="flex items-start gap-2">
+                <AlertCircle className="mt-0.5 size-4 shrink-0 text-destructive" />
+                <div>
+                  <p className="text-sm font-medium text-destructive">
+                    Không thể tải danh mục.
+                  </p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Bạn vẫn có thể tạo ticket mà không chọn danh mục.
+                  </p>
+                </div>
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="mt-3"
+                onClick={() => categoriesQuery.refetch()}
+                disabled={categoriesQuery.isFetching}
+              >
+                {categoriesQuery.isFetching ? (
+                  <Loader2 className="size-4 animate-spin" />
+                ) : null}
+                Thử lại
+              </Button>
+            </div>
+          ) : categories.length ? (
+            <>
+              <div className="relative">
+                <FolderKanban className="pointer-events-none absolute left-3 top-1/2 z-10 size-4 -translate-y-1/2 text-muted-foreground" />
+                <Controller
+                  control={form.control}
+                  name="categoryId"
+                  render={({ field }) => (
+                    <Select
+                      value={field.value || "NONE"}
+                      onValueChange={(value) =>
+                        field.onChange(value === "NONE" ? "" : value)
+                      }
+                      disabled={isSubmitting}
+                    >
+                      <SelectTrigger
+                        id="ticket-category-id"
+                        className="w-full pl-9"
+                      >
+                        <SelectValue placeholder="Chọn danh mục" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="NONE">
+                          Không chọn danh mục
+                        </SelectItem>
+                        {categories.map((category) => (
+                          <SelectItem
+                            key={category.id}
+                            value={String(category.id)}
+                          >
+                            {category.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
+                />
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Chọn danh mục phù hợp để yêu cầu được phân loại chính xác hơn.
+              </p>
+            </>
+          ) : (
+            <div className="rounded-lg border border-dashed p-3">
+              <p className="text-sm font-medium">Chưa có danh mục</p>
+              <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                Ticket vẫn có thể được tạo mà không cần chọn danh mục.
+              </p>
+            </div>
+          )}
           {form.formState.errors.categoryId?.message ? (
             <p className="text-xs font-medium text-destructive">
               {form.formState.errors.categoryId.message}

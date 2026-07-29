@@ -14,8 +14,9 @@ export const ticketFormSchema = z.object({
     .trim()
     .optional()
     .refine(
-      (value) => !value || (Number.isInteger(Number(value)) && Number(value) > 0),
-      "Danh mục ID phải là số nguyên lớn hơn 0",
+      (value) =>
+        !value || (Number.isInteger(Number(value)) && Number(value) > 0),
+      "Danh mục không hợp lệ",
     ),
 });
 
@@ -28,6 +29,6 @@ export function toTicketPayload(values: TicketFormValues): CreateTicketInput {
     title: values.title.trim(),
     description: values.description.trim(),
     priority: values.priority,
-    categoryId: Number.isInteger(categoryId) ? categoryId : undefined,
+    categoryId: Number(values.categoryId) ? categoryId : undefined,
   };
 }

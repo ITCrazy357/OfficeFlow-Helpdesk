@@ -77,6 +77,25 @@ export class TicketsService {
     private readonly eventEmitter: EventEmitter2,
   ) {}
 
+  private async ensureCategoryExists(categoryId?: number) {
+    if (categoryId === undefined) {
+      return;
+    }
+
+    const category = await this.prisma.ticketCategory.findUnique({
+      where: {
+        id: categoryId,
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    if (!category) {
+      throw new NotFoundException('Ticket category not found');
+    }
+  }
+
   async getTickets(currentUser: CurrentUser, query: GetTicketsQueryDto) {
     const page = query.page || 1;
     const limit = query.limit || 10;
@@ -203,6 +222,8 @@ export class TicketsService {
   }
 
   async create(createTicketDto: CreateTicketDto, currentUser: CurrentUser) {
+    await this.ensureCategoryExists(createTicketDto.categoryId);
+
     const dueAt = calculateDueAt(createTicketDto.priority);
 
     const ticket = await this.prisma.ticket.create({
@@ -379,6 +400,8 @@ export class TicketsService {
     ) {
       throw new ForbiddenException('Forbidden');
     }
+
+    await this.ensureCategoryExists(updateTicketDto.categoryId);
 
     const updatedTicket = await this.prisma.ticket.update({
       where: { id },
