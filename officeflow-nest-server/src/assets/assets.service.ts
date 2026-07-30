@@ -6,8 +6,15 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import { AssetStatus, type Prisma, UserRole } from '@prisma/client';
+import {
+  AuditLogAction,
+  AuditLogEntity,
+  AssetStatus,
+  type Prisma,
+  UserRole,
+} from '@prisma/client';
 
+import { AuditLogsService } from '../audit-logs/audit-logs.service';
 import type { CurrentUserPayload } from '../common/decorators/current-user.decorator';
 import { AssetAssignedEvent } from '../notifications/events/asset-assigned.event';
 import { AssetReturnedEvent } from '../notifications/events/asset-returned.event';
@@ -25,6 +32,7 @@ export class AssetsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly eventEmitter: EventEmitter2,
+    private readonly auditLogsService: AuditLogsService,
   ) {}
 
   private canManageAssets(currentUser: CurrentUserPayload) {
@@ -77,7 +85,10 @@ export class AssetsService {
     return asset;
   }
 
-  async create(createAssetDto: CreateAssetDto) {
+  async create(
+    createAssetDto: CreateAssetDto,
+    currentUser: CurrentUserPayload,
+  ) {
     const assetTagExists = await this.prisma.asset.findUnique({
       where: {
         assetTag: createAssetDto.assetTag,
@@ -106,22 +117,45 @@ export class AssetsService {
       }
     }
 
-    return this.prisma.asset.create({
-      data: {
-        assetTag: createAssetDto.assetTag,
-        name: createAssetDto.name,
-        type: createAssetDto.type,
-        brand: createAssetDto.brand,
-        model: createAssetDto.model,
-        serialNumber: createAssetDto.serialNumber,
-        purchaseDate: createAssetDto.purchaseDate
-          ? new Date(createAssetDto.purchaseDate)
-          : undefined,
-        warrantyUntil: createAssetDto.warrantyUntil
-          ? new Date(createAssetDto.warrantyUntil)
-          : undefined,
-        notes: createAssetDto.notes,
-      },
+    return this.prisma.$transaction(async (transaction) => {
+      const asset = await transaction.asset.create({
+        data: {
+          assetTag: createAssetDto.assetTag,
+          name: createAssetDto.name,
+          type: createAssetDto.type,
+          brand: createAssetDto.brand,
+          model: createAssetDto.model,
+          serialNumber: createAssetDto.serialNumber,
+          purchaseDate: createAssetDto.purchaseDate
+            ? new Date(createAssetDto.purchaseDate)
+            : undefined,
+          warrantyUntil: createAssetDto.warrantyUntil
+            ? new Date(createAssetDto.warrantyUntil)
+            : undefined,
+          notes: createAssetDto.notes,
+        },
+      });
+
+      await this.auditLogsService.create(
+        {
+          actorId: currentUser.userId,
+          entity: AuditLogEntity.ASSET,
+          entityId: asset.id,
+          action: AuditLogAction.CREATE,
+          description: `Created asset ${asset.assetTag}.`,
+          newValues: {
+            assetTag: asset.assetTag,
+            name: asset.name,
+            type: asset.type,
+            status: asset.status,
+          },
+          ipAddress: currentUser.ipAddress,
+          userAgent: currentUser.userAgent,
+        },
+        transaction,
+      );
+
+      return asset;
     });
   }
 
@@ -283,8 +317,12 @@ export class AssetsService {
     return asset;
   }
 
-  async update(id: number, updateAssetDto: UpdateAssetDto) {
-    await this.getAssetOrThrow(id);
+  async update(
+    id: number,
+    updateAssetDto: UpdateAssetDto,
+    currentUser: CurrentUserPayload,
+  ) {
+    const asset = await this.getAssetOrThrow(id);
 
     if (updateAssetDto.assetTag) {
       const duplicate = await this.prisma.asset.findFirst({
@@ -322,23 +360,62 @@ export class AssetsService {
       }
     }
 
-    return this.prisma.asset.update({
-      where: { id },
-      data: {
-        assetTag: updateAssetDto.assetTag,
-        name: updateAssetDto.name,
-        type: updateAssetDto.type,
-        brand: updateAssetDto.brand,
-        model: updateAssetDto.model,
-        serialNumber: updateAssetDto.serialNumber,
-        purchaseDate: updateAssetDto.purchaseDate
-          ? new Date(updateAssetDto.purchaseDate)
-          : undefined,
-        warrantyUntil: updateAssetDto.warrantyUntil
-          ? new Date(updateAssetDto.warrantyUntil)
-          : undefined,
-        notes: updateAssetDto.notes,
-      },
+    return this.prisma.$transaction(async (transaction) => {
+      const updatedAsset = await transaction.asset.update({
+        where: { id },
+        data: {
+          assetTag: updateAssetDto.assetTag,
+          name: updateAssetDto.name,
+          type: updateAssetDto.type,
+          brand: updateAssetDto.brand,
+          model: updateAssetDto.model,
+          serialNumber: updateAssetDto.serialNumber,
+          purchaseDate: updateAssetDto.purchaseDate
+            ? new Date(updateAssetDto.purchaseDate)
+            : undefined,
+          warrantyUntil: updateAssetDto.warrantyUntil
+            ? new Date(updateAssetDto.warrantyUntil)
+            : undefined,
+          notes: updateAssetDto.notes,
+        },
+      });
+
+      await this.auditLogsService.create(
+        {
+          actorId: currentUser.userId,
+          entity: AuditLogEntity.ASSET,
+          entityId: asset.id,
+          action: AuditLogAction.UPDATE,
+          description: `Updated asset ${asset.assetTag}.`,
+          oldValues: {
+            assetTag: asset.assetTag,
+            name: asset.name,
+            type: asset.type,
+            brand: asset.brand,
+            model: asset.model,
+            serialNumber: asset.serialNumber,
+            purchaseDate: asset.purchaseDate?.toISOString() ?? null,
+            warrantyUntil: asset.warrantyUntil?.toISOString() ?? null,
+            notes: asset.notes,
+          },
+          newValues: {
+            assetTag: updatedAsset.assetTag,
+            name: updatedAsset.name,
+            type: updatedAsset.type,
+            brand: updatedAsset.brand,
+            model: updatedAsset.model,
+            serialNumber: updatedAsset.serialNumber,
+            purchaseDate: updatedAsset.purchaseDate?.toISOString() ?? null,
+            warrantyUntil: updatedAsset.warrantyUntil?.toISOString() ?? null,
+            notes: updatedAsset.notes,
+          },
+          ipAddress: currentUser.ipAddress,
+          userAgent: currentUser.userAgent,
+        },
+        transaction,
+      );
+
+      return updatedAsset;
     });
   }
 
@@ -444,6 +521,29 @@ export class AssetsService {
           assignedById: currentUser.userId,
         },
       });
+
+      await this.auditLogsService.create(
+        {
+          actorId: currentUser.userId,
+          entity: AuditLogEntity.ASSET,
+          entityId: asset.id,
+          action: AuditLogAction.ASSIGNED,
+          description:
+            `${actor?.name || 'IT staff'} assigned ` +
+            `${asset.assetTag} to ${targetUser.name}.`,
+          oldValues: {
+            status: asset.status,
+            assignedToId: asset.assignedToId,
+          },
+          newValues: {
+            status: AssetStatus.ASSIGNED,
+            assignedToId: targetUser.id,
+          },
+          ipAddress: currentUser.ipAddress,
+          userAgent: currentUser.userAgent,
+        },
+        tx,
+      );
 
       return {
         asset: updatedAsset,
@@ -553,6 +653,27 @@ export class AssetsService {
         throw new NotFoundException('Asset not found');
       }
 
+      await this.auditLogsService.create(
+        {
+          actorId: currentUser.userId,
+          entity: AuditLogEntity.ASSET,
+          entityId: asset.id,
+          action: AuditLogAction.RETURNED,
+          description: `Returned asset ${asset.assetTag}.`,
+          oldValues: {
+            status: asset.status,
+            assignedToId: previousAssignedToId,
+          },
+          newValues: {
+            status: AssetStatus.AVAILABLE,
+            assignedToId: null,
+          },
+          ipAddress: currentUser.ipAddress,
+          userAgent: currentUser.userAgent,
+        },
+        tx,
+      );
+
       return updatedAsset;
     });
 
@@ -570,7 +691,11 @@ export class AssetsService {
     return result;
   }
 
-  async changeStatus(id: number, changeAssetStatusDto: ChangeAssetStatusDto) {
+  async changeStatus(
+    id: number,
+    changeAssetStatusDto: ChangeAssetStatusDto,
+    currentUser: CurrentUserPayload,
+  ) {
     const asset = await this.getAssetOrThrow(id);
 
     if (asset.assignedToId || asset.status === AssetStatus.ASSIGNED) {
@@ -605,6 +730,27 @@ export class AssetsService {
 
       if (!updatedAsset) {
         throw new NotFoundException('Asset not found');
+      }
+
+      if (asset.status !== updatedAsset.status) {
+        await this.auditLogsService.create(
+          {
+            actorId: currentUser.userId,
+            entity: AuditLogEntity.ASSET,
+            entityId: asset.id,
+            action: AuditLogAction.STATUS_CHANGED,
+            description: `Changed status of asset ${asset.assetTag}.`,
+            oldValues: {
+              status: asset.status,
+            },
+            newValues: {
+              status: updatedAsset.status,
+            },
+            ipAddress: currentUser.ipAddress,
+            userAgent: currentUser.userAgent,
+          },
+          tx,
+        );
       }
 
       return updatedAsset;

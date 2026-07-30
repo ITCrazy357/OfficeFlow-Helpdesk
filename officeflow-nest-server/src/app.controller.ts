@@ -1,11 +1,12 @@
 import { Controller, Get } from '@nestjs/common';
-import { PrismaService } from './prisma/prisma.service';
+
 import { Message } from './common/decorators/message.decorator';
+import { PrismaService } from './prisma/prisma.service';
 
 @Controller()
 export class AppController {
   constructor(private readonly prisma: PrismaService) {}
-  
+
   @Get()
   @Message('Welcome to OfficeFlow Helpdesk API')
   getApiInfo() {
@@ -16,8 +17,6 @@ export class AppController {
     };
   }
 
-  //readonly: giá trị được gán một lần, sau đó không thể thay đổi.
-  // Nó giúp bảo vệ dữ liệu khỏi việc bị thay đổi ngoài ý muốn, đảm bảo tính toàn vẹn của dữ liệu trong ứng dụng.
   @Get('health')
   @Message('OfficeFlow NestJS API is running')
   getHealth() {

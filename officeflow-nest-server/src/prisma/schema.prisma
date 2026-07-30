@@ -69,6 +69,29 @@ enum AssetStatus {
   LOST
 }
 
+enum AuditLogEntity {
+  USER
+  DEPARTMENT
+  TICKET
+  KNOWLEDGE_ARTICLE
+  ASSET
+}
+
+enum AuditLogAction {
+  CREATE
+  UPDATE
+  DELETED
+  ASSIGNED
+  RETURNED
+  STATUS_CHANGED
+  ACTIVATED
+  DEACTIVATED
+  PUBLISHED
+  UNPUBLISHED
+  LINKED
+  UNLINKED
+}
+
 model Department {
   id   Int    @id @default(autoincrement())
   name String @unique
@@ -109,6 +132,8 @@ model User {
   assetAssignmentsReceived AssetAssignment[] @relation("AssetAssignmentsReceived")
 
   assetAssignmentsCreated AssetAssignment[] @relation("AssetAssignmentsCreated")
+
+  auditLogs AuditLog[] @relation("AuditLogActor")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -332,4 +357,31 @@ model AssetAssignment {
   @@index([assignedById])
   @@index([returnedAt])
   @@map("Asset_assignments")
+}
+
+model AuditLog {
+  id Int @id @default(autoincrement())
+
+  actorId Int?
+  actor   User? @relation("AuditLogActor", fields: [actorId], references: [id], onDelete: SetNull)
+
+  entity   AuditLogEntity
+  entityId Int?
+
+  action      AuditLogAction
+  description String         @db.VarChar(500)
+
+  oldValues Json?
+  newValues Json?
+
+  ipAddress String? @db.VarChar(45)
+  userAgent String? @db.Text
+
+  createdAt DateTime @default(now())
+
+  @@index([actorId])
+  @@index([entity, entityId])
+  @@index([action])
+  @@index([createdAt])
+  @@map("Audit_logs")
 }

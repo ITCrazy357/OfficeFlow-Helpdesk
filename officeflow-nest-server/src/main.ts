@@ -1,12 +1,13 @@
 import 'dotenv/config';
 
-import { NestFactory, Reflector } from '@nestjs/core';
 import { RequestMethod, ValidationPipe } from '@nestjs/common';
+import { NestFactory, Reflector } from '@nestjs/core';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 
 import { AppModule } from './app.module';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 import { ResponseInterceptor } from './common/interceptors/response.interceptor';
+import { RequestLoggingInterceptor } from './common/interceptors/request-logging.interceptor';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -22,6 +23,11 @@ async function bootstrap() {
     exclude: [{ path: '', method: RequestMethod.GET }],
   });
 
+  app.useGlobalInterceptors(
+    new RequestLoggingInterceptor(),
+    new ResponseInterceptor(app.get(Reflector)),
+  );
+
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true, //Chỉ giữ lại các thuộc tính được khai báo trong DTO, loại bỏ các thuộc tính không mong muốn
@@ -31,8 +37,6 @@ async function bootstrap() {
   );
 
   app.useGlobalFilters(new HttpExceptionFilter());
-
-  app.useGlobalInterceptors(new ResponseInterceptor(app.get(Reflector)));
 
   app.enableCors({
     origin: allowedOrigins,
@@ -55,4 +59,4 @@ async function bootstrap() {
   console.log(`NestJS API is running on port ${port}`);
 }
 
-bootstrap();
+void bootstrap();

@@ -4,6 +4,7 @@ import { ScheduleModule } from '@nestjs/schedule';
 
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
+import { AuditLogsModule } from './audit-logs/audit-logs.module';
 import { AssetsModule } from './assets/assets.module';
 import { AuthModule } from './auth/auth.module';
 import { DashboardModule } from './dashboard/dashboard.module';
@@ -31,6 +32,7 @@ import { TicketCategoriesModule } from './ticket-categories/ticket-categories.mo
     NotificationsModule,
     AssetsModule,
     TicketCategoriesModule,
+    AuditLogsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

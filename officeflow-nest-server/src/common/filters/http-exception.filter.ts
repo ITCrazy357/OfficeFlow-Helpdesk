@@ -6,17 +6,16 @@ import {
   HttpStatus,
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
-import { Request, Response } from 'express';
+import type { Request, Response } from 'express';
 
-import { ApiErrorResponse } from '../types/api-response.type';
+import type { ApiErrorResponse } from '../types/api-response.type';
 
 @Catch()
 export class HttpExceptionFilter implements ExceptionFilter {
   catch(exception: unknown, host: ArgumentsHost) {
-    const ctx = host.switchToHttp();
-
-    const response = ctx.getResponse<Response>();
-    const request = ctx.getRequest<Request>();
+    const context = host.switchToHttp();
+    const response = context.getResponse<Response>();
+    const request = context.getRequest<Request>();
 
     let statusCode = HttpStatus.INTERNAL_SERVER_ERROR;
     let message = 'Internal server error';
@@ -36,9 +35,8 @@ export class HttpExceptionFilter implements ExceptionFilter {
         const responseBody = exceptionResponse as {
           message?: string | string[];
           error?: string;
-          statusCode?: number;
         };
-        //Validate
+
         if (Array.isArray(responseBody.message)) {
           message = 'Validation failed';
           errors = responseBody.message;

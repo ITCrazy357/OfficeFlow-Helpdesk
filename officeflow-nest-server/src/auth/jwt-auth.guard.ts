@@ -5,15 +5,18 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
-import { Request } from 'express';
+import type { UserRole } from '@prisma/client';
+import type { Request } from 'express';
+
+import type { CurrentUserPayload } from '../common/decorators/current-user.decorator';
 
 type JwtPayload = {
   userId: number;
-  role: string;
+  role: UserRole;
 };
 
 type AuthRequest = Request & {
-  user?: JwtPayload;
+  user?: CurrentUserPayload;
 };
 
 @Injectable()
@@ -34,7 +37,12 @@ export class JwtAuthGuard implements CanActivate {
     try {
       const payload = this.jwtService.verify<JwtPayload>(token);
 
-      request.user = payload;
+      request.user = {
+        userId: payload.userId,
+        role: payload.role,
+        ipAddress: request.ip,
+        userAgent: request.headers['user-agent'],
+      };
 
       return true;
     } catch {

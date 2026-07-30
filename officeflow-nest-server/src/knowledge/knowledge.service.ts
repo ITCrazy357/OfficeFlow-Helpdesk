@@ -4,22 +4,27 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { Prisma, UserRole } from '@prisma/client';
+import {
+  AuditLogAction,
+  AuditLogEntity,
+  type Prisma,
+  UserRole,
+} from '@prisma/client';
 
+import { AuditLogsService } from '../audit-logs/audit-logs.service';
+import type { CurrentUserPayload } from '../common/decorators/current-user.decorator';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateKnowledgeArticleDto } from './dto/create-knowledge-article.dto';
 import { UpdateKnowledgeArticleDto } from './dto/update-knowledge-article.dto';
 import { GetKnowledgeQueryDto } from './dto/get-knowledge-query.dto';
 import { SuggestArticlesDto } from './dto/suggest-articles.dto';
 
-type CurrentUser = {
-  userId: number;
-  role: UserRole;
-};
-
 @Injectable()
 export class KnowledgeService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly auditLogsService: AuditLogsService,
+  ) {}
 
   private createSlug(title: string) {
     return title
@@ -58,7 +63,7 @@ export class KnowledgeService {
   }
 
   private buildReadScope(
-    currentUser: CurrentUser,
+    currentUser: CurrentUserPayload,
   ): Prisma.KnowledgeArticleWhereInput {
     if (currentUser.role === UserRole.ADMIN) {
       return {};
@@ -82,45 +87,68 @@ export class KnowledgeService {
     };
   }
 
-  async create(createDto: CreateKnowledgeArticleDto, currentUser: CurrentUser) {
+  async create(
+    createDto: CreateKnowledgeArticleDto,
+    currentUser: CurrentUserPayload,
+  ) {
     const slug = await this.generateUniqueSlug(createDto.title);
 
-    const article = await this.prisma.knowledgeArticle.create({
-      data: {
-        title: createDto.title,
-        slug,
-        summary: createDto.summary,
-        content: createDto.content,
-        tags: createDto.tags,
-        isPublished: createDto.isPublished ?? false,
-        createdById: currentUser.userId,
-      },
-      select: {
-        id: true,
-        title: true,
-        slug: true,
-        summary: true,
-        content: true,
-        tags: true,
-        isPublished: true,
-        viewCount: true,
-        createdAt: true,
-        updatedAt: true,
-        createdBy: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-            role: true,
+    return this.prisma.$transaction(async (transaction) => {
+      const article = await transaction.knowledgeArticle.create({
+        data: {
+          title: createDto.title,
+          slug,
+          summary: createDto.summary,
+          content: createDto.content,
+          tags: createDto.tags,
+          isPublished: createDto.isPublished ?? false,
+          createdById: currentUser.userId,
+        },
+        select: {
+          id: true,
+          title: true,
+          slug: true,
+          summary: true,
+          content: true,
+          tags: true,
+          isPublished: true,
+          viewCount: true,
+          createdAt: true,
+          updatedAt: true,
+          createdBy: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+              role: true,
+            },
           },
         },
-      },
-    });
+      });
 
-    return article;
+      await this.auditLogsService.create(
+        {
+          actorId: currentUser.userId,
+          entity: AuditLogEntity.KNOWLEDGE_ARTICLE,
+          entityId: article.id,
+          action: AuditLogAction.CREATE,
+          description: `Created knowledge article ${article.title}.`,
+          newValues: {
+            title: article.title,
+            slug: article.slug,
+            isPublished: article.isPublished,
+          },
+          ipAddress: currentUser.ipAddress,
+          userAgent: currentUser.userAgent,
+        },
+        transaction,
+      );
+
+      return article;
+    });
   }
 
-  async findAll(currentUser: CurrentUser, query: GetKnowledgeQueryDto) {
+  async findAll(currentUser: CurrentUserPayload, query: GetKnowledgeQueryDto) {
     const page = query.page || 1;
     const limit = query.limit || 10;
     const skip = (page - 1) * limit;
@@ -204,7 +232,7 @@ export class KnowledgeService {
     };
   }
 
-  async getById(id: number, currentUser: CurrentUser) {
+  async getById(id: number, currentUser: CurrentUserPayload) {
     const article = await this.prisma.knowledgeArticle.findUnique({
       where: {
         id,
@@ -214,7 +242,6 @@ export class KnowledgeService {
         title: true,
         slug: true,
         summary: true,
-        content: true,
         tags: true,
         isPublished: true,
         viewCount: true,
@@ -263,7 +290,7 @@ export class KnowledgeService {
   async update(
     id: number,
     updateDto: UpdateKnowledgeArticleDto,
-    currentUser: CurrentUser,
+    currentUser: CurrentUserPayload,
   ) {
     const article = await this.prisma.knowledgeArticle.findUnique({
       where: {
@@ -271,6 +298,11 @@ export class KnowledgeService {
       },
       select: {
         id: true,
+        title: true,
+        slug: true,
+        summary: true,
+        tags: true,
+        isPublished: true,
         createdById: true,
       },
     });
@@ -303,41 +335,85 @@ export class KnowledgeService {
       data.slug = await this.generateUniqueSlug(title, id);
     }
 
-    return this.prisma.knowledgeArticle.update({
-      where: {
-        id,
-      },
-      data,
-      select: {
-        id: true,
-        title: true,
-        slug: true,
-        summary: true,
-        content: true,
-        tags: true,
-        isPublished: true,
-        viewCount: true,
-        createdAt: true,
-        updatedAt: true,
-        createdBy: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-            role: true,
+    return this.prisma.$transaction(async (transaction) => {
+      const updatedArticle = await transaction.knowledgeArticle.update({
+        where: {
+          id,
+        },
+        data,
+        select: {
+          id: true,
+          title: true,
+          slug: true,
+          summary: true,
+          content: true,
+          tags: true,
+          isPublished: true,
+          viewCount: true,
+          createdAt: true,
+          updatedAt: true,
+          createdBy: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+              role: true,
+            },
           },
         },
-      },
+      });
+
+      let action: AuditLogAction = AuditLogAction.UPDATE;
+
+      if (
+        updateDto.isPublished !== undefined &&
+        updateDto.isPublished !== article.isPublished
+      ) {
+        action = updateDto.isPublished
+          ? AuditLogAction.PUBLISHED
+          : AuditLogAction.UNPUBLISHED;
+      }
+
+      await this.auditLogsService.create(
+        {
+          actorId: currentUser.userId,
+          entity: AuditLogEntity.KNOWLEDGE_ARTICLE,
+          entityId: article.id,
+          action,
+          description: `Updated knowledge article ${updatedArticle.title}.`,
+          oldValues: {
+            title: article.title,
+            slug: article.slug,
+            summary: article.summary,
+            tags: article.tags,
+            isPublished: article.isPublished,
+          },
+          newValues: {
+            title: updatedArticle.title,
+            slug: updatedArticle.slug,
+            summary: updatedArticle.summary,
+            tags: updatedArticle.tags,
+            isPublished: updatedArticle.isPublished,
+          },
+          ipAddress: currentUser.ipAddress,
+          userAgent: currentUser.userAgent,
+        },
+        transaction,
+      );
+
+      return updatedArticle;
     });
   }
 
-  async publish(id: number, currentUser: CurrentUser) {
+  async publish(id: number, currentUser: CurrentUserPayload) {
     const article = await this.prisma.knowledgeArticle.findUnique({
       where: {
         id,
       },
       select: {
         id: true,
+        title: true,
+        isPublished: true,
         createdById: true,
       },
     });
@@ -355,43 +431,71 @@ export class KnowledgeService {
       throw new ForbiddenException('Forbidden');
     }
 
-    return this.prisma.knowledgeArticle.update({
-      where: {
-        id,
-      },
-      data: {
-        isPublished: true,
-      },
-      select: {
-        id: true,
-        title: true,
-        slug: true,
-        summary: true,
-        content: true,
-        tags: true,
-        isPublished: true,
-        viewCount: true,
-        createdAt: true,
-        updatedAt: true,
-        createdBy: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-            role: true,
+    return this.prisma.$transaction(async (transaction) => {
+      const publishedArticle = await transaction.knowledgeArticle.update({
+        where: {
+          id,
+        },
+        data: {
+          isPublished: true,
+        },
+        select: {
+          id: true,
+          title: true,
+          slug: true,
+          summary: true,
+          content: true,
+          tags: true,
+          isPublished: true,
+          viewCount: true,
+          createdAt: true,
+          updatedAt: true,
+          createdBy: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+              role: true,
+            },
           },
         },
-      },
+      });
+
+      if (!article.isPublished) {
+        await this.auditLogsService.create(
+          {
+            actorId: currentUser.userId,
+            entity: AuditLogEntity.KNOWLEDGE_ARTICLE,
+            entityId: article.id,
+            action: AuditLogAction.PUBLISHED,
+            description: `Published knowledge article ${article.title}.`,
+            oldValues: {
+              isPublished: false,
+            },
+            newValues: {
+              isPublished: true,
+            },
+            ipAddress: currentUser.ipAddress,
+            userAgent: currentUser.userAgent,
+          },
+          transaction,
+        );
+      }
+
+      return publishedArticle;
     });
   }
 
-  async remove(id: number, currentUser: CurrentUser) {
+  async remove(id: number, currentUser: CurrentUserPayload) {
     const article = await this.prisma.knowledgeArticle.findUnique({
       where: {
         id,
       },
       select: {
         id: true,
+        title: true,
+        slug: true,
+        isPublished: true,
         createdById: true,
       },
     });
@@ -409,19 +513,41 @@ export class KnowledgeService {
       throw new ForbiddenException('Forbidden');
     }
 
-    return this.prisma.knowledgeArticle.delete({
-      where: {
-        id,
-      },
-      select: {
-        id: true,
-      },
+    return this.prisma.$transaction(async (transaction) => {
+      const deletedArticle = await transaction.knowledgeArticle.delete({
+        where: {
+          id,
+        },
+        select: {
+          id: true,
+        },
+      });
+
+      await this.auditLogsService.create(
+        {
+          actorId: currentUser.userId,
+          entity: AuditLogEntity.KNOWLEDGE_ARTICLE,
+          entityId: article.id,
+          action: AuditLogAction.DELETED,
+          description: `Deleted knowledge article ${article.title}.`,
+          oldValues: {
+            title: article.title,
+            slug: article.slug,
+            isPublished: article.isPublished,
+          },
+          ipAddress: currentUser.ipAddress,
+          userAgent: currentUser.userAgent,
+        },
+        transaction,
+      );
+
+      return deletedArticle;
     });
   }
 
   async suggestForTicket(
     suggestDto: SuggestArticlesDto,
-    currentUser: CurrentUser,
+    currentUser: CurrentUserPayload,
   ) {
     const text = `${suggestDto.title} ${suggestDto.description ?? ''}`;
     const keywords = Array.from(

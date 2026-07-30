@@ -1,10 +1,12 @@
 import { createParamDecorator, ExecutionContext } from '@nestjs/common';
-import { UserRole } from '@prisma/client';
-import { Request } from 'express';
+import type { UserRole } from '@prisma/client';
+import type { Request } from 'express';
 
 export type CurrentUserPayload = {
   userId: number;
   role: UserRole;
+  ipAddress?: string;
+  userAgent?: string;
 };
 
 type AuthRequest = Request & {

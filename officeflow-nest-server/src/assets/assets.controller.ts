@@ -47,8 +47,11 @@ export class AssetsController {
   @Message('Create asset successfully')
   @ApiOperation({ summary: 'Create a new asset' })
   @ApiResponse({ status: 201, description: 'Asset created' })
-  create(@Body() createAssetDto: CreateAssetDto) {
-    return this.assetsService.create(createAssetDto);
+  create(
+    @Body() createAssetDto: CreateAssetDto,
+    @CurrentUser() currentUser: CurrentUserPayload,
+  ) {
+    return this.assetsService.create(createAssetDto, currentUser);
   }
 
   @Get()
@@ -85,8 +88,9 @@ export class AssetsController {
   update(
     @Param('id', ParseIntPipe) id: number,
     @Body() updateAssetDto: UpdateAssetDto,
+    @CurrentUser() currentUser: CurrentUserPayload,
   ) {
-    return this.assetsService.update(id, updateAssetDto);
+    return this.assetsService.update(id, updateAssetDto, currentUser);
   }
 
   @Patch(':id/assign')
@@ -120,8 +124,13 @@ export class AssetsController {
   changeStatus(
     @Param('id', ParseIntPipe) id: number,
     @Body() changeAssetStatusDto: ChangeAssetStatusDto,
+    @CurrentUser() currentUser: CurrentUserPayload,
   ) {
-    return this.assetsService.changeStatus(id, changeAssetStatusDto);
+    return this.assetsService.changeStatus(
+      id,
+      changeAssetStatusDto,
+      currentUser,
+    );
   }
 
   @Get(':id/assignment-history')

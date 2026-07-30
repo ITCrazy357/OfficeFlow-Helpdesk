@@ -4,18 +4,17 @@ import {
   ForbiddenException,
   Injectable,
 } from '@nestjs/common';
-import { Reflector } from '@nestjs/core'; // Đọc metadata được tạo bởi setMetadata trong decorator Roles
-import { UserRole } from '@prisma/client';
-import { ROLES_KEY } from '../decorators/roles.decorator';
-import { Request } from 'express';
+import { Reflector } from '@nestjs/core';
+import type { UserRole } from '@prisma/client';
+import type { Request } from 'express';
 
-type AuthUser = {
-  userId: number;
-  role: UserRole;
-};
+import { ROLES_KEY } from '../decorators/roles.decorator';
 
 type AuthRequest = Request & {
-  user?: AuthUser;
+  user?: {
+    userId: number;
+    role: UserRole;
+  };
 };
 
 @Injectable()
@@ -25,10 +24,7 @@ export class RolesGuard implements CanActivate {
   canActivate(context: ExecutionContext): boolean {
     const requiredRoles = this.reflector.getAllAndOverride<UserRole[]>(
       ROLES_KEY,
-      [
-        context.getHandler() /*lấy quyền trong method trước */,
-        context.getClass() /*Không có quyền trong method thì lấy từ controller */,
-      ],
+      [context.getHandler(), context.getClass()],
     );
 
     if (!requiredRoles || requiredRoles.length === 0) {
@@ -38,11 +34,7 @@ export class RolesGuard implements CanActivate {
     const request = context.switchToHttp().getRequest<AuthRequest>();
     const user = request.user;
 
-    if (!user) {
-      throw new ForbiddenException('Forbidden');
-    }
-
-    if (!requiredRoles.includes(user.role)) {
+    if (!user || !requiredRoles.includes(user.role)) {
       throw new ForbiddenException('Forbidden');
     }
 

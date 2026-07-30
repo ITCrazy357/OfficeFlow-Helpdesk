@@ -7,6 +7,8 @@ import {
 } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import {
+  AuditLogAction,
+  AuditLogEntity,
   type Prisma,
   TicketHistoryAction,
   TicketStatus,
@@ -15,10 +17,12 @@ import {
 import type { Request } from 'express';
 import type {} from 'multer';
 
+import { AuditLogsService } from '../audit-logs/audit-logs.service';
 import {
   CloudinaryService,
   type CloudinaryResourceType,
 } from '../cloudinary/cloudinary.service';
+import type { CurrentUserPayload } from '../common/decorators/current-user.decorator';
 import { TicketAssignedEvent } from '../notifications/events/ticket-assigned.event';
 import { TicketCommentedEvent } from '../notifications/events/ticket-commented.event';
 import { TicketStatusChangedEvent } from '../notifications/events/ticket-status-changed.event';
@@ -32,11 +36,6 @@ import { LinkTicketAssetDto } from './dto/link-ticket-asset.dto';
 import { UpdateTicketStatusDto } from './dto/update-ticket-status.dto';
 import { UpdateTicketDto } from './dto/update-ticket.dto';
 import { calculateDueAt } from './ticket-sla.util';
-
-type CurrentUser = {
-  userId: number;
-  role: UserRole;
-};
 
 export type TicketAttachmentFile = NonNullable<Request['file']>;
 
@@ -75,6 +74,7 @@ export class TicketsService {
     private readonly prisma: PrismaService,
     private readonly cloudinaryService: CloudinaryService,
     private readonly eventEmitter: EventEmitter2,
+    private readonly auditLogsService: AuditLogsService,
   ) {}
 
   private async ensureCategoryExists(categoryId?: number) {
@@ -96,7 +96,7 @@ export class TicketsService {
     }
   }
 
-  async getTickets(currentUser: CurrentUser, query: GetTicketsQueryDto) {
+  async getTickets(currentUser: CurrentUserPayload, query: GetTicketsQueryDto) {
     const page = query.page || 1;
     const limit = query.limit || 10;
     const skip = (page - 1) * limit;
@@ -221,50 +221,77 @@ export class TicketsService {
     };
   }
 
-  async create(createTicketDto: CreateTicketDto, currentUser: CurrentUser) {
+  async create(
+    createTicketDto: CreateTicketDto,
+    currentUser: CurrentUserPayload,
+  ) {
     await this.ensureCategoryExists(createTicketDto.categoryId);
 
     const dueAt = calculateDueAt(createTicketDto.priority);
 
-    const ticket = await this.prisma.ticket.create({
-      data: {
-        title: createTicketDto.title,
-        description: createTicketDto.description,
-        priority: createTicketDto.priority,
-        categoryId: createTicketDto.categoryId,
-        createdById: currentUser.userId,
-        dueAt,
-      },
-      select: {
-        id: true,
-        title: true,
-        description: true,
-        status: true,
-        priority: true,
-        dueAt: true,
-        resolveAt: true,
-        isOverdue: true,
-        createdAt: true,
-        category: {
-          select: {
-            id: true,
-            name: true,
+    return this.prisma.$transaction(async (transaction) => {
+      const ticket = await transaction.ticket.create({
+        data: {
+          title: createTicketDto.title,
+          description: createTicketDto.description,
+          priority: createTicketDto.priority,
+          categoryId: createTicketDto.categoryId,
+          createdById: currentUser.userId,
+          dueAt,
+        },
+        select: {
+          id: true,
+          title: true,
+          description: true,
+          status: true,
+          priority: true,
+          dueAt: true,
+          resolveAt: true,
+          isOverdue: true,
+          createdAt: true,
+          category: {
+            select: {
+              id: true,
+              name: true,
+            },
           },
         },
-      },
-    });
+      });
 
-    await this.createHistory({
-      ticketId: ticket.id,
-      userId: currentUser.userId,
-      action: TicketHistoryAction.CREATE,
-      newValue: ticket.title,
-    });
+      await this.createHistory(
+        {
+          ticketId: ticket.id,
+          userId: currentUser.userId,
+          action: TicketHistoryAction.CREATE,
+          newValue: ticket.title,
+        },
+        transaction,
+      );
 
-    return ticket;
+      await this.auditLogsService.create(
+        {
+          actorId: currentUser.userId,
+          entity: AuditLogEntity.TICKET,
+          entityId: ticket.id,
+          action: AuditLogAction.CREATE,
+          description: `Created ticket ${ticket.title}.`,
+          newValues: {
+            title: ticket.title,
+            status: ticket.status,
+            priority: ticket.priority,
+            categoryId: ticket.category?.id ?? null,
+          },
+          ipAddress: currentUser.ipAddress,
+          userAgent: currentUser.userAgent,
+        },
+        transaction,
+      );
+
+      return ticket;
+    });
   }
 
-  async canGetById(id: number, currentUser: CurrentUser) {
+  async canGetById(id: number, currentUser: CurrentUserPayload) {
     const ticket = await this.prisma.ticket.findUnique({
       where: { id },
       select: {
@@ -363,7 +390,7 @@ export class TicketsService {
   async update(
     id: number,
     updateTicketDto: UpdateTicketDto,
-    currentUser: CurrentUser,
+    currentUser: CurrentUserPayload,
   ) {
     const ticket = await this.prisma.ticket.findUnique({
       where: { id },
@@ -406,63 +433,91 @@ export class TicketsService {
 
     await this.ensureCategoryExists(updateTicketDto.categoryId);
 
-    const updatedTicket = await this.prisma.ticket.update({
-      where: { id },
-      data: {
-        title: updateTicketDto.title,
-        description: updateTicketDto.description,
-        priority: updateTicketDto.priority,
-        categoryId: updateTicketDto.categoryId,
-      },
-      select: {
-        id: true,
-        title: true,
-        description: true,
-        status: true,
-        priority: true,
-        dueAt: true,
-        resolveAt: true,
-        isOverdue: true,
-        createdAt: true,
-        updatedAt: true,
-        createdBy: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
+    return this.prisma.$transaction(async (transaction) => {
+      const updatedTicket = await transaction.ticket.update({
+        where: { id },
+        data: {
+          title: updateTicketDto.title,
+          description: updateTicketDto.description,
+          priority: updateTicketDto.priority,
+          categoryId: updateTicketDto.categoryId,
+        },
+        select: {
+          id: true,
+          title: true,
+          description: true,
+          status: true,
+          priority: true,
+          dueAt: true,
+          resolveAt: true,
+          isOverdue: true,
+          createdAt: true,
+          updatedAt: true,
+          createdBy: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+            },
+          },
+          assignedTo: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+            },
+          },
+          category: {
+            select: {
+              id: true,
+              name: true,
+            },
           },
         },
-        assignedTo: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-          },
-        },
-        category: {
-          select: {
-            id: true,
-            name: true,
-          },
-        },
-      },
-    });
+      });
 
-    await this.createHistory({
-      ticketId: id,
-      userId: currentUser.userId,
-      action: TicketHistoryAction.UPDATE,
-      oldValue: ticket.title,
-      newValue: updatedTicket.title,
-    });
+      await this.createHistory(
+        {
+          ticketId: id,
+          userId: currentUser.userId,
+          action: TicketHistoryAction.UPDATE,
+          oldValue: ticket.title,
+          newValue: updatedTicket.title,
+        },
+        transaction,
+      );
 
-    return updatedTicket;
+      await this.auditLogsService.create(
+        {
+          actorId: currentUser.userId,
+          entity: AuditLogEntity.TICKET,
+          entityId: ticket.id,
+          action: AuditLogAction.UPDATE,
+          description: `Updated ticket ${updatedTicket.title}.`,
+          oldValues: {
+            title: ticket.title,
+            priority: ticket.priority,
+            categoryId: ticket.categoryId,
+          },
+          newValues: {
+            title: updatedTicket.title,
+            priority: updatedTicket.priority,
+            categoryId: updatedTicket.category?.id ?? null,
+          },
+          ipAddress: currentUser.ipAddress,
+          userAgent: currentUser.userAgent,
+        },
+        transaction,
+      );
+
+      return updatedTicket;
+    });
   }
 
   async updateStatus(
     id: number,
     updateStatusDto: UpdateTicketStatusDto,
-    currentUser: CurrentUser,
+    currentUser: CurrentUserPayload,
   ) {
     const nextStatus = updateStatusDto.status;
 
@@ -492,53 +547,83 @@ export class TicketsService {
       throw new NotFoundException('Ticket not found');
     }
 
-    const updateTicket = await this.prisma.ticket.update({
-      where: { id },
-      data: {
-        status: updateStatusDto.status,
-        resolveAt: shouldSetResolveAt ? new Date() : null,
-      },
-      select: {
-        id: true,
-        title: true,
-        description: true,
-        status: true,
-        priority: true,
-        dueAt: true,
-        resolveAt: true,
-        isOverdue: true,
-        createdAt: true,
-        updatedAt: true,
-        createdBy: {
+    const updatedTicket = await this.prisma.$transaction(
+      async (transaction) => {
+        const result = await transaction.ticket.update({
+          where: { id },
+          data: {
+            status: updateStatusDto.status,
+            resolveAt: shouldSetResolveAt ? new Date() : null,
+          },
           select: {
             id: true,
-            name: true,
-            email: true,
+            title: true,
+            description: true,
+            status: true,
+            priority: true,
+            dueAt: true,
+            resolveAt: true,
+            isOverdue: true,
+            createdAt: true,
+            updatedAt: true,
+            createdBy: {
+              select: {
+                id: true,
+                name: true,
+                email: true,
+              },
+            },
+            assignedTo: {
+              select: {
+                id: true,
+                name: true,
+                email: true,
+              },
+            },
+            category: {
+              select: {
+                id: true,
+                name: true,
+              },
+            },
           },
-        },
-        assignedTo: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-          },
-        },
-        category: {
-          select: {
-            id: true,
-            name: true,
-          },
-        },
-      },
-    });
+        });
 
-    await this.createHistory({
-      ticketId: id,
-      userId: currentUser.userId,
-      action: TicketHistoryAction.STATUS_CHANGED,
-      oldValue: ticket.status,
-      newValue: updateTicket.status,
-    });
+        await this.createHistory(
+          {
+            ticketId: id,
+            userId: currentUser.userId,
+            action: TicketHistoryAction.STATUS_CHANGED,
+            oldValue: ticket.status,
+            newValue: result.status,
+          },
+          transaction,
+        );
+
+        if (ticket.status !== result.status) {
+          await this.auditLogsService.create(
+            {
+              actorId: currentUser.userId,
+              entity: AuditLogEntity.TICKET,
+              entityId: ticket.id,
+              action: AuditLogAction.STATUS_CHANGED,
+              description: `Changed status of ticket ${ticket.title}.`,
+              oldValues: {
+                status: ticket.status,
+              },
+              newValues: {
+                status: result.status,
+              },
+              ipAddress: currentUser.ipAddress,
+              userAgent: currentUser.userAgent,
+            },
+            transaction,
+          );
+        }
+
+        return result;
+      },
+    );
 
     const recipientIds = [ticket.createdById, ticket.assignedToId].filter(
       (userId): userId is number => Boolean(userId),
@@ -559,18 +644,18 @@ export class TicketsService {
         currentUser.userId,
         actor?.name || 'Someone',
         ticket.status,
-        updateTicket.status,
+        updatedTicket.status,
         recipientIds,
       ),
     );
 
-    return updateTicket;
+    return updatedTicket;
   }
 
   async assign(
     id: number,
     assignTicketDto: AssignTicketDto,
-    currentUser: CurrentUser,
+    currentUser: CurrentUserPayload,
   ) {
     if (
       currentUser.role !== UserRole.ADMIN &&
@@ -611,52 +696,82 @@ export class TicketsService {
       throw new BadRequestException('Assignee must be IT staff or admin');
     }
 
-    const updatedTicket = await this.prisma.ticket.update({
-      where: { id },
-      data: {
-        assignedToId: assignTicketDto.assignedToId,
-      },
-      select: {
-        id: true,
-        title: true,
-        description: true,
-        status: true,
-        priority: true,
-        dueAt: true,
-        resolveAt: true,
-        isOverdue: true,
-        createdAt: true,
-        updatedAt: true,
-        createdBy: {
+    const updatedTicket = await this.prisma.$transaction(
+      async (transaction) => {
+        const result = await transaction.ticket.update({
+          where: { id },
+          data: {
+            assignedToId: assignTicketDto.assignedToId,
+          },
           select: {
             id: true,
-            name: true,
-            email: true,
+            title: true,
+            description: true,
+            status: true,
+            priority: true,
+            dueAt: true,
+            resolveAt: true,
+            isOverdue: true,
+            createdAt: true,
+            updatedAt: true,
+            createdBy: {
+              select: {
+                id: true,
+                name: true,
+                email: true,
+              },
+            },
+            assignedTo: {
+              select: {
+                id: true,
+                name: true,
+                email: true,
+              },
+            },
+            category: {
+              select: {
+                id: true,
+                name: true,
+              },
+            },
           },
-        },
-        assignedTo: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-          },
-        },
-        category: {
-          select: {
-            id: true,
-            name: true,
-          },
-        },
-      },
-    });
+        });
 
-    await this.createHistory({
-      ticketId: id,
-      userId: currentUser.userId,
-      action: TicketHistoryAction.ASSIGNED,
-      oldValue: ticket.assignedToId ? String(ticket.assignedToId) : undefined,
-      newValue: String(assignTicketDto.assignedToId),
-    });
+        await this.createHistory(
+          {
+            ticketId: id,
+            userId: currentUser.userId,
+            action: TicketHistoryAction.ASSIGNED,
+            oldValue: ticket.assignedToId
+              ? String(ticket.assignedToId)
+              : undefined,
+            newValue: String(assignTicketDto.assignedToId),
+          },
+          transaction,
+        );
+
+        await this.auditLogsService.create(
+          {
+            actorId: currentUser.userId,
+            entity: AuditLogEntity.TICKET,
+            entityId: ticket.id,
+            action: AuditLogAction.ASSIGNED,
+            description: `Assigned ticket ${ticket.title}.`,
+            oldValues: {
+              assignedToId: ticket.assignedToId,
+            },
+            newValues: {
+              assignedToId: assignTicketDto.assignedToId,
+            },
+            ipAddress: currentUser.ipAddress,
+            userAgent: currentUser.userAgent,
+          },
+          transaction,
+        );
+
+        return result;
+      },
+    );
 
     const actor = await this.prisma.user.findUnique({
       where: { id: currentUser.userId },
@@ -680,11 +795,12 @@ export class TicketsService {
     return updatedTicket;
   }
 
-  async remove(id: number, currentUser: CurrentUser) {
+  async remove(id: number, currentUser: CurrentUserPayload) {
     const ticket = await this.prisma.ticket.findUnique({
       where: { id },
       select: {
         id: true,
+        title: true,
         createdById: true,
         status: true,
         attachments: {
@@ -727,15 +843,38 @@ export class TicketsService {
       }),
     );
 
-    await this.prisma.ticket.delete({
-      where: { id },
+    await this.prisma.$transaction(async (transaction) => {
+      await transaction.ticket.delete({
+        where: { id },
+      });
+
+      await this.auditLogsService.create(
+        {
+          actorId: currentUser.userId,
+          entity: AuditLogEntity.TICKET,
+          entityId: ticket.id,
+          action: AuditLogAction.DELETED,
+          description: `Deleted ticket ${ticket.title}.`,
+          oldValues: {
+            title: ticket.title,
+            status: ticket.status,
+            createdById: ticket.createdById,
+          },
+          ipAddress: currentUser.ipAddress,
+          userAgent: currentUser.userAgent,
+        },
+        transaction,
+      );
     });
 
     return { id };
   }
 
   //Cho phép ADMIN, IT_STAFF và MANAGER(có cùng phòng ban vói người tạo ra ticket) truy cập vào ticket
-  private async canAccessTicket(ticketId: number, currentUser: CurrentUser) {
+  private async canAccessTicket(
+    ticketId: number,
+    currentUser: CurrentUserPayload,
+  ) {
     const ticket = await this.prisma.ticket.findUnique({
       where: { id: ticketId },
       select: {
@@ -786,14 +925,19 @@ export class TicketsService {
   }
 
   //Tạo lịch sử ticket
-  private async createHistory(params: {
-    ticketId: number;
-    userId: number;
-    action: TicketHistoryAction;
-    oldValue?: string;
-    newValue?: string;
-  }) {
-    return this.prisma.ticketHistory.create({
+  private async createHistory(
+    params: {
+      ticketId: number;
+      userId: number;
+      action: TicketHistoryAction;
+      oldValue?: string;
+      newValue?: string;
+    },
+    transaction?: Prisma.TransactionClient,
+  ) {
+    const database = transaction ?? this.prisma;
+
+    return database.ticketHistory.create({
       data: {
         ticketId: params.ticketId,
         userId: params.userId,
@@ -809,7 +953,7 @@ export class TicketsService {
   async addComment(
     ticketId: number,
     createCommentDto: CreateTicketCommentDto,
-    currentUser: CurrentUser,
+    currentUser: CurrentUserPayload,
   ) {
     await this.canAccessTicket(ticketId, currentUser);
 
@@ -871,7 +1015,7 @@ export class TicketsService {
   }
 
   // Lấy nội dung comment
-  async getComments(ticketId: number, currentUser: CurrentUser) {
+  async getComments(ticketId: number, currentUser: CurrentUserPayload) {
     await this.canAccessTicket(ticketId, currentUser);
 
     const comments = await this.prisma.ticketComment.findMany({
@@ -898,7 +1042,7 @@ export class TicketsService {
   }
 
   //Lấy lịch sử comment
-  async getHistory(ticketId: number, currentUser: CurrentUser) {
+  async getHistory(ticketId: number, currentUser: CurrentUserPayload) {
     await this.canAccessTicket(ticketId, currentUser);
 
     const histories = await this.prisma.ticketHistory.findMany({
@@ -929,7 +1073,7 @@ export class TicketsService {
   async uploadAttachment(
     ticketId: number,
     file: TicketAttachmentFile,
-    currentUser: CurrentUser,
+    currentUser: CurrentUserPayload,
   ) {
     if (!file) {
       throw new BadRequestException('File is required');
@@ -1001,7 +1145,7 @@ export class TicketsService {
     }
   }
 
-  async getAttachments(ticketId: number, currentUser: CurrentUser) {
+  async getAttachments(ticketId: number, currentUser: CurrentUserPayload) {
     await this.canAccessTicket(ticketId, currentUser);
 
     const attachments = await this.prisma.ticketAttachment.findMany({
@@ -1030,7 +1174,7 @@ export class TicketsService {
   async deleteAttachment(
     ticketId: number,
     attachmentId: number,
-    currentUser: CurrentUser,
+    currentUser: CurrentUserPayload,
   ) {
     await this.canAccessTicket(ticketId, currentUser);
 
@@ -1101,9 +1245,9 @@ export class TicketsService {
   async linkAsset(
     ticketId: number,
     linkTicketAssetDto: LinkTicketAssetDto,
-    currentUser: CurrentUser,
+    currentUser: CurrentUserPayload,
   ) {
-    const [, asset] = await Promise.all([
+    const [ticket, asset] = await Promise.all([
       this.canGetById(ticketId, currentUser),
       this.prisma.asset.findUnique({
         where: {
@@ -1131,37 +1275,87 @@ export class TicketsService {
       );
     }
 
-    return this.prisma.ticket.update({
-      where: {
-        id: ticketId,
-      },
-      data: {
-        assetId: asset.id,
-      },
-      include: {
-        asset: {
-          select: {
-            id: true,
-            assetTag: true,
-            name: true,
-            type: true,
-            status: true,
+    return this.prisma.$transaction(async (transaction) => {
+      const updatedTicket = await transaction.ticket.update({
+        where: {
+          id: ticketId,
+        },
+        data: {
+          assetId: asset.id,
+        },
+        include: {
+          asset: {
+            select: {
+              id: true,
+              assetTag: true,
+              name: true,
+              type: true,
+              status: true,
+            },
           },
         },
-      },
+      });
+
+      if (ticket.asset?.id !== asset.id) {
+        await this.auditLogsService.create(
+          {
+            actorId: currentUser.userId,
+            entity: AuditLogEntity.TICKET,
+            entityId: ticket.id,
+            action: AuditLogAction.LINKED,
+            description: `Linked asset to ticket ${ticket.title}.`,
+            oldValues: {
+              assetId: ticket.asset?.id ?? null,
+            },
+            newValues: {
+              assetId: asset.id,
+            },
+            ipAddress: currentUser.ipAddress,
+            userAgent: currentUser.userAgent,
+          },
+          transaction,
+        );
+      }
+
+      return updatedTicket;
     });
   }
 
-  async unlinkAsset(ticketId: number, currentUser: CurrentUser) {
-    await this.canGetById(ticketId, currentUser);
+  async unlinkAsset(ticketId: number, currentUser: CurrentUserPayload) {
+    const ticket = await this.canGetById(ticketId, currentUser);
 
-    return this.prisma.ticket.update({
-      where: {
-        id: ticketId,
-      },
-      data: {
-        assetId: null,
-      },
+    return this.prisma.$transaction(async (transaction) => {
+      const updatedTicket = await transaction.ticket.update({
+        where: {
+          id: ticketId,
+        },
+        data: {
+          assetId: null,
+        },
+      });
+
+      if (ticket.asset) {
+        await this.auditLogsService.create(
+          {
+            actorId: currentUser.userId,
+            entity: AuditLogEntity.TICKET,
+            entityId: ticket.id,
+            action: AuditLogAction.UNLINKED,
+            description: `Unlinked asset from ticket ${ticket.title}.`,
+            oldValues: {
+              assetId: ticket.asset.id,
+            },
+            newValues: {
+              assetId: null,
+            },
+            ipAddress: currentUser.ipAddress,
+            userAgent: currentUser.userAgent,
+          },
+          transaction,
+        );
+      }
+
+      return updatedTicket;
     });
   }
 }

@@ -4,9 +4,7 @@ import { AppController } from './app.controller';
 import { PrismaService } from './prisma/prisma.service';
 
 const mockPrismaService = {
-  department: {
-    findMany: jest.fn(),
-  },
+  $queryRaw: jest.fn(),
 };
 
 describe('AppController', () => {
@@ -37,13 +35,11 @@ describe('AppController', () => {
   });
 
   describe('getDbHealth', () => {
-    it('should return departments when the database is connected', async () => {
-      const departments = [{ id: 1, name: 'Engineering' }];
+    it('should check the database connection', async () => {
+      mockPrismaService.$queryRaw.mockResolvedValue([{ connected: 1 }]);
 
-      mockPrismaService.department.findMany.mockResolvedValue(departments);
-
-      await expect(appController.getDbHealth()).resolves.toEqual(departments);
-      expect(mockPrismaService.department.findMany).toHaveBeenCalledTimes(1);
+      await expect(appController.getDbHealth()).resolves.toBeUndefined();
+      expect(mockPrismaService.$queryRaw).toHaveBeenCalledTimes(1);
     });
   });
 });

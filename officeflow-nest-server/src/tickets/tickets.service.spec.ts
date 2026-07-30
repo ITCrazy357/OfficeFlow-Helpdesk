@@ -8,8 +8,9 @@ import {
 } from '@prisma/client';
 
 import { TicketsService } from './tickets.service';
-import { PrismaService } from '../prisma/prisma.service';
+import { AuditLogsService } from '../audit-logs/audit-logs.service';
 import { CloudinaryService } from '../cloudinary/cloudinary.service';
+import { PrismaService } from '../prisma/prisma.service';
 
 const mockTransaction = {
   ticketAttachment: {
@@ -49,6 +50,10 @@ const mockEventEmitter = {
   emit: jest.fn(),
 };
 
+const mockAuditLogsService = {
+  create: jest.fn(),
+};
+
 describe('TicketsService', () => {
   let service: TicketsService;
 
@@ -74,6 +79,10 @@ describe('TicketsService', () => {
         {
           provide: EventEmitter2,
           useValue: mockEventEmitter,
+        },
+        {
+          provide: AuditLogsService,
+          useValue: mockAuditLogsService,
         },
       ],
     }).compile();

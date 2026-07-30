@@ -138,10 +138,10 @@ export class DashboardService {
       },
     });
 
-    return result.map((item) => {
-      priority: item.priority;
-      total: item._count.id;
-    });
+    return result.map((item) => ({
+      priority: item.priority,
+      total: item._count.id,
+    }));
   }
 
   async getTicketsByCategory(currentUser: CurrentUser) {
