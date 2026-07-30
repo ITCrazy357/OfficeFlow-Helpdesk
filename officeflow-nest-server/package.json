@@ -18,6 +18,7 @@
     "start:prod": "node dist/main.js",
     "prisma:studio": "node scripts/prisma-studio.js",
     "prisma:migrate": "prisma migrate dev",
+    "prisma:seed": "prisma db seed",
     "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
     "test": "jest",
     "test:watch": "jest --watch",
