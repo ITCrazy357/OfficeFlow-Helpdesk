@@ -45,6 +45,7 @@ import {
   TicketStatusBadge,
 } from "@/features/tickets/components/ticket-badges";
 import { getTicketCategoryLabel } from "@/features/ticket-categories/constants";
+import { useTicketCategories } from "@/features/ticket-categories/hooks";
 import {
   getTicketDueAt,
   ticketSlaOptions,
@@ -56,6 +57,7 @@ import type {
   GetTicketsParams,
   Ticket,
   TicketPriority,
+  TicketSlaFilter,
   TicketStatus,
 } from "@/features/tickets/types";
 import { getApiErrorMessage } from "@/lib/axios";
@@ -64,7 +66,7 @@ const PAGE_SIZE = 10;
 
 type StatusFilter = "ALL" | TicketStatus;
 type PriorityFilter = "ALL" | TicketPriority;
-type SlaFilter = "ALL" | "ON_TRACK" | "OVERDUE";
+type SlaFilter = "ALL" | TicketSlaFilter;
 
 function formatDateTime(value?: string | null) {
   if (!value) {
@@ -211,7 +213,7 @@ export default function TicketsPage() {
   const [priorityFilter, setPriorityFilter] =
     useState<PriorityFilter>("ALL");
   const [slaFilter, setSlaFilter] = useState<SlaFilter>("ALL");
-  const [categoryFilter, setCategoryFilter] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState("ALL");
 
   const params = useMemo<GetTicketsParams>(
     () => ({
@@ -220,16 +222,17 @@ export default function TicketsPage() {
       keyword: keyword || undefined,
       status: statusFilter === "ALL" ? undefined : statusFilter,
       priority: priorityFilter === "ALL" ? undefined : priorityFilter,
-      isOverdue:
-        slaFilter === "ALL" ? undefined : slaFilter === "OVERDUE",
+      slaState: slaFilter === "ALL" ? undefined : slaFilter,
       categoryId:
-        categoryFilter.trim() === "" ? undefined : Number(categoryFilter),
+        categoryFilter === "ALL" ? undefined : Number(categoryFilter),
     }),
     [categoryFilter, keyword, page, priorityFilter, slaFilter, statusFilter],
   );
 
   const { data, error, isError, isFetching, isLoading, refetch } =
     useTickets(params);
+  const categoriesQuery = useTicketCategories();
+  const categories = categoriesQuery.data ?? [];
 
   function handleSearch(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -243,7 +246,7 @@ export default function TicketsPage() {
     setStatusFilter("ALL");
     setPriorityFilter("ALL");
     setSlaFilter("ALL");
-    setCategoryFilter("");
+    setCategoryFilter("ALL");
     setPage(1);
   }
 
@@ -258,7 +261,7 @@ export default function TicketsPage() {
     statusFilter !== "ALL" ||
     priorityFilter !== "ALL" ||
     slaFilter !== "ALL" ||
-    categoryFilter.trim() !== "";
+    categoryFilter !== "ALL";
 
   return (
     <div className="grid gap-6 motion-enter">
@@ -289,7 +292,7 @@ export default function TicketsPage() {
             <div>
               <CardTitle>Bộ lọc</CardTitle>
               <CardDescription>
-                Lọc theo từ khóa, trạng thái, độ ưu tiên, SLA và danh mục ID.
+                Lọc theo từ khóa, trạng thái, độ ưu tiên, SLA và danh mục.
               </CardDescription>
             </div>
           </div>
@@ -349,16 +352,47 @@ export default function TicketsPage() {
               </SelectContent>
             </Select>
 
-            <Input
-              type="number"
-              min={1}
-              value={categoryFilter}
-              onChange={(event) => {
-                setCategoryFilter(event.target.value);
-                setPage(1);
-              }}
-              placeholder="Danh mục ID"
-            />
+            {categoriesQuery.isLoading ? (
+              <Button type="button" variant="outline" disabled>
+                Đang tải danh mục...
+              </Button>
+            ) : categoriesQuery.isError ? (
+              <Button
+                type="button"
+                variant="outline"
+                className="justify-start text-destructive"
+                onClick={() => categoriesQuery.refetch()}
+              >
+                Tải lại danh mục
+              </Button>
+            ) : categories.length === 0 ? (
+              <Button type="button" variant="outline" disabled>
+                Chưa có danh mục
+              </Button>
+            ) : (
+              <Select
+                value={categoryFilter}
+                onValueChange={(value) => {
+                  setCategoryFilter(value);
+                  setPage(1);
+                }}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Danh mục" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="ALL">Tất cả danh mục</SelectItem>
+                  {categories.map((category) => (
+                    <SelectItem
+                      key={category.id}
+                      value={String(category.id)}
+                    >
+                      {getTicketCategoryLabel(category.name)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
 
             <Select
               value={slaFilter}

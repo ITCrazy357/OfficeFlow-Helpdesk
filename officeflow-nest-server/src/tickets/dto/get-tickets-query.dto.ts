@@ -10,6 +10,12 @@ import {
 } from 'class-validator';
 import { TicketPriority, TicketStatus } from '@prisma/client';
 
+export enum TicketSlaFilter {
+  ON_TRACK = 'ON_TRACK',
+  DUE_SOON = 'DUE_SOON',
+  OVERDUE = 'OVERDUE',
+}
+
 export class GetTicketsQueryDto {
   @ApiPropertyOptional({
     example: 1,
@@ -72,4 +78,14 @@ export class GetTicketsQueryDto {
   @Transform(({ value }) => value === 'true')
   @IsBoolean()
   isOverdue?: boolean;
+
+  @ApiPropertyOptional({
+    enum: TicketSlaFilter,
+    example: TicketSlaFilter.DUE_SOON,
+    description:
+      'Filter active tickets by SLA state. DUE_SOON means due within 24 hours.',
+  })
+  @IsOptional()
+  @IsEnum(TicketSlaFilter)
+  slaState?: TicketSlaFilter;
 }

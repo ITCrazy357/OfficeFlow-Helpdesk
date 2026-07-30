@@ -1,6 +1,7 @@
 import type {
   Ticket,
   TicketPriority,
+  TicketSlaFilter,
   TicketSlaState,
   TicketStatus,
 } from "./types";
@@ -76,11 +77,12 @@ const SLA_SOON_THRESHOLD_MS = 24 * 60 * 60 * 1000;
 const terminalStatuses: TicketStatus[] = ["RESOLVED", "CLOSED", "CANCELLED"];
 
 export const ticketSlaOptions: Array<{
-  value: "ALL" | "ON_TRACK" | "OVERDUE";
+  value: "ALL" | TicketSlaFilter;
   label: string;
 }> = [
   { value: "ALL", label: "Tất cả SLA" },
-  { value: "ON_TRACK", label: "Trong hạn" },
+  { value: "ON_TRACK", label: "Còn hạn" },
+  { value: "DUE_SOON", label: "Sắp quá hạn" },
   { value: "OVERDUE", label: "Quá hạn" },
 ];
 

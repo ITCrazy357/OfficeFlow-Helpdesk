@@ -17,6 +17,11 @@ export type TicketSlaState =
   | "OVERDUE"
   | "DONE";
 
+export type TicketSlaFilter = Extract<
+  TicketSlaState,
+  "ON_TRACK" | "DUE_SOON" | "OVERDUE"
+>;
+
 export type TicketHistoryAction =
   | "CREATE"
   | "UPDATE"
@@ -74,6 +79,7 @@ export type GetTicketsParams = {
   priority?: TicketPriority;
   categoryId?: number;
   isOverdue?: boolean;
+  slaState?: TicketSlaFilter;
 };
 
 export type TicketsList = PaginatedData<Ticket>;

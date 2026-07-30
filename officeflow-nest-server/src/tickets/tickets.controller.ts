@@ -42,7 +42,10 @@ import { RolesGuard } from '../common/guards/roles.guard';
 import { AssignTicketDto } from './dto/assign-ticket.dto';
 import { CreateTicketCommentDto } from './dto/create-ticket-comment.dto';
 import { CreateTicketDto } from './dto/create-ticket.dto';
-import { GetTicketsQueryDto } from './dto/get-tickets-query.dto';
+import {
+  GetTicketsQueryDto,
+  TicketSlaFilter,
+} from './dto/get-tickets-query.dto';
 import { LinkTicketAssetDto } from './dto/link-ticket-asset.dto';
 import { UpdateTicketStatusDto } from './dto/update-ticket-status.dto';
 import { UpdateTicketDto } from './dto/update-ticket.dto';
@@ -66,6 +69,7 @@ export class TicketsController {
   @ApiQuery({ name: 'status', required: false, enum: TicketStatus })
   @ApiQuery({ name: 'priority', required: false, enum: TicketPriority })
   @ApiQuery({ name: 'categoryId', required: false, example: 3 })
+  @ApiQuery({ name: 'slaState', required: false, enum: TicketSlaFilter })
   @ApiResponse({ status: 200, description: 'Get tickets successfully' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   getTickets(

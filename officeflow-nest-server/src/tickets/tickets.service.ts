@@ -31,13 +31,23 @@ import { PrismaService } from '../prisma/prisma.service';
 import { AssignTicketDto } from './dto/assign-ticket.dto';
 import { CreateTicketCommentDto } from './dto/create-ticket-comment.dto';
 import { CreateTicketDto } from './dto/create-ticket.dto';
-import { GetTicketsQueryDto } from './dto/get-tickets-query.dto';
+import {
+  GetTicketsQueryDto,
+  TicketSlaFilter,
+} from './dto/get-tickets-query.dto';
 import { LinkTicketAssetDto } from './dto/link-ticket-asset.dto';
 import { UpdateTicketStatusDto } from './dto/update-ticket-status.dto';
 import { UpdateTicketDto } from './dto/update-ticket.dto';
 import { calculateDueAt } from './ticket-sla.util';
 
 export type TicketAttachmentFile = NonNullable<Request['file']>;
+
+const SLA_DUE_SOON_HOURS = 24;
+const TERMINAL_TICKET_STATUSES = [
+  TicketStatus.RESOLVED,
+  TicketStatus.CLOSED,
+  TicketStatus.CANCELLED,
+];
 
 function resolveCloudinaryResourceType(
   resourceType: string | null,
@@ -134,7 +144,56 @@ export class TicketsService {
       where.categoryId = query.categoryId;
     }
 
-    if (typeof query.isOverdue === 'boolean') {
+    if (query.slaState) {
+      const now = new Date();
+      const dueSoonAt = new Date(
+        now.getTime() + SLA_DUE_SOON_HOURS * 60 * 60 * 1000,
+      );
+
+      if (query.slaState === TicketSlaFilter.OVERDUE) {
+        where.AND = {
+          OR: [
+            {
+              isOverdue: true,
+            },
+            {
+              isOverdue: false,
+              dueAt: {
+                lte: now,
+              },
+              status: {
+                notIn: TERMINAL_TICKET_STATUSES,
+              },
+            },
+          ],
+        };
+      }
+
+      if (query.slaState === TicketSlaFilter.DUE_SOON) {
+        where.AND = {
+          isOverdue: false,
+          status: {
+            notIn: TERMINAL_TICKET_STATUSES,
+          },
+          dueAt: {
+            gt: now,
+            lte: dueSoonAt,
+          },
+        };
+      }
+
+      if (query.slaState === TicketSlaFilter.ON_TRACK) {
+        where.AND = {
+          isOverdue: false,
+          status: {
+            notIn: TERMINAL_TICKET_STATUSES,
+          },
+          dueAt: {
+            gt: dueSoonAt,
+          },
+        };
+      }
+    } else if (typeof query.isOverdue === 'boolean') {
       where.isOverdue = query.isOverdue;
     }
 

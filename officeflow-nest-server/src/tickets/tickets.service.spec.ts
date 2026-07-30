@@ -3,11 +3,13 @@ import { Test, TestingModule } from '@nestjs/testing';
 import {
   Prisma,
   TicketHistoryAction,
+  TicketStatus,
   UserRole,
   type TicketAttachment,
 } from '@prisma/client';
 
 import { TicketsService } from './tickets.service';
+import { TicketSlaFilter } from './dto/get-tickets-query.dto';
 import { AuditLogsService } from '../audit-logs/audit-logs.service';
 import { CloudinaryService } from '../cloudinary/cloudinary.service';
 import { PrismaService } from '../prisma/prisma.service';
@@ -121,6 +123,114 @@ describe('TicketsService', () => {
         totalPages: 0,
       },
     });
+  });
+
+  it('should apply distinct SLA filters using the 24-hour threshold', async () => {
+    jest.useFakeTimers();
+    const now = new Date('2026-07-31T08:00:00.000Z');
+    const dueSoonAt = new Date('2026-08-01T08:00:00.000Z');
+    jest.setSystemTime(now);
+    mockPrismaService.ticket.findMany.mockResolvedValue([]);
+    mockPrismaService.ticket.count.mockResolvedValue(0);
+
+    try {
+      await service.getTickets(
+        {
+          userId: 1,
+          role: UserRole.ADMIN,
+        },
+        {
+          slaState: TicketSlaFilter.DUE_SOON,
+        },
+      );
+
+      let [findManyArgs] = mockPrismaService.ticket.findMany.mock.calls.at(
+        -1,
+      ) as [Prisma.TicketFindManyArgs];
+      expect(findManyArgs.where).toMatchObject({
+        AND: {
+          isOverdue: false,
+          status: {
+            notIn: [
+              TicketStatus.RESOLVED,
+              TicketStatus.CLOSED,
+              TicketStatus.CANCELLED,
+            ],
+          },
+          dueAt: {
+            gt: now,
+            lte: dueSoonAt,
+          },
+        },
+      });
+
+      await service.getTickets(
+        {
+          userId: 1,
+          role: UserRole.ADMIN,
+        },
+        {
+          slaState: TicketSlaFilter.ON_TRACK,
+        },
+      );
+
+      [findManyArgs] = mockPrismaService.ticket.findMany.mock.calls.at(-1) as [
+        Prisma.TicketFindManyArgs,
+      ];
+      expect(findManyArgs.where).toMatchObject({
+        AND: {
+          isOverdue: false,
+          status: {
+            notIn: [
+              TicketStatus.RESOLVED,
+              TicketStatus.CLOSED,
+              TicketStatus.CANCELLED,
+            ],
+          },
+          dueAt: {
+            gt: dueSoonAt,
+          },
+        },
+      });
+
+      await service.getTickets(
+        {
+          userId: 1,
+          role: UserRole.ADMIN,
+        },
+        {
+          slaState: TicketSlaFilter.OVERDUE,
+        },
+      );
+
+      [findManyArgs] = mockPrismaService.ticket.findMany.mock.calls.at(-1) as [
+        Prisma.TicketFindManyArgs,
+      ];
+      expect(findManyArgs.where).toMatchObject({
+        AND: {
+          OR: [
+            {
+              isOverdue: true,
+            },
+            {
+              isOverdue: false,
+              dueAt: {
+                lte: now,
+              },
+              status: {
+                notIn: [
+                  TicketStatus.RESOLVED,
+                  TicketStatus.CLOSED,
+                  TicketStatus.CANCELLED,
+                ],
+              },
+            },
+          ],
+        },
+      });
+    } finally {
+      jest.useRealTimers();
+    }
   });
 
   it('should return attachment IDs in deterministic newest-first order', async () => {
