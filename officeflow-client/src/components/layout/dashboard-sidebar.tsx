@@ -6,6 +6,7 @@ import {
   Building2,
   CircleCheck,
   LayoutDashboard,
+  ScrollText,
   Tags,
   TicketCheck,
   Users,
@@ -77,6 +78,13 @@ const navigationItems: NavigationItem[] = [
     icon: Tags,
     roles: ["ADMIN"],
   },
+  {
+    href: "/audit-logs",
+    label: "Audit Logs",
+    description: "Nhật ký hệ thống",
+    icon: ScrollText,
+    roles: ["ADMIN"],
+  },
 ];
 
 function isActivePath(pathname: string, href: string) {
@@ -115,7 +123,7 @@ function SidebarNav({
   const pathname = usePathname();
 
   return (
-    <nav className="grid gap-1.5 p-3">
+    <nav className="grid min-h-0 flex-1 content-start gap-1.5 overflow-y-auto p-3">
       {navigationItems
         .filter((item) => !item.roles || item.roles.includes(userRole))
         .map((item) => {
