@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback } from "react";
 import { removeAccessToken, setAccessToken } from "@/lib/token";
-import { getMeApi, loginApi, registerApi } from "./api";
+import { getMeApi, loginApi, logoutApi, registerApi } from "./api";
 
 export const authQueryKeys = {
   me: ["auth", "me"] as const,
@@ -37,8 +37,12 @@ export function useMe(enabled = true) {
 export function useLogout() {
   const queryClient = useQueryClient();
 
-  return useCallback(() => {
-    removeAccessToken();
-    queryClient.clear();
+  return useCallback(async () => {
+    try {
+      await logoutApi();
+    } finally {
+      removeAccessToken();
+      queryClient.clear();
+    }
   }, [queryClient]);
 }

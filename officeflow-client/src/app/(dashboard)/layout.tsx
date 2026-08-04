@@ -34,8 +34,7 @@ export default function DashboardLayout({ children }: Props) {
 
   useEffect(() => {
     if (isError) {
-      logout();
-      router.replace("/login");
+      void logout().finally(() => router.replace("/login"));
     }
   }, [isError, logout, router]);
 

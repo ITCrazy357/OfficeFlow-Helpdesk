@@ -4,6 +4,7 @@ import {
   IsInt,
   IsOptional,
   IsString,
+  MaxLength,
   MinLength,
 } from 'class-validator';
 
@@ -24,11 +25,12 @@ export class RegisterDto {
   email!: string;
 
   @ApiProperty({
-    example: '123456',
-    description: 'User password, minimum 6 characters',
+    example: 'correct-horse-battery-staple',
+    description: 'User password, 12 to 128 characters',
   })
   @IsString()
-  @MinLength(6)
+  @MinLength(12)
+  @MaxLength(128)
   password!: string;
 
   @ApiPropertyOptional({

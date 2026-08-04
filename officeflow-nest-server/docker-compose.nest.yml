@@ -4,34 +4,35 @@ services:
     container_name: officeflow_nest_mysql
     restart: always
     environment:
-      MYSQL_ROOT_PASSWORD: root
-      MYSQL_DATABASE: officeflow_helpdesk
-      MYSQL_USER: officeflow_user
-      MYSQL_PASSWORD: officeflow_password
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?MYSQL_ROOT_PASSWORD is required}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-officeflow_helpdesk}
+      MYSQL_USER: ${MYSQL_USER:-officeflow_user}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:?MYSQL_PASSWORD is required}
     ports:
       - "3307:3306"
     volumes:
       - officeflow_nest_mysql_data:/var/lib/mysql
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-proot"]
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -uroot -p\"$${MYSQL_ROOT_PASSWORD}\""]
       interval: 10s
       timeout: 5s
       retries: 5
 
   nest-api:
     build:
-      context: ./officeflow-nest-server
+      context: .
       dockerfile: Dockerfile
     container_name: officeflow_nest_api
     restart: always
     ports:
       - "5001:5001"
     environment:
-      PORT: 5001
-      DATABASE_URL: mysql://officeflow_user:officeflow_password@mysql:3306/officeflow_helpdesk
-      JWT_ACCESS_SECRET: 6112c199fa5336cd262d20c78cebab68ed25cc4ede747325d1a6c4577d53e07a
-      JWT_REFRESH_SECRET: 5b719426e27f361f087a24fda2d46eaa943355305bb634a806e7228e1c594a23
-      FRONTEND_URL: http://localhost:3000
+      PORT: ${PORT:-5001}
+      NODE_ENV: ${NODE_ENV:-production}
+      DATABASE_URL: ${DATABASE_URL:?DATABASE_URL is required}
+      JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET:?JWT_ACCESS_SECRET is required}
+      FRONTEND_URL: ${FRONTEND_URL:?FRONTEND_URL is required}
+      TRUST_PROXY: ${TRUST_PROXY:-0}
     depends_on:
       mysql:
         condition: service_healthy

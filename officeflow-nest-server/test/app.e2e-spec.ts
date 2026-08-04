@@ -30,7 +30,7 @@ describe('AppController (e2e)', () => {
   let httpServer: Server;
 
   beforeAll(async () => {
-    process.env.JWT_ACCESS_SECRET ||= 'e2e-test-secret';
+    process.env.JWT_ACCESS_SECRET ||= 'e2e-test-secret-at-least-32-bytes';
 
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [AppModule],

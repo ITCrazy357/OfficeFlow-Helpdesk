@@ -3,21 +3,32 @@ import 'dotenv/config';
 import { RequestMethod, ValidationPipe } from '@nestjs/common';
 import { NestFactory, Reflector } from '@nestjs/core';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import cookieParser from 'cookie-parser';
+import helmet from 'helmet';
+import type { Application } from 'express';
 
 import { AppModule } from './app.module';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 import { ResponseInterceptor } from './common/interceptors/response.interceptor';
 import { RequestLoggingInterceptor } from './common/interceptors/request-logging.interceptor';
+import { getAllowedOrigins } from './common/security/allowed-origins';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
-  const allowedOrigins = [
-    'http://localhost:3000',
-    ...(process.env.FRONTEND_URL ?? '')
-      .split(',')
-      .map((origin) => origin.trim())
-      .filter(Boolean),
-  ];
+  const allowedOrigins = getAllowedOrigins();
+
+  if (process.env.TRUST_PROXY === '1') {
+    const expressApp = app.getHttpAdapter().getInstance() as Application;
+    expressApp.set('trust proxy', 1);
+  }
+
+  app.use(
+    helmet({
+      contentSecurityPolicy: false,
+      crossOriginResourcePolicy: { policy: 'cross-origin' },
+    }),
+  );
+  app.use(cookieParser());
 
   app.setGlobalPrefix('api', {
     exclude: [{ path: '', method: RequestMethod.GET }],
@@ -43,15 +54,17 @@ async function bootstrap() {
     credentials: true,
   });
 
-  const config = new DocumentBuilder()
-    .setTitle('OfficeFlow Helpdesk API')
-    .setDescription('NestJS REST API documentation for OfficeFlow Helpdesk')
-    .setVersion('1.0.0')
-    .addBearerAuth()
-    .build();
+  if (process.env.NODE_ENV !== 'production') {
+    const config = new DocumentBuilder()
+      .setTitle('OfficeFlow Helpdesk API')
+      .setDescription('NestJS REST API documentation for OfficeFlow Helpdesk')
+      .setVersion('1.0.0')
+      .addBearerAuth()
+      .build();
 
-  const document = SwaggerModule.createDocument(app, config);
-  SwaggerModule.setup('api/docs', app, document);
+    const document = SwaggerModule.createDocument(app, config);
+    SwaggerModule.setup('api/docs', app, document);
+  }
 
   const port = process.env.PORT || 5001;
   await app.listen(port);

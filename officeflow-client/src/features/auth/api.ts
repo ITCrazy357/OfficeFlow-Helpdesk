@@ -1,4 +1,4 @@
-import { api } from "@/lib/axios";
+import { api, refreshAccessToken } from "@/lib/axios";
 import { ApiResponse } from "@/types/api";
 import { AuthUser, LoginInput, LoginResponse, RegisterInput } from "./types";
 
@@ -15,4 +15,16 @@ export async function getMeApi() {
 export async function registerApi(input: RegisterInput) {
   const res = await api.post<ApiResponse<AuthUser>>("/auth/register", input);
   return res.data.data;
+}
+
+export async function restoreSessionApi() {
+  return refreshAccessToken();
+}
+
+export async function logoutApi() {
+  await api.post("/auth/logout");
+}
+
+export async function logoutAllApi() {
+  await api.post("/auth/logout-all");
 }

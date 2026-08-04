@@ -1,23 +1,18 @@
-const ACCESS_TOKEN_KEY = "officeflow_access_token";
+const LEGACY_ACCESS_TOKEN_KEY = "officeflow_access_token";
+let accessToken: string | null = null;
 
 export function getAccessToken(): string | null {
-  if (typeof window === "undefined") return null;
-
-  return localStorage.getItem(ACCESS_TOKEN_KEY);
+  return accessToken;
 }
 
-export function setAccessToken(token: string): void {
-  if (typeof window === "undefined") return;
+export function setAccessToken(token: string | null): void {
+  accessToken = token;
 
-  if (!token) {
-    localStorage.removeItem(ACCESS_TOKEN_KEY);
-    return;
+  if (typeof window !== "undefined") {
+    localStorage.removeItem(LEGACY_ACCESS_TOKEN_KEY);
   }
-  localStorage.setItem(ACCESS_TOKEN_KEY, token);
 }
 
 export function removeAccessToken(): void {
-  if (typeof window === "undefined") return;
-
-  localStorage.removeItem(ACCESS_TOKEN_KEY);
+  setAccessToken(null);
 }

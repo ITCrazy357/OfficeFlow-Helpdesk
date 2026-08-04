@@ -2,13 +2,25 @@
 
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { getAccessToken } from "@/lib/token";
+import { restoreSessionApi } from "@/features/auth/api";
 
 export default function HomePage() {
   const router = useRouter();
 
   useEffect(() => {
-    router.replace(getAccessToken() ? "/dashboard" : "/login");
+    let active = true;
+
+    void restoreSessionApi()
+      .then(() => {
+        if (active) router.replace("/dashboard");
+      })
+      .catch(() => {
+        if (active) router.replace("/login");
+      });
+
+    return () => {
+      active = false;
+    };
   }, [router]);
 
   return (

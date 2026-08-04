@@ -20,9 +20,9 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useLogin } from "@/features/auth/hooks";
+import { restoreSessionApi } from "@/features/auth/api";
 import { loginSchema, type LoginFormValues } from "@/features/auth/schemas";
 import { getApiErrorMessage } from "@/lib/axios";
-import { getAccessToken } from "@/lib/token";
 
 const productNotes = [
   "Theo dõi ticket theo trạng thái và độ ưu tiên",
@@ -44,9 +44,17 @@ export default function LoginPage() {
   });
 
   useEffect(() => {
-    if (getAccessToken()) {
-      router.replace("/dashboard");
-    }
+    let active = true;
+
+    void restoreSessionApi()
+      .then(() => {
+        if (active) router.replace("/dashboard");
+      })
+      .catch(() => undefined);
+
+    return () => {
+      active = false;
+    };
   }, [router]);
 
   const onSubmit: SubmitHandler<LoginFormValues> = async (values) => {

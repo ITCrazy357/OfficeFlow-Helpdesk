@@ -1,6 +1,11 @@
 import axios from "axios";
-import { getAccessToken, removeAccessToken } from "./token";
-import type { ApiErrorResponse } from "@/types/api";
+import type { InternalAxiosRequestConfig } from "axios";
+import {
+  getAccessToken,
+  removeAccessToken,
+  setAccessToken,
+} from "./token";
+import type { ApiErrorResponse, ApiResponse } from "@/types/api";
 
 const DEFAULT_API_TIMEOUT_MS = 70000;
 const configuredApiTimeout = Number(process.env.NEXT_PUBLIC_API_TIMEOUT_MS);
@@ -9,13 +14,59 @@ const apiTimeout =
     ? configuredApiTimeout
     : DEFAULT_API_TIMEOUT_MS;
 
-export const api = axios.create({
+const apiConfig = {
   baseURL: process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:5001/api",
   timeout: apiTimeout,
+  withCredentials: true,
   headers: {
     Accept: "application/json",
   },
-});
+};
+
+export const api = axios.create(apiConfig);
+const authApi = axios.create(apiConfig);
+
+type RefreshAccessTokenResponse = {
+  accessToken: string;
+};
+
+type RetryableRequestConfig = InternalAxiosRequestConfig & {
+  _retry?: boolean;
+};
+
+let refreshRequest: Promise<string> | null = null;
+
+function isRefreshExcludedEndpoint(url?: string) {
+  const path = url?.split("?")[0];
+
+  return [
+    "/auth/login",
+    "/auth/register",
+    "/auth/refresh",
+    "/auth/logout",
+  ].includes(path ?? "");
+}
+
+export function refreshAccessToken(): Promise<string> {
+  if (!refreshRequest) {
+    refreshRequest = authApi
+      .post<ApiResponse<RefreshAccessTokenResponse>>("/auth/refresh")
+      .then((response) => {
+        const token = response.data.data.accessToken;
+        setAccessToken(token);
+        return token;
+      })
+      .catch((error: unknown) => {
+        removeAccessToken();
+        throw error;
+      })
+      .finally(() => {
+        refreshRequest = null;
+      });
+  }
+
+  return refreshRequest;
+}
 
 api.interceptors.request.use((config) => {
   const token = getAccessToken();
@@ -33,19 +84,35 @@ api.interceptors.request.use((config) => {
 
 api.interceptors.response.use(
   (response) => response,
-  (error) => {
-    const message = axios.isAxiosError<ApiErrorResponse>(error)
-      ? error.response?.data?.message
-      : undefined;
-
+  async (error: unknown) => {
     if (
-      axios.isAxiosError(error) &&
-      (error.response?.status === 401 || message === "Invalid or expired token")
+      !axios.isAxiosError<ApiErrorResponse>(error) ||
+      error.response?.status !== 401
     ) {
-      removeAccessToken();
+      return Promise.reject(error);
     }
 
-    return Promise.reject(error);
+    const originalRequest = error.config as RetryableRequestConfig | undefined;
+
+    if (
+      !originalRequest ||
+      originalRequest._retry ||
+      isRefreshExcludedEndpoint(originalRequest.url)
+    ) {
+      removeAccessToken();
+      return Promise.reject(error);
+    }
+
+    originalRequest._retry = true;
+
+    try {
+      const token = await refreshAccessToken();
+      originalRequest.headers.set("Authorization", `Bearer ${token}`);
+      return api.request(originalRequest);
+    } catch {
+      removeAccessToken();
+      return Promise.reject(error);
+    }
   },
 );
 

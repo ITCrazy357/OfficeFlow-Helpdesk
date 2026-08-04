@@ -138,7 +138,7 @@ export default function RegisterPage() {
                 id="password"
                 type="password"
                 autoComplete="new-password"
-                placeholder="Ít nhất 6 ký tự"
+                placeholder="Ít nhất 12 ký tự"
                 aria-invalid={Boolean(passwordError)}
                 disabled={registerMutation.isPending}
                 {...form.register("password")}

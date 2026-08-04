@@ -67,8 +67,8 @@ export function DashboardHeader({
   const logout = useLogout();
   const currentPage = getCurrentPageLabel(pathname);
 
-  function handleLogout() {
-    logout();
+  async function handleLogout() {
+    await logout();
     router.replace("/login");
   }
 

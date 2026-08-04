@@ -50,6 +50,22 @@ const mockPrismaService = {
     findUnique: jest.fn<Promise<unknown>, [unknown]>(),
     create: jest.fn<Promise<unknown>, [CreateUserArgs]>(),
   },
+  refreshToken: {
+    findUnique: jest.fn<Promise<unknown>, [unknown]>(),
+    create: jest.fn<Promise<unknown>, [unknown]>(),
+    updateMany: jest.fn<Promise<{ count: number }>, [unknown]>(),
+  },
+  $transaction: jest.fn<
+    Promise<unknown>,
+    [
+      (transaction: {
+        refreshToken: {
+          create: jest.Mock;
+          updateMany: jest.Mock;
+        };
+      }) => Promise<unknown>,
+    ]
+  >(),
 };
 
 const mockJwtService = {
@@ -62,6 +78,11 @@ describe('AuthService', () => {
   beforeEach(async () => {
     jest.resetAllMocks();
     mockBcryptHash.mockResolvedValue('hashed-password');
+    mockPrismaService.refreshToken.create.mockResolvedValue({});
+    mockPrismaService.refreshToken.updateMany.mockResolvedValue({ count: 1 });
+    mockPrismaService.$transaction.mockImplementation((callback) =>
+      callback({ refreshToken: mockPrismaService.refreshToken }),
+    );
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -88,7 +109,7 @@ describe('AuthService', () => {
     const registerDto = {
       name: 'Test User',
       email: 'test@example.com',
-      password: '123456',
+      password: 'strong-password-123',
       departmentId: 1,
     };
 
@@ -180,21 +201,29 @@ describe('AuthService', () => {
         loginDto.password,
         user.passwordHash,
       );
+      const createdSession = mockPrismaService.refreshToken.create.mock
+        .calls[0][0] as {
+        data: {
+          id: string;
+          expiresAt: Date;
+        };
+      };
+
       expect(mockJwtService.sign).toHaveBeenCalledWith({
-        userId: user.id,
+        sub: user.id,
+        sid: createdSession.data.id,
         role: user.role,
       });
-      expect(result).toEqual({
-        accessToken: 'mock-token',
-        user: {
-          id: user.id,
-          name: user.name,
-          email: user.email,
-          role: user.role,
-          isActive: user.isActive,
-        },
-      });
       expect(result.accessToken).toBe('mock-token');
+      expect(typeof result.refreshToken).toBe('string');
+      expect(result.refreshTokenExpiresAt).toBe(createdSession.data.expiresAt);
+      expect(result.user).toEqual({
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        isActive: user.isActive,
+      });
     });
 
     it('should throw UnauthorizedException when user does not exist', async () => {
@@ -239,6 +268,113 @@ describe('AuthService', () => {
         loginDto.password,
         'hashed-password',
       );
+      expect(mockJwtService.sign).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('refresh', () => {
+    const storedToken = {
+      id: 'old-session-id',
+      tokenHash: 'stored-hash',
+      familyId: 'token-family-id',
+      userId: 1,
+      expiresAt: new Date(Date.now() + 60_000),
+      usedAt: null,
+      revokedAt: null,
+      user: {
+        id: 1,
+        name: 'Test User',
+        email: 'test@example.com',
+        role: UserRole.EMPLOYEE,
+        isActive: true,
+      },
+    };
+
+    it('should rotate a valid refresh token', async () => {
+      mockPrismaService.refreshToken.findUnique.mockResolvedValue(storedToken);
+      mockJwtService.sign.mockReturnValue('new-access-token');
+
+      const result = await service.refresh('valid-refresh-token', {
+        ipAddress: '127.0.0.1',
+        userAgent: 'test-agent',
+      });
+
+      expect(result.accessToken).toBe('new-access-token');
+      expect(typeof result.refreshToken).toBe('string');
+      expect(result.refreshTokenExpiresAt).toBe(storedToken.expiresAt);
+      expect(result.refreshToken).not.toBe('valid-refresh-token');
+
+      const updateArgs = mockPrismaService.refreshToken.updateMany.mock
+        .calls[0][0] as {
+        where: {
+          id: string;
+          usedAt: null;
+          revokedAt: null;
+        };
+        data: {
+          usedAt: Date;
+          revokedAt: Date;
+          replacedById: string;
+        };
+      };
+      expect(updateArgs.where.id).toBe(storedToken.id);
+      expect(updateArgs.where.usedAt).toBeNull();
+      expect(updateArgs.where.revokedAt).toBeNull();
+      expect(updateArgs.data.usedAt).toBeInstanceOf(Date);
+      expect(updateArgs.data.revokedAt).toBeInstanceOf(Date);
+      expect(typeof updateArgs.data.replacedById).toBe('string');
+
+      const createArgs = mockPrismaService.refreshToken.create.mock
+        .calls[0][0] as {
+        data: {
+          id: string;
+          tokenHash: string;
+          familyId: string;
+          userId: number;
+          expiresAt: Date;
+          ipAddress?: string;
+          userAgent?: string;
+        };
+      };
+      expect(typeof createArgs.data.id).toBe('string');
+      expect(typeof createArgs.data.tokenHash).toBe('string');
+      expect(createArgs.data.familyId).toBe(storedToken.familyId);
+      expect(createArgs.data.userId).toBe(storedToken.userId);
+      expect(createArgs.data.expiresAt).toBe(storedToken.expiresAt);
+      expect(createArgs.data.ipAddress).toBe('127.0.0.1');
+      expect(createArgs.data.userAgent).toBe('test-agent');
+    });
+
+    it('should revoke the token family when a used token is replayed', async () => {
+      mockPrismaService.refreshToken.findUnique.mockResolvedValue({
+        ...storedToken,
+        usedAt: new Date(),
+      });
+
+      await expect(service.refresh('replayed-refresh-token')).rejects.toThrow(
+        UnauthorizedException,
+      );
+
+      const revokeArgs = mockPrismaService.refreshToken.updateMany.mock
+        .calls[0][0] as {
+        where: {
+          familyId: string;
+          revokedAt: null;
+        };
+        data: {
+          revokedAt: Date;
+        };
+      };
+      expect(revokeArgs).toEqual({
+        where: {
+          familyId: storedToken.familyId,
+          revokedAt: null,
+        },
+        data: {
+          revokedAt: revokeArgs.data.revokedAt,
+        },
+      });
+      expect(revokeArgs.data.revokedAt).toBeInstanceOf(Date);
       expect(mockJwtService.sign).not.toHaveBeenCalled();
     });
   });
