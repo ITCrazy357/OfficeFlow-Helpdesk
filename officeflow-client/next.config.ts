@@ -49,6 +49,14 @@ const nextConfig: NextConfig = {
       },
     ];
   },
+  async rewrites() {
+    return [
+      {
+        source: "/backend-api/:path*",
+        destination: "https://officeflow-helpdesk.onrender.com/api/:path*",
+      },
+    ];
+  },
 };
 
 export default nextConfig;
