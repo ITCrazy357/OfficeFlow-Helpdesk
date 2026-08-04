@@ -6,18 +6,13 @@ import {
 } from '@nestjs/common';
 import type { Request } from 'express';
 
-import { getAllowedOrigins } from '../common/security/allowed-origins';
+import { isAllowedOrigin } from '../common/security/allowed-origins';
 
 @Injectable()
 export class TrustedOriginGuard implements CanActivate {
   canActivate(context: ExecutionContext): boolean {
     const request = context.switchToHttp().getRequest<Request>();
     const origin = request.headers.origin;
-    const fetchSite = request.headers['sec-fetch-site'];
-
-    if (fetchSite === 'cross-site') {
-      throw new ForbiddenException('Untrusted request origin');
-    }
 
     if (!origin) {
       if (process.env.NODE_ENV !== 'production') {
@@ -27,7 +22,7 @@ export class TrustedOriginGuard implements CanActivate {
       throw new ForbiddenException('Request origin is required');
     }
 
-    if (!getAllowedOrigins().includes(origin)) {
+    if (!isAllowedOrigin(origin)) {
       throw new ForbiddenException('Untrusted request origin');
     }
 

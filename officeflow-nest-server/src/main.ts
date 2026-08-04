@@ -11,11 +11,10 @@ import { AppModule } from './app.module';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 import { ResponseInterceptor } from './common/interceptors/response.interceptor';
 import { RequestLoggingInterceptor } from './common/interceptors/request-logging.interceptor';
-import { getAllowedOrigins } from './common/security/allowed-origins';
+import { isAllowedOrigin } from './common/security/allowed-origins';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
-  const allowedOrigins = getAllowedOrigins();
 
   if (process.env.TRUST_PROXY === '1') {
     const expressApp = app.getHttpAdapter().getInstance() as Application;
@@ -50,7 +49,12 @@ async function bootstrap() {
   app.useGlobalFilters(new HttpExceptionFilter());
 
   app.enableCors({
-    origin: allowedOrigins,
+    origin: (
+      origin: string | undefined,
+      callback: (error: Error | null, allow?: boolean) => void,
+    ) => {
+      callback(null, !origin || isAllowedOrigin(origin));
+    },
     credentials: true,
   });
 
