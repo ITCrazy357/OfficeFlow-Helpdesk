@@ -23,7 +23,6 @@ import {
 import { AuthService } from './auth.service';
 import { JwtAuthGuard } from './jwt-auth.guard';
 import { LoginDto } from './dto/login.dto';
-import { RegisterDto } from './dto/register.dto';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { Message } from '../common/decorators/message.decorator';
 import {
@@ -37,18 +36,6 @@ import { TrustedOriginGuard } from './trusted-origin.guard';
 @Controller('auth')
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
-
-  @Post('register')
-  @UseGuards(TrustedOriginGuard)
-  @Throttle({ default: { limit: 5, ttl: 60_000 } })
-  @Message('Register successfully')
-  @ApiOperation({ summary: 'Register a new user' })
-  @ApiBody({ type: RegisterDto })
-  @ApiResponse({ status: 201, description: 'Register successfully' })
-  @ApiResponse({ status: 400, description: 'Email already exists' })
-  register(@Body() registerDto: RegisterDto) {
-    return this.authService.register(registerDto);
-  }
 
   @Post('login')
   @UseGuards(TrustedOriginGuard)

@@ -1,5 +1,4 @@
 import {
-  BadRequestException,
   ForbiddenException,
   Injectable,
   NotFoundException,
@@ -11,7 +10,6 @@ import * as bcrypt from 'bcrypt';
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
 
 import { PrismaService } from '../prisma/prisma.service';
-import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 import { REFRESH_TOKEN_TTL_MS } from './auth-cookie';
 
@@ -45,39 +43,6 @@ export class AuthService {
     private readonly jwtService: JwtService,
   ) {}
 
-  async register(registerDto: RegisterDto) {
-    const existedUser = await this.prisma.user.findUnique({
-      where: {
-        email: registerDto.email,
-      },
-    });
-
-    if (existedUser) {
-      throw new BadRequestException('Email already exists');
-    }
-
-    const passwordHash = await bcrypt.hash(registerDto.password, 10);
-
-    const user = await this.prisma.user.create({
-      data: {
-        name: registerDto.name,
-        email: registerDto.email,
-        passwordHash,
-        departmentId: registerDto.departmentId,
-      },
-      select: {
-        id: true,
-        name: true,
-        email: true,
-        role: true,
-        isActive: true,
-        departmentId: true,
-        createdAt: true,
-      },
-    });
-
-    return user;
-  }
   async login(loginDto: LoginDto, metadata: RequestMetadata = {}) {
     const user = await this.prisma.user.findUnique({
       where: {

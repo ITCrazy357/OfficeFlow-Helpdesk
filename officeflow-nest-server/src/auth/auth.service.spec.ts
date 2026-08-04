@@ -1,5 +1,4 @@
 import {
-  BadRequestException,
   ForbiddenException,
   NotFoundException,
   UnauthorizedException,
@@ -13,42 +12,17 @@ import { AuthService } from './auth.service';
 import { PrismaService } from '../prisma/prisma.service';
 
 jest.mock('bcrypt', () => ({
-  hash: jest.fn(),
   compare: jest.fn(),
 }));
-
-const mockBcryptHash = bcrypt.hash as unknown as jest.Mock<
-  Promise<string>,
-  [string, number]
->;
 
 const mockBcryptCompare = bcrypt.compare as unknown as jest.Mock<
   Promise<boolean>,
   [string, string]
 >;
 
-type CreateUserArgs = {
-  data: {
-    name: string;
-    email: string;
-    passwordHash: string;
-    departmentId?: number;
-  };
-  select: {
-    id: boolean;
-    name: boolean;
-    email: boolean;
-    role: boolean;
-    isActive: boolean;
-    departmentId: boolean;
-    createdAt: boolean;
-  };
-};
-
 const mockPrismaService = {
   user: {
     findUnique: jest.fn<Promise<unknown>, [unknown]>(),
-    create: jest.fn<Promise<unknown>, [CreateUserArgs]>(),
   },
   refreshToken: {
     findUnique: jest.fn<Promise<unknown>, [unknown]>(),
@@ -77,7 +51,6 @@ describe('AuthService', () => {
 
   beforeEach(async () => {
     jest.resetAllMocks();
-    mockBcryptHash.mockResolvedValue('hashed-password');
     mockPrismaService.refreshToken.create.mockResolvedValue({});
     mockPrismaService.refreshToken.updateMany.mockResolvedValue({ count: 1 });
     mockPrismaService.$transaction.mockImplementation((callback) =>
@@ -103,73 +76,6 @@ describe('AuthService', () => {
 
   it('should be defined', () => {
     expect(service).toBeDefined();
-  });
-
-  describe('register', () => {
-    const registerDto = {
-      name: 'Test User',
-      email: 'test@example.com',
-      password: 'strong-password-123',
-      departmentId: 1,
-    };
-
-    it('should register a new user successfully', async () => {
-      const createdUser = {
-        id: 1,
-        name: registerDto.name,
-        email: registerDto.email,
-        role: UserRole.EMPLOYEE,
-        isActive: true,
-        departmentId: registerDto.departmentId,
-        createdAt: new Date(),
-      };
-
-      mockPrismaService.user.findUnique.mockResolvedValue(null);
-      mockPrismaService.user.create.mockResolvedValue(createdUser);
-
-      const result = await service.register(registerDto);
-
-      expect(mockPrismaService.user.findUnique).toHaveBeenCalledWith({
-        where: { email: registerDto.email },
-      });
-
-      expect(mockPrismaService.user.create).toHaveBeenCalledTimes(1);
-
-      const createArgs = mockPrismaService.user.create.mock.calls[0][0];
-
-      expect(createArgs).toEqual({
-        data: {
-          name: registerDto.name,
-          email: registerDto.email,
-          passwordHash: 'hashed-password',
-          departmentId: registerDto.departmentId,
-        },
-        select: {
-          id: true,
-          name: true,
-          email: true,
-          role: true,
-          isActive: true,
-          departmentId: true,
-          createdAt: true,
-        },
-      });
-      expect(mockBcryptHash).toHaveBeenCalledWith(registerDto.password, 10);
-      expect(result).toEqual(createdUser);
-    });
-
-    it('should throw BadRequestException when email already exists', async () => {
-      mockPrismaService.user.findUnique.mockResolvedValue({
-        id: 1,
-        email: registerDto.email,
-      });
-
-      await expect(service.register(registerDto)).rejects.toThrow(
-        BadRequestException,
-      );
-      expect(mockBcryptHash).not.toHaveBeenCalled();
-      expect(mockPrismaService.user.create).not.toHaveBeenCalled();
-    });
   });
 
   describe('login', () => {

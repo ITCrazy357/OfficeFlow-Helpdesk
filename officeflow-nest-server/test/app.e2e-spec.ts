@@ -90,4 +90,15 @@ describe('AppController (e2e)', () => {
         expect(body.path).toBe('/api/auth/login');
       });
   });
+
+  it('/api/auth/register should not exist', () => {
+    return request(httpServer)
+      .post('/api/auth/register')
+      .send({
+        name: 'Employee',
+        email: 'employee@officeflow.com',
+        password: 'strong-password-123',
+      })
+      .expect(404);
+  });
 });

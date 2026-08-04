@@ -66,8 +66,8 @@ const navigationItems: NavigationItem[] = [
   },
   {
     href: "/users",
-    label: "Users",
-    description: "Tài khoản",
+    label: "Người dùng",
+    description: "Quản lý tài khoản",
     icon: Users,
     roles: ["ADMIN"],
   },

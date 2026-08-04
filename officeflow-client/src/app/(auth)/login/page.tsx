@@ -2,7 +2,6 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { ArrowRight, CheckCircle2, LockKeyhole, LogIn } from "lucide-react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { CSSProperties } from "react";
 import { useEffect, useState } from "react";
@@ -178,13 +177,7 @@ export default function LoginPage() {
               </Button>
 
               <p className="text-center text-sm text-muted-foreground">
-                Chưa có tài khoản?{" "}
-                <Link
-                  href="/register"
-                  className="font-semibold text-teal-900 hover:text-teal-700"
-                >
-                  Đăng ký
-                </Link>
+                Tài khoản được cấp bởi quản trị viên của hệ thống.
               </p>
             </form>
           </CardContent>

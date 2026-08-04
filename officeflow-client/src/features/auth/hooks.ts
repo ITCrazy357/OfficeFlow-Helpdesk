@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback } from "react";
 import { removeAccessToken, setAccessToken } from "@/lib/token";
-import { getMeApi, loginApi, logoutApi, registerApi } from "./api";
+import { getMeApi, loginApi, logoutApi } from "./api";
 
 export const authQueryKeys = {
   me: ["auth", "me"] as const,
@@ -16,12 +16,6 @@ export function useLogin() {
       setAccessToken(data.accessToken);
       queryClient.setQueryData(authQueryKeys.me, data.user);
     },
-  });
-}
-
-export function useRegister() {
-  return useMutation({
-    mutationFn: registerApi,
   });
 }
 

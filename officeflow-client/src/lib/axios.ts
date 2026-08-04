@@ -1,10 +1,6 @@
 import axios from "axios";
 import type { InternalAxiosRequestConfig } from "axios";
-import {
-  getAccessToken,
-  removeAccessToken,
-  setAccessToken,
-} from "./token";
+import { getAccessToken, removeAccessToken, setAccessToken } from "./token";
 import type { ApiErrorResponse, ApiResponse } from "@/types/api";
 
 const DEFAULT_API_TIMEOUT_MS = 70000;
@@ -39,12 +35,7 @@ let refreshRequest: Promise<string> | null = null;
 function isRefreshExcludedEndpoint(url?: string) {
   const path = url?.split("?")[0];
 
-  return [
-    "/auth/login",
-    "/auth/register",
-    "/auth/refresh",
-    "/auth/logout",
-  ].includes(path ?? "");
+  return ["/auth/login", "/auth/refresh", "/auth/logout"].includes(path ?? "");
 }
 
 export function refreshAccessToken(): Promise<string> {

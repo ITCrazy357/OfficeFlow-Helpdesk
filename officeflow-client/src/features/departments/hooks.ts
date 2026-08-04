@@ -5,9 +5,10 @@ export const departmentsQueryKeys = {
   all: ["departments"] as const,
 };
 
-export function useDepartments() {
+export function useDepartments(enabled = true) {
   return useQuery({
     queryKey: departmentsQueryKeys.all,
     queryFn: getDepartmentsApi,
+    enabled,
   });
 }
