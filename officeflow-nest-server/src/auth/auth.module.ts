@@ -5,6 +5,7 @@ import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 
 import { JwtAuthGuard } from './jwt-auth.guard';
+import { RefreshTokenCleanupService } from './refresh-token-cleanup.service';
 import { TrustedOriginGuard } from './trusted-origin.guard';
 
 @Module({
@@ -32,7 +33,12 @@ import { TrustedOriginGuard } from './trusted-origin.guard';
     }),
   ],
   controllers: [AuthController],
-  providers: [AuthService, JwtAuthGuard, TrustedOriginGuard],
+  providers: [
+    AuthService,
+    JwtAuthGuard,
+    RefreshTokenCleanupService,
+    TrustedOriginGuard,
+  ],
   exports: [JwtAuthGuard, JwtModule],
 })
 export class AuthModule {}
