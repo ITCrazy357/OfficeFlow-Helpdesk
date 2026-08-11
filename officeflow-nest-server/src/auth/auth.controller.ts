@@ -37,6 +37,13 @@ import { TrustedOriginGuard } from './trusted-origin.guard';
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
+  private getRequestMetadata(request: Request) {
+    return {
+      ipAddress: request.ip,
+      userAgent: request.headers['user-agent'],
+    };
+  }
+
   @Post('login')
   @UseGuards(TrustedOriginGuard)
   @Throttle({ default: { limit: 5, ttl: 60_000 } })
@@ -142,12 +149,5 @@ export class AuthController {
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   me(@CurrentUser('userId') userId: number) {
     return this.authService.getMe(userId);
-  }
-
-  private getRequestMetadata(request: Request) {
-    return {
-      ipAddress: request.ip,
-      userAgent: request.headers['user-agent'],
-    };
   }
 }

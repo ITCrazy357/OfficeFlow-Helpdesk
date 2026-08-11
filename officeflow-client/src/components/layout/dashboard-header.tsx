@@ -1,12 +1,31 @@
 "use client";
 
-import { ChevronRight, LogOut, Menu, UserRound } from "lucide-react";
+import {
+  ChevronRight,
+  LogOut,
+  Menu,
+  ShieldAlert,
+  UserRound,
+} from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
+import { useState } from "react";
 
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
-import { useLogout } from "@/features/auth/hooks";
+import { useLogout, useLogoutAll } from "@/features/auth/hooks";
 import type { AuthUser, UserRole } from "@/features/auth/types";
 import { NotificationBell } from "@/features/notifications/components/notification-bell";
+import { getApiErrorMessage } from "@/lib/axios";
 
 type DashboardHeaderProps = {
   user: AuthUser;
@@ -58,18 +77,47 @@ function getCurrentPageLabel(pathname: string) {
   return "Tổng quan";
 }
 
-export function DashboardHeader({
-  user,
-  onMenuClick,
-}: DashboardHeaderProps) {
+export function DashboardHeader({ user, onMenuClick }: DashboardHeaderProps) {
   const router = useRouter();
   const pathname = usePathname();
   const logout = useLogout();
+  const logoutAll = useLogoutAll();
+  const [isLogoutDialogOpen, setIsLogoutDialogOpen] = useState(false);
+  const [logoutScope, setLogoutScope] = useState<"current" | "all" | null>(
+    null,
+  );
+  const [logoutError, setLogoutError] = useState<string | null>(null);
   const currentPage = getCurrentPageLabel(pathname);
 
-  async function handleLogout() {
-    await logout();
-    router.replace("/login");
+  async function handleLogout(scope: "current" | "all") {
+    setLogoutScope(scope);
+    setLogoutError(null);
+
+    try {
+      if (scope === "all") {
+        await logoutAll();
+      } else {
+        await logout();
+      }
+
+      setIsLogoutDialogOpen(false);
+      router.replace("/login");
+    } catch (error) {
+      if (scope === "current") {
+        setIsLogoutDialogOpen(false);
+        router.replace("/login");
+        return;
+      }
+
+      setLogoutError(
+        getApiErrorMessage(
+          error,
+          "Không thể đăng xuất khỏi tất cả thiết bị. Vui lòng thử lại.",
+        ),
+      );
+    } finally {
+      setLogoutScope(null);
+    }
   }
 
   return (
@@ -120,10 +168,90 @@ export function DashboardHeader({
             </p>
           </div>
 
-          <Button type="button" variant="outline" onClick={handleLogout}>
-            <LogOut className="size-4" />
-            <span className="hidden sm:inline">Đăng xuất</span>
-          </Button>
+          <AlertDialog
+            open={isLogoutDialogOpen}
+            onOpenChange={(open) => {
+              if (logoutScope) return;
+              setIsLogoutDialogOpen(open);
+              if (open) setLogoutError(null);
+            }}
+          >
+            <AlertDialogTrigger asChild>
+              <Button type="button" variant="outline" className="px-3 sm:px-4">
+                <LogOut className="size-4" />
+                <span className="hidden sm:inline">Đăng xuất</span>
+              </Button>
+            </AlertDialogTrigger>
+
+            <AlertDialogContent>
+              <div className="flex items-start gap-3">
+                <div className="grid size-11 shrink-0 place-items-center rounded-xl bg-destructive/10 text-destructive">
+                  <ShieldAlert className="size-5" />
+                </div>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Bạn muốn đăng xuất ở đâu?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Chỉ đăng xuất thiết bị đang dùng, hoặc thu hồi toàn bộ phiên
+                    đăng nhập trên tất cả thiết bị của tài khoản này.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+              </div>
+
+              {logoutError ? (
+                <p
+                  role="alert"
+                  className="rounded-lg border border-destructive/20 bg-destructive/5 px-3 py-2 text-sm font-medium text-destructive"
+                >
+                  {logoutError}
+                </p>
+              ) : null}
+
+              <AlertDialogFooter>
+                <AlertDialogCancel asChild>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    disabled={logoutScope !== null}
+                  >
+                    Ở lại
+                  </Button>
+                </AlertDialogCancel>
+
+                <AlertDialogAction asChild>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    disabled={logoutScope !== null}
+                    onClick={(event) => {
+                      event.preventDefault();
+                      void handleLogout("current");
+                    }}
+                  >
+                    {logoutScope === "current"
+                      ? "Đang đăng xuất..."
+                      : "Thiết bị này"}
+                  </Button>
+                </AlertDialogAction>
+
+                <AlertDialogAction asChild>
+                  <Button
+                    type="button"
+                    variant="destructive"
+                    disabled={logoutScope !== null}
+                    onClick={(event) => {
+                      event.preventDefault();
+                      void handleLogout("all");
+                    }}
+                  >
+                    <ShieldAlert className="size-4" />
+                    {logoutScope === "all"
+                      ? "Đang thu hồi..."
+                      : "Tất cả thiết bị"}
+                  </Button>
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
         </div>
       </div>
     </header>

@@ -43,6 +43,37 @@ export class AuthService {
     private readonly jwtService: JwtService,
   ) {}
 
+  private signAccessToken(user: Pick<SessionUser, 'id' | 'role'>, sid: string) {
+    return this.jwtService.sign({
+      sub: user.id,
+      sid,
+      role: user.role,
+    });
+  }
+
+  private async createRefreshSession(
+    userId: number,
+    metadata: RequestMetadata,
+  ) {
+    const token = generateRefreshToken();
+    const expiresAt = new Date(Date.now() + REFRESH_TOKEN_TTL_MS);
+    const id = randomUUID();
+
+    await this.prisma.refreshToken.create({
+      data: {
+        id,
+        tokenHash: hashRefreshToken(token),
+        familyId: randomUUID(),
+        userId,
+        expiresAt,
+        ipAddress: metadata.ipAddress,
+        userAgent: metadata.userAgent,
+      },
+    });
+
+    return { id, token, expiresAt };
+  }
+
   async login(loginDto: LoginDto, metadata: RequestMetadata = {}) {
     const user = await this.prisma.user.findUnique({
       where: {
@@ -169,6 +200,18 @@ export class AuthService {
     };
   }
 
+  private async revokeTokenFamily(familyId: string) {
+    await this.prisma.refreshToken.updateMany({
+      where: {
+        familyId,
+        revokedAt: null,
+      },
+      data: {
+        revokedAt: new Date(),
+      },
+    });
+  }
+
   async logout(refreshToken: string | null) {
     if (!refreshToken) {
       return;
@@ -221,48 +264,5 @@ export class AuthService {
     }
 
     return user;
-  }
-
-  private signAccessToken(user: Pick<SessionUser, 'id' | 'role'>, sid: string) {
-    return this.jwtService.sign({
-      sub: user.id,
-      sid,
-      role: user.role,
-    });
-  }
-
-  private async createRefreshSession(
-    userId: number,
-    metadata: RequestMetadata,
-  ) {
-    const token = generateRefreshToken();
-    const expiresAt = new Date(Date.now() + REFRESH_TOKEN_TTL_MS);
-    const id = randomUUID();
-
-    await this.prisma.refreshToken.create({
-      data: {
-        id,
-        tokenHash: hashRefreshToken(token),
-        familyId: randomUUID(),
-        userId,
-        expiresAt,
-        ipAddress: metadata.ipAddress,
-        userAgent: metadata.userAgent,
-      },
-    });
-
-    return { id, token, expiresAt };
-  }
-
-  private async revokeTokenFamily(familyId: string) {
-    await this.prisma.refreshToken.updateMany({
-      where: {
-        familyId,
-        revokedAt: null,
-      },
-      data: {
-        revokedAt: new Date(),
-      },
-    });
   }
 }
