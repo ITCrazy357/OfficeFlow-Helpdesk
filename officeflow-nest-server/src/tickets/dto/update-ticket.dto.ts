@@ -27,6 +27,7 @@ export class UpdateTicketDto {
   @IsOptional()
   @IsString()
   @MinLength(10)
+  @MaxLength(15_000)
   description?: string;
 
   @ApiPropertyOptional({

@@ -78,7 +78,7 @@ import type {
   TicketHistoryAction,
   TicketStatus,
 } from "@/features/tickets/types";
-import { useItStaffUsers } from "@/features/users/hooks";
+import { useTicketAssignees } from "@/features/users/hooks";
 import type { UserListItem } from "@/features/users/types";
 import { getApiErrorMessage } from "@/lib/axios";
 
@@ -136,6 +136,10 @@ function canEditTicket(user: AuthUser | undefined, ticket: Ticket) {
 
   if (user.role === "EMPLOYEE") {
     return ticket.createdBy?.id === user.id && ticket.status === "OPEN";
+  }
+
+  if (user.role === "IT_STAFF") {
+    return !ticket.assignedTo || ticket.assignedTo.id === user.id;
   }
 
   return true;
@@ -261,7 +265,7 @@ export default function TicketDetailPage() {
     },
     Boolean(ticketQuery.data?.title && ticketQuery.data.title.length >= 3),
   );
-  const staffUsersQuery = useItStaffUsers(canChangeStatus(user));
+  const staffUsersQuery = useTicketAssignees(canChangeStatus(user));
   const updateTicket = useUpdateTicket();
   const updateStatus = useUpdateTicketStatus();
   const assignTicket = useAssignTicket();

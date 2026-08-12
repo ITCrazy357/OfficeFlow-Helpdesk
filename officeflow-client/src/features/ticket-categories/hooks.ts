@@ -3,7 +3,6 @@ import {
   createTicketCategoryApi,
   deleteTicketCategoryApi,
   getTicketCategoriesApi,
-  getTicketCategoryApi,
   updateTicketCategoryApi,
 } from "./api";
 import type {
@@ -14,8 +13,6 @@ import type {
 export const ticketCategoryQueryKeys = {
   all: ["ticket-categories"] as const,
   list: () => [...ticketCategoryQueryKeys.all, "list"] as const,
-  detail: (id: number) =>
-    [...ticketCategoryQueryKeys.all, "detail", id] as const,
 };
 
 function invalidateCategoryConsumers(queryClient: ReturnType<typeof useQueryClient>) {
@@ -33,27 +30,14 @@ export function useTicketCategories(enabled = true) {
   });
 }
 
-export function useTicketCategory(id: number, enabled = true) {
-  return useQuery({
-    queryKey: ticketCategoryQueryKeys.detail(id),
-    queryFn: () => getTicketCategoryApi(id),
-    enabled,
-    retry: false,
-  });
-}
-
 export function useCreateTicketCategory() {
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: (input: CreateTicketCategoryInput) =>
       createTicketCategoryApi(input),
-    onSuccess: (category) => {
+    onSuccess: () => {
       invalidateCategoryConsumers(queryClient);
-      queryClient.setQueryData(
-        ticketCategoryQueryKeys.detail(category.id),
-        category,
-      );
     },
   });
 }
@@ -69,12 +53,8 @@ export function useUpdateTicketCategory() {
       id: number;
       input: UpdateTicketCategoryInput;
     }) => updateTicketCategoryApi(id, input),
-    onSuccess: (category) => {
+    onSuccess: () => {
       invalidateCategoryConsumers(queryClient);
-      queryClient.setQueryData(
-        ticketCategoryQueryKeys.detail(category.id),
-        category,
-      );
     },
   });
 }
@@ -84,11 +64,8 @@ export function useDeleteTicketCategory() {
 
   return useMutation({
     mutationFn: (id: number) => deleteTicketCategoryApi(id),
-    onSuccess: (deleted) => {
+    onSuccess: () => {
       invalidateCategoryConsumers(queryClient);
-      queryClient.removeQueries({
-        queryKey: ticketCategoryQueryKeys.detail(deleted.id),
-      });
     },
   });
 }

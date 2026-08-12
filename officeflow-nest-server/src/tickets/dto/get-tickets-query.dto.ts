@@ -6,6 +6,8 @@ import {
   IsBoolean,
   IsOptional,
   IsString,
+  Max,
+  MaxLength,
   Min,
 } from 'class-validator';
 import { TicketPriority, TicketStatus } from '@prisma/client';
@@ -35,6 +37,7 @@ export class GetTicketsQueryDto {
   @Type(() => Number)
   @IsInt()
   @Min(1)
+  @Max(100)
   limit?: number = 10;
 
   @ApiPropertyOptional({
@@ -43,6 +46,7 @@ export class GetTicketsQueryDto {
   })
   @IsOptional()
   @IsString()
+  @MaxLength(200)
   keyword?: string;
 
   @ApiPropertyOptional({
@@ -75,7 +79,12 @@ export class GetTicketsQueryDto {
     description: 'Filter overdue tickets',
   })
   @IsOptional()
-  @Transform(({ value }) => value === 'true')
+  @Transform(({ value }: { value: unknown }) => {
+    if (value === true || value === 'true') return true;
+    if (value === false || value === 'false') return false;
+
+    return value;
+  })
   @IsBoolean()
   isOverdue?: boolean;
 

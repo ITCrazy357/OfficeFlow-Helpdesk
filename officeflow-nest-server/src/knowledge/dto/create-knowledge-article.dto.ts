@@ -30,6 +30,7 @@ export class CreateKnowledgeArticleDto {
   })
   @IsString()
   @MinLength(20)
+  @MaxLength(15_000)
   content!: string;
 
   @ApiPropertyOptional({
@@ -38,6 +39,7 @@ export class CreateKnowledgeArticleDto {
   })
   @IsOptional()
   @IsString()
+  @MaxLength(1000)
   tags?: string;
 
   @ApiPropertyOptional({

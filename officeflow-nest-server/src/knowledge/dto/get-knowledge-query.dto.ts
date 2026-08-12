@@ -1,6 +1,14 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform, Type } from 'class-transformer';
-import { IsBoolean, IsInt, IsOptional, IsString, Min } from 'class-validator';
+import {
+  IsBoolean,
+  IsInt,
+  IsOptional,
+  IsString,
+  Max,
+  MaxLength,
+  Min,
+} from 'class-validator';
 
 export class GetKnowledgeQueryDto {
   @ApiPropertyOptional({
@@ -19,6 +27,7 @@ export class GetKnowledgeQueryDto {
   @Type(() => Number)
   @IsInt()
   @Min(1)
+  @Max(100)
   limit?: number = 10;
 
   @ApiPropertyOptional({
@@ -26,6 +35,7 @@ export class GetKnowledgeQueryDto {
   })
   @IsOptional()
   @IsString()
+  @MaxLength(200)
   keyword?: string;
 
   @ApiPropertyOptional({
@@ -33,13 +43,19 @@ export class GetKnowledgeQueryDto {
   })
   @IsOptional()
   @IsString()
+  @MaxLength(100)
   tag?: string;
 
   @ApiPropertyOptional({
     example: true,
   })
   @IsOptional()
-  @Transform(({ value }) => value === 'true')
+  @Transform(({ value }: { value: unknown }) => {
+    if (value === true || value === 'true') return true;
+    if (value === false || value === 'false') return false;
+
+    return value;
+  })
   @IsBoolean()
   isPublished?: boolean;
 }

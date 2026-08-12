@@ -6,8 +6,6 @@ import {
 } from '@prisma/client';
 import { createRecordMap } from './seed.utils';
 
-export const DEFAULT_SEED_PASSWORD = 'OfficeFlow@123';
-
 const userSeeds = [
   {
     key: 'admin',
@@ -124,19 +122,19 @@ export async function seedUsers(
   const users: Array<[string, User]> = [];
 
   for (const seed of userSeeds) {
-    const data = {
+    const profile = {
       name: seed.name,
-      passwordHash,
       role: seed.role,
       isActive: true,
       departmentId: departments[seed.department].id,
     };
     const user = await prisma.user.upsert({
       where: { email: seed.email },
-      update: data,
+      update: profile,
       create: {
         email: seed.email,
-        ...data,
+        passwordHash,
+        ...profile,
       },
     });
 

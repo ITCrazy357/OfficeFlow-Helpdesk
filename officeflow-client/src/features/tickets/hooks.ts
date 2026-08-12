@@ -31,7 +31,9 @@ import type {
 
 export const ticketsQueryKeys = {
   all: ["tickets"] as const,
-  list: (params: GetTicketsParams) => [...ticketsQueryKeys.all, params] as const,
+  lists: () => [...ticketsQueryKeys.all, "list"] as const,
+  list: (params: GetTicketsParams) =>
+    [...ticketsQueryKeys.lists(), params] as const,
   detail: (id: number) => [...ticketsQueryKeys.all, "detail", id] as const,
   comments: (id: number) => [...ticketsQueryKeys.detail(id), "comments"] as const,
   history: (id: number) => [...ticketsQueryKeys.detail(id), "history"] as const,
@@ -88,7 +90,8 @@ export function useCreateTicket() {
   return useMutation({
     mutationFn: (input: CreateTicketInput) => createTicketApi(input),
     onSuccess: (ticket) => {
-      queryClient.invalidateQueries({ queryKey: ticketsQueryKeys.all });
+      queryClient.invalidateQueries({ queryKey: ticketsQueryKeys.lists() });
+      queryClient.invalidateQueries({ queryKey: ["dashboard"] });
       queryClient.setQueryData(ticketsQueryKeys.detail(ticket.id), ticket);
     },
   });
@@ -101,7 +104,8 @@ export function useUpdateTicket() {
     mutationFn: ({ id, input }: { id: number; input: UpdateTicketInput }) =>
       updateTicketApi(id, input),
     onSuccess: (ticket, variables) => {
-      queryClient.invalidateQueries({ queryKey: ticketsQueryKeys.all });
+      queryClient.invalidateQueries({ queryKey: ticketsQueryKeys.lists() });
+      queryClient.invalidateQueries({ queryKey: ["dashboard"] });
       queryClient.invalidateQueries({
         queryKey: ticketsQueryKeys.history(variables.id),
       });
@@ -122,7 +126,8 @@ export function useUpdateTicketStatus() {
       input: UpdateTicketStatusInput;
     }) => updateTicketStatusApi(id, input),
     onSuccess: (ticket, variables) => {
-      queryClient.invalidateQueries({ queryKey: ticketsQueryKeys.all });
+      queryClient.invalidateQueries({ queryKey: ticketsQueryKeys.lists() });
+      queryClient.invalidateQueries({ queryKey: ["dashboard"] });
       queryClient.invalidateQueries({
         queryKey: ticketsQueryKeys.history(variables.id),
       });
@@ -143,7 +148,7 @@ export function useAssignTicket() {
       input: AssignTicketInput;
     }) => assignTicketApi(id, input),
     onSuccess: (ticket, variables) => {
-      queryClient.invalidateQueries({ queryKey: ticketsQueryKeys.all });
+      queryClient.invalidateQueries({ queryKey: ticketsQueryKeys.lists() });
       queryClient.invalidateQueries({
         queryKey: ticketsQueryKeys.history(variables.id),
       });
@@ -158,7 +163,8 @@ export function useDeleteTicket() {
   return useMutation({
     mutationFn: (id: number) => deleteTicketApi(id),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ticketsQueryKeys.all });
+      queryClient.invalidateQueries({ queryKey: ticketsQueryKeys.lists() });
+      queryClient.invalidateQueries({ queryKey: ["dashboard"] });
     },
   });
 }
@@ -180,12 +186,6 @@ export function useAddTicketComment() {
         (current) => (current ? [...current, comment] : [comment]),
       );
       queryClient.invalidateQueries({
-        queryKey: ticketsQueryKeys.detail(variables.id),
-      });
-      queryClient.invalidateQueries({
-        queryKey: ticketsQueryKeys.comments(variables.id),
-      });
-      queryClient.invalidateQueries({
         queryKey: ticketsQueryKeys.history(variables.id),
       });
     },
@@ -203,12 +203,6 @@ export function useUploadTicketAttachment() {
         ticketsQueryKeys.attachments(variables.id),
         (current) => (current ? [attachment, ...current] : [attachment]),
       );
-      queryClient.invalidateQueries({
-        queryKey: ticketsQueryKeys.detail(variables.id),
-      });
-      queryClient.invalidateQueries({
-        queryKey: ticketsQueryKeys.attachments(variables.id),
-      });
       queryClient.invalidateQueries({
         queryKey: ticketsQueryKeys.history(variables.id),
       });
@@ -236,12 +230,6 @@ export function useDeleteTicketAttachment() {
           current?.filter((attachment) => attachment.id !== deletedId) ?? [],
       );
       queryClient.invalidateQueries({
-        queryKey: ticketsQueryKeys.detail(variables.id),
-      });
-      queryClient.invalidateQueries({
-        queryKey: ticketsQueryKeys.attachments(variables.id),
-      });
-      queryClient.invalidateQueries({
         queryKey: ticketsQueryKeys.history(variables.id),
       });
     },
@@ -260,7 +248,7 @@ export function useLinkTicketAsset() {
       input: LinkTicketAssetInput;
     }) => linkTicketAssetApi(id, input),
     onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: ticketsQueryKeys.all });
+      queryClient.invalidateQueries({ queryKey: ticketsQueryKeys.lists() });
       queryClient.invalidateQueries({
         queryKey: ticketsQueryKeys.detail(variables.id),
       });
@@ -275,7 +263,7 @@ export function useUnlinkTicketAsset() {
   return useMutation({
     mutationFn: (id: number) => unlinkTicketAssetApi(id),
     onSuccess: (_, id) => {
-      queryClient.invalidateQueries({ queryKey: ticketsQueryKeys.all });
+      queryClient.invalidateQueries({ queryKey: ticketsQueryKeys.lists() });
       queryClient.invalidateQueries({
         queryKey: ticketsQueryKeys.detail(id),
       });

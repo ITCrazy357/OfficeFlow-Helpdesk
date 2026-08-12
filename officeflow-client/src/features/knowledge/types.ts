@@ -1,4 +1,3 @@
-import type { PaginatedData } from "@/types/api";
 import type { TicketUser } from "@/features/tickets/types";
 
 export type KnowledgeArticle = {
@@ -28,8 +27,6 @@ export type GetKnowledgeArticlesParams = {
   tag?: string;
   isPublished?: boolean;
 };
-
-export type KnowledgeArticlesList = PaginatedData<KnowledgeArticle>;
 
 export type CreateKnowledgeArticleInput = {
   title: string;

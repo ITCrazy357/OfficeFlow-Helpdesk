@@ -25,7 +25,3 @@ export type PaginatedData<T> = {
   items: T[];
   pagination: Pagination;
 };
-
-export type PaginatedApiResponse<T> = ApiResponse<PaginatedData<T>>;
-
-export type PaginatedResponse<T> = PaginatedApiResponse<T>;

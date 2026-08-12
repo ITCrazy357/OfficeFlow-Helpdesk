@@ -32,6 +32,7 @@ const productNotes = [
 export default function LoginPage() {
   const router = useRouter();
   const loginMutation = useLogin();
+  const [isRestoringSession, setIsRestoringSession] = useState(true);
   const [formError, setFormError] = useState<string | null>(null);
 
   const form = useForm<LoginFormValues>({
@@ -49,7 +50,10 @@ export default function LoginPage() {
       .then(() => {
         if (active) router.replace("/dashboard");
       })
-      .catch(() => undefined);
+      .catch(() => undefined)
+      .finally(() => {
+        if (active) setIsRestoringSession(false);
+      });
 
     return () => {
       active = false;
@@ -57,6 +61,10 @@ export default function LoginPage() {
   }, [router]);
 
   const onSubmit: SubmitHandler<LoginFormValues> = async (values) => {
+    if (isRestoringSession) {
+      return;
+    }
+
     setFormError(null);
 
     try {
@@ -133,7 +141,7 @@ export default function LoginPage() {
                   autoComplete="email"
                   placeholder="admin@officeflow.com"
                   aria-invalid={Boolean(emailError)}
-                  disabled={loginMutation.isPending}
+                  disabled={loginMutation.isPending || isRestoringSession}
                   {...form.register("email")}
                 />
                 {emailError ? (
@@ -151,7 +159,7 @@ export default function LoginPage() {
                   autoComplete="current-password"
                   placeholder="Nhập mật khẩu"
                   aria-invalid={Boolean(passwordError)}
-                  disabled={loginMutation.isPending}
+                  disabled={loginMutation.isPending || isRestoringSession}
                   {...form.register("password")}
                 />
                 {passwordError ? (
@@ -170,9 +178,13 @@ export default function LoginPage() {
               <Button
                 type="submit"
                 className="h-10 w-full bg-teal-950 hover:bg-teal-900"
-                disabled={loginMutation.isPending}
+                disabled={loginMutation.isPending || isRestoringSession}
               >
-                {loginMutation.isPending ? "Đang đăng nhập..." : "Đăng nhập"}
+                {isRestoringSession
+                  ? "Đang kiểm tra phiên..."
+                  : loginMutation.isPending
+                    ? "Đang đăng nhập..."
+                    : "Đăng nhập"}
                 <ArrowRight className="size-4" />
               </Button>
 

@@ -15,6 +15,13 @@ import { CloudinaryService } from '../cloudinary/cloudinary.service';
 import { PrismaService } from '../prisma/prisma.service';
 
 const mockTransaction = {
+  ticket: {
+    findUnique: jest.fn(),
+    updateMany: jest.fn(),
+  },
+  ticketComment: {
+    create: jest.fn(),
+  },
   ticketAttachment: {
     create: jest.fn(),
     deleteMany: jest.fn(),
@@ -231,6 +238,171 @@ describe('TicketsService', () => {
     } finally {
       jest.useRealTimers();
     }
+  });
+
+  it('should forbid a manager from updating a ticket outside their department', async () => {
+    mockPrismaService.ticket.findUnique.mockResolvedValue({
+      id: 5,
+      title: 'VPN issue',
+      description: 'Cannot connect to VPN',
+      status: TicketStatus.OPEN,
+      priority: 'MEDIUM',
+      dueAt: new Date(),
+      resolveAt: null,
+      isOverdue: false,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      createdById: 20,
+      assignedToId: null,
+      categoryId: null,
+      createdBy: {
+        departmentId: 2,
+      },
+    });
+    mockPrismaService.user.findUnique.mockResolvedValue({ departmentId: 1 });
+
+    await expect(
+      service.update(
+        5,
+        { title: 'Updated VPN issue' },
+        { userId: 30, role: UserRole.MANAGER },
+      ),
+    ).rejects.toThrow('Forbidden');
+
+    expect(mockPrismaService.$transaction).not.toHaveBeenCalled();
+  });
+
+  it('should preserve resolveAt and side effects when status does not change', async () => {
+    const unchangedTicket = {
+      id: 5,
+      title: 'VPN issue',
+      description: 'Cannot connect to VPN',
+      status: TicketStatus.RESOLVED,
+      priority: 'MEDIUM',
+      dueAt: new Date(),
+      resolveAt: new Date('2026-08-01T10:00:00.000Z'),
+      isOverdue: false,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      createdBy: { id: 2, name: 'Employee', email: 'employee@example.com' },
+      assignedTo: null,
+      category: null,
+    };
+    mockTransaction.ticket.findUnique.mockResolvedValue(unchangedTicket);
+
+    await expect(
+      service.updateStatus(
+        unchangedTicket.id,
+        { status: TicketStatus.RESOLVED },
+        { userId: 1, role: UserRole.ADMIN },
+      ),
+    ).resolves.toEqual(unchangedTicket);
+
+    expect(mockTransaction.ticket.updateMany).not.toHaveBeenCalled();
+    expect(mockTransaction.ticketHistory.create).not.toHaveBeenCalled();
+    expect(mockAuditLogsService.create).not.toHaveBeenCalled();
+    expect(mockEventEmitter.emit).not.toHaveBeenCalled();
+  });
+
+  it('should reject a stale concurrent status update without side effects', async () => {
+    mockTransaction.ticket.findUnique.mockResolvedValue({
+      id: 5,
+      title: 'VPN issue',
+      description: 'Cannot connect to VPN',
+      status: TicketStatus.OPEN,
+      priority: 'MEDIUM',
+      dueAt: new Date(),
+      resolveAt: null,
+      isOverdue: false,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      createdBy: { id: 2, name: 'Employee', email: 'employee@example.com' },
+      assignedTo: null,
+      category: null,
+    });
+    mockTransaction.ticket.updateMany.mockResolvedValue({ count: 0 });
+
+    await expect(
+      service.updateStatus(
+        5,
+        { status: TicketStatus.CLOSED },
+        { userId: 1, role: UserRole.ADMIN },
+      ),
+    ).rejects.toThrow('Ticket status changed concurrently');
+
+    expect(mockTransaction.ticketHistory.create).not.toHaveBeenCalled();
+    expect(mockAuditLogsService.create).not.toHaveBeenCalled();
+    expect(mockEventEmitter.emit).not.toHaveBeenCalled();
+  });
+
+  it('should reject assigning a ticket to an inactive IT user', async () => {
+    mockPrismaService.ticket.findUnique.mockResolvedValue({
+      id: 5,
+      title: 'VPN issue',
+      assignedToId: null,
+    });
+    mockPrismaService.user.findUnique.mockResolvedValue({
+      id: 20,
+      role: UserRole.IT_STAFF,
+      isActive: false,
+    });
+
+    await expect(
+      service.assign(
+        5,
+        { assignedToId: 20 },
+        { userId: 1, role: UserRole.ADMIN },
+      ),
+    ).rejects.toThrow('Cannot assign ticket to an inactive user');
+
+    expect(mockPrismaService.$transaction).not.toHaveBeenCalled();
+  });
+
+  it('should create a comment and bounded history in one transaction', async () => {
+    const longComment = 'x'.repeat(300);
+    const comment = {
+      id: 10,
+      content: longComment,
+      createdAt: new Date(),
+      author: {
+        id: 1,
+        name: 'Admin',
+        email: 'admin@example.com',
+        role: UserRole.ADMIN,
+      },
+    };
+    mockPrismaService.ticket.findUnique
+      .mockResolvedValueOnce({
+        id: 5,
+        createdById: 2,
+        createdBy: { departmentId: 1 },
+      })
+      .mockResolvedValueOnce({
+        id: 5,
+        title: 'VPN issue',
+        createdById: 2,
+        assignedToId: null,
+      });
+    mockTransaction.ticketComment.create.mockResolvedValue(comment);
+    mockTransaction.ticketHistory.create.mockResolvedValue({ id: 100 });
+
+    await expect(
+      service.addComment(
+        5,
+        { content: longComment },
+        { userId: 1, role: UserRole.ADMIN },
+      ),
+    ).resolves.toEqual(comment);
+
+    expect(mockTransaction.ticketComment.create).toHaveBeenCalledTimes(1);
+    expect(mockTransaction.ticketHistory.create).toHaveBeenCalledWith({
+      data: {
+        ticketId: 5,
+        userId: 1,
+        action: TicketHistoryAction.COMMENTED,
+        newValue: longComment.slice(0, 191),
+      },
+    });
   });
 
   it('should return attachment IDs in deterministic newest-first order', async () => {

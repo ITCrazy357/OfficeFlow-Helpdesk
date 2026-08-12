@@ -2,6 +2,7 @@
 
 import type { CSSProperties } from "react";
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import {
   AlertCircle,
   KeyRound,
@@ -31,7 +32,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { useMe } from "@/features/auth/hooks";
+import { useLogout, useMe } from "@/features/auth/hooks";
 import { useDepartments } from "@/features/departments/hooks";
 import { ResetPasswordForm } from "@/features/users/components/reset-password-form";
 import { UserForm } from "@/features/users/components/user-form";
@@ -85,7 +86,9 @@ function UsersSkeleton() {
 }
 
 export default function UsersPage() {
+  const router = useRouter();
   const { data: me } = useMe();
+  const logout = useLogout();
   const isAdmin = me?.role === "ADMIN";
   const usersQuery = useUsers(isAdmin);
   const departmentsQuery = useDepartments(isAdmin);
@@ -168,6 +171,13 @@ export default function UsersPage() {
           password: values.password,
         },
       });
+
+      if (panel.user.id === me?.id) {
+        await logout().catch(() => undefined);
+        router.replace("/login");
+        return;
+      }
+
       setPanel(null);
       setActionMessage(`Đã đặt lại mật khẩu cho ${panel.user.email}.`);
     } catch (error) {

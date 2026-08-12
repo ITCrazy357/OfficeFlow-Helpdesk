@@ -1,8 +1,4 @@
-import {
-  ForbiddenException,
-  NotFoundException,
-  UnauthorizedException,
-} from '@nestjs/common';
+import { NotFoundException, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { Test, TestingModule } from '@nestjs/testing';
 import { UserRole } from '@prisma/client';
@@ -132,17 +128,21 @@ describe('AuthService', () => {
       });
     });
 
-    it('should throw UnauthorizedException when user does not exist', async () => {
+    it('should compare against a dummy hash and return UnauthorizedException when user does not exist', async () => {
       mockPrismaService.user.findUnique.mockResolvedValue(null);
+      mockBcryptCompare.mockResolvedValue(false);
 
       await expect(service.login(loginDto)).rejects.toThrow(
         UnauthorizedException,
       );
-      expect(mockBcryptCompare).not.toHaveBeenCalled();
+      expect(mockBcryptCompare).toHaveBeenCalledWith(
+        loginDto.password,
+        expect.stringMatching(/^\$2b\$10\$/),
+      );
       expect(mockJwtService.sign).not.toHaveBeenCalled();
     });
 
-    it('should throw ForbiddenException when account is inactive', async () => {
+    it('should return the same UnauthorizedException when account is inactive', async () => {
       mockPrismaService.user.findUnique.mockResolvedValue({
         id: 1,
         email: loginDto.email,
@@ -150,9 +150,15 @@ describe('AuthService', () => {
         role: UserRole.EMPLOYEE,
         isActive: false,
       });
+      mockBcryptCompare.mockResolvedValue(true);
 
-      await expect(service.login(loginDto)).rejects.toThrow(ForbiddenException);
-      expect(mockBcryptCompare).not.toHaveBeenCalled();
+      await expect(service.login(loginDto)).rejects.toThrow(
+        UnauthorizedException,
+      );
+      expect(mockBcryptCompare).toHaveBeenCalledWith(
+        loginDto.password,
+        'password-hash',
+      );
       expect(mockJwtService.sign).not.toHaveBeenCalled();
     });
 

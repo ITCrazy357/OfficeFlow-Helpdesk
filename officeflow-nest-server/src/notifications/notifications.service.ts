@@ -137,7 +137,7 @@ export class NotificationsService {
       throw new ForbiddenException('Forbidden');
     }
 
-    await this.prisma.notification.update({
+    return this.prisma.notification.update({
       where: {
         id: notificationId,
       },
@@ -145,8 +145,6 @@ export class NotificationsService {
         isRead: true,
       },
     });
-
-    return notification;
   }
 
   async markAllAsRead(userId: number) {

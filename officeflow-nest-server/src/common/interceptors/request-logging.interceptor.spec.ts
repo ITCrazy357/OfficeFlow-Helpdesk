@@ -16,7 +16,7 @@ describe('RequestLoggingInterceptor', () => {
       switchToHttp: () => ({
         getRequest: () => ({
           method: 'GET',
-          originalUrl: '/api/audit-logs',
+          originalUrl: '/api/audit-logs?keyword=confidential',
           ip: '127.0.0.1',
           user: {
             userId: 1,

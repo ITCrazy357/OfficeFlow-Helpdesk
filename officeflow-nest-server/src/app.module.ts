@@ -5,7 +5,6 @@ import { ScheduleModule } from '@nestjs/schedule';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 
 import { AppController } from './app.controller';
-import { AppService } from './app.service';
 import { AuditLogsModule } from './audit-logs/audit-logs.module';
 import { AssetsModule } from './assets/assets.module';
 import { AuthModule } from './auth/auth.module';
@@ -45,7 +44,6 @@ import { TicketCategoriesModule } from './ticket-categories/ticket-categories.mo
   ],
   controllers: [AppController],
   providers: [
-    AppService,
     {
       provide: APP_GUARD,
       useClass: ThrottlerGuard,

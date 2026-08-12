@@ -25,6 +25,7 @@ export class CreateTicketDto {
   })
   @IsString()
   @MinLength(10)
+  @MaxLength(15_000)
   description!: string;
 
   @ApiPropertyOptional({

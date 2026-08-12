@@ -25,7 +25,7 @@ export class RequestLoggingInterceptor implements NestInterceptor {
     const response = httpContext.getResponse<Response>();
     const startedAt = Date.now();
     const method = request.method;
-    const url = request.originalUrl;
+    const url = request.path || request.originalUrl.split('?', 1)[0];
     const userId = request.user?.userId ?? 'guest';
     const ipAddress = request.ip;
 

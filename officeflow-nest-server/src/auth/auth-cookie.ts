@@ -24,11 +24,17 @@ function getRefreshCookieOptions(): CookieOptions {
   };
 }
 
+function setNoStoreHeaders(response: Response) {
+  response.setHeader('Cache-Control', 'no-store');
+  response.setHeader('Pragma', 'no-cache');
+}
+
 export function setRefreshCookie(
   response: Response,
   token: string,
   expiresAt: Date,
 ) {
+  setNoStoreHeaders(response);
   response.cookie(getRefreshCookieName(), token, {
     ...getRefreshCookieOptions(),
     expires: expiresAt,
@@ -37,6 +43,7 @@ export function setRefreshCookie(
 }
 
 export function clearRefreshCookie(response: Response) {
+  setNoStoreHeaders(response);
   response.clearCookie(getRefreshCookieName(), getRefreshCookieOptions());
 }
 

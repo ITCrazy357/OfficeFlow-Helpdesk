@@ -17,12 +17,23 @@ import type {
 
 export const knowledgeQueryKeys = {
   all: ["knowledge"] as const,
+  lists: () => [...knowledgeQueryKeys.all, "list"] as const,
   list: (params: GetKnowledgeArticlesParams) =>
-    [...knowledgeQueryKeys.all, params] as const,
+    [...knowledgeQueryKeys.lists(), params] as const,
   detail: (id: number) => [...knowledgeQueryKeys.all, "detail", id] as const,
+  suggestionLists: () => [...knowledgeQueryKeys.all, "suggestions"] as const,
   suggestions: (input: SuggestKnowledgeArticlesInput) =>
-    [...knowledgeQueryKeys.all, "suggestions", input] as const,
+    [...knowledgeQueryKeys.suggestionLists(), input] as const,
 };
+
+function invalidateKnowledgeConsumers(
+  queryClient: ReturnType<typeof useQueryClient>,
+) {
+  queryClient.invalidateQueries({ queryKey: knowledgeQueryKeys.lists() });
+  queryClient.invalidateQueries({
+    queryKey: knowledgeQueryKeys.suggestionLists(),
+  });
+}
 
 export function useKnowledgeArticles(
   params: GetKnowledgeArticlesParams = {},
@@ -49,7 +60,7 @@ export function useCreateKnowledgeArticle() {
     mutationFn: (input: CreateKnowledgeArticleInput) =>
       createKnowledgeArticleApi(input),
     onSuccess: (article) => {
-      queryClient.invalidateQueries({ queryKey: knowledgeQueryKeys.all });
+      invalidateKnowledgeConsumers(queryClient);
       queryClient.setQueryData(knowledgeQueryKeys.detail(article.id), article);
     },
   });
@@ -67,7 +78,7 @@ export function useUpdateKnowledgeArticle() {
       input: UpdateKnowledgeArticleInput;
     }) => updateKnowledgeArticleApi(id, input),
     onSuccess: (article) => {
-      queryClient.invalidateQueries({ queryKey: knowledgeQueryKeys.all });
+      invalidateKnowledgeConsumers(queryClient);
       queryClient.setQueryData(knowledgeQueryKeys.detail(article.id), article);
     },
   });
@@ -79,7 +90,7 @@ export function usePublishKnowledgeArticle() {
   return useMutation({
     mutationFn: (id: number) => publishKnowledgeArticleApi(id),
     onSuccess: (article) => {
-      queryClient.invalidateQueries({ queryKey: knowledgeQueryKeys.all });
+      invalidateKnowledgeConsumers(queryClient);
       queryClient.setQueryData(knowledgeQueryKeys.detail(article.id), article);
     },
   });
@@ -91,7 +102,7 @@ export function useDeleteKnowledgeArticle() {
   return useMutation({
     mutationFn: (id: number) => deleteKnowledgeArticleApi(id),
     onSuccess: (deleted) => {
-      queryClient.invalidateQueries({ queryKey: knowledgeQueryKeys.all });
+      invalidateKnowledgeConsumers(queryClient);
       queryClient.removeQueries({
         queryKey: knowledgeQueryKeys.detail(deleted.id),
       });

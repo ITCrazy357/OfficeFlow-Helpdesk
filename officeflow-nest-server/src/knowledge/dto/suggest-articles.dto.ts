@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsOptional, IsString, MinLength } from 'class-validator';
+import { IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
 
 export class SuggestArticlesDto {
   @ApiProperty({
@@ -7,6 +7,7 @@ export class SuggestArticlesDto {
   })
   @IsString()
   @MinLength(3)
+  @MaxLength(150)
   title!: string;
 
   @ApiPropertyOptional({
@@ -14,5 +15,6 @@ export class SuggestArticlesDto {
   })
   @IsOptional()
   @IsString()
+  @MaxLength(5000)
   description?: string;
 }

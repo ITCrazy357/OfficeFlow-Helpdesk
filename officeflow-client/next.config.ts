@@ -1,6 +1,9 @@
 import type { NextConfig } from "next";
 
 const isDevelopment = process.env.NODE_ENV !== "production";
+const apiProxyTarget = (
+  process.env.API_PROXY_TARGET ?? "http://localhost:5001/api"
+).replace(/\/+$/, "");
 const apiOrigin = (() => {
   try {
     return new URL(
@@ -53,7 +56,7 @@ const nextConfig: NextConfig = {
     return [
       {
         source: "/backend-api/:path*",
-        destination: "https://officeflow-helpdesk.onrender.com/api/:path*",
+        destination: `${apiProxyTarget}/:path*`,
       },
     ];
   },

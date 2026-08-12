@@ -128,7 +128,9 @@ export function useMarkNotificationAsRead() {
         );
       }
 
-      queryClient.invalidateQueries({ queryKey: notificationsQueryKeys.all });
+      queryClient.invalidateQueries({
+        queryKey: notificationsQueryKeys.lists(),
+      });
     },
   });
 }
@@ -141,7 +143,9 @@ export function useMarkAllNotificationsAsRead() {
     onSuccess: () => {
       markCachedNotificationsAsRead(queryClient);
       queryClient.setQueryData(notificationsQueryKeys.unreadCount(), 0);
-      queryClient.invalidateQueries({ queryKey: notificationsQueryKeys.all });
+      queryClient.invalidateQueries({
+        queryKey: notificationsQueryKeys.lists(),
+      });
     },
   });
 }
@@ -164,7 +168,9 @@ export function useDeleteNotification() {
         );
       }
 
-      queryClient.invalidateQueries({ queryKey: notificationsQueryKeys.all });
+      queryClient.invalidateQueries({
+        queryKey: notificationsQueryKeys.lists(),
+      });
     },
   });
 }

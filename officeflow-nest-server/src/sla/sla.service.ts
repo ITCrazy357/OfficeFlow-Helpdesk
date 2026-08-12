@@ -47,18 +47,35 @@ export class SlaService {
       return;
     }
 
-    await this.prisma.ticket.updateMany({
-      where: {
-        id: {
-          in: overdueTickets.map((ticket) => ticket.id),
-        },
-      },
-      data: {
-        isOverdue: true,
-      },
-    });
+    let markedCount = 0;
 
     for (const ticket of overdueTickets) {
+      const updated = await this.prisma.ticket.updateMany({
+        where: {
+          id: ticket.id,
+          dueAt: {
+            lt: now,
+          },
+          isOverdue: false,
+          status: {
+            notIn: [
+              TicketStatus.RESOLVED,
+              TicketStatus.CLOSED,
+              TicketStatus.CANCELLED,
+            ],
+          },
+        },
+        data: {
+          isOverdue: true,
+        },
+      });
+
+      // Another worker may have claimed the same ticket after the initial read.
+      if (updated.count !== 1) {
+        continue;
+      }
+
+      markedCount++;
       const recipientIds = [ticket.createdById, ticket.assignedToId].filter(
         (id): id is number => Boolean(id),
       );
@@ -69,6 +86,6 @@ export class SlaService {
       );
     }
 
-    this.logger.warn(`Marked ${overdueTickets.length} tickets as overdue`);
+    this.logger.warn(`Marked ${markedCount} tickets as overdue`);
   }
 }

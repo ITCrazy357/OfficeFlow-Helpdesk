@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   ForbiddenException,
   Injectable,
   Logger,
@@ -43,11 +44,45 @@ import { calculateDueAt } from './ticket-sla.util';
 export type TicketAttachmentFile = NonNullable<Request['file']>;
 
 const SLA_DUE_SOON_HOURS = 24;
+const MAX_TICKET_HISTORY_VALUE_LENGTH = 191;
 const TERMINAL_TICKET_STATUSES = [
   TicketStatus.RESOLVED,
   TicketStatus.CLOSED,
   TicketStatus.CANCELLED,
 ];
+
+const ticketStatusSelect = {
+  id: true,
+  title: true,
+  description: true,
+  status: true,
+  priority: true,
+  dueAt: true,
+  resolveAt: true,
+  isOverdue: true,
+  createdAt: true,
+  updatedAt: true,
+  createdBy: {
+    select: {
+      id: true,
+      name: true,
+      email: true,
+    },
+  },
+  assignedTo: {
+    select: {
+      id: true,
+      name: true,
+      email: true,
+    },
+  },
+  category: {
+    select: {
+      id: true,
+      name: true,
+    },
+  },
+} satisfies Prisma.TicketSelect;
 
 function resolveCloudinaryResourceType(
   resourceType: string | null,
@@ -467,10 +502,33 @@ export class TicketsService {
         createdById: true,
         assignedToId: true,
         categoryId: true,
+        createdBy: {
+          select: {
+            departmentId: true,
+          },
+        },
       },
     });
 
     if (!ticket) throw new NotFoundException('Ticket not found');
+
+    if (Object.keys(updateTicketDto).length === 0) {
+      throw new BadRequestException('At least one field is required');
+    }
+
+    if (currentUser.role === UserRole.MANAGER) {
+      const manager = await this.prisma.user.findUnique({
+        where: { id: currentUser.userId },
+        select: { departmentId: true },
+      });
+
+      if (
+        !manager?.departmentId ||
+        ticket.createdBy.departmentId !== manager.departmentId
+      ) {
+        throw new ForbiddenException('Forbidden');
+      }
+    }
 
     if (currentUser.role === UserRole.EMPLOYEE) {
       if (ticket.createdById !== currentUser.userId) {
@@ -591,124 +649,119 @@ export class TicketsService {
       throw new ForbiddenException('Forbidden');
     }
 
-    const ticket = await this.prisma.ticket.findUnique({
-      where: { id },
-      select: {
-        id: true,
-        title: true,
-        status: true,
-        createdById: true,
-        assignedToId: true,
-      },
+    const result = await this.prisma.$transaction(async (transaction) => {
+      const currentTicket = await transaction.ticket.findUnique({
+        where: {
+          id,
+        },
+        select: ticketStatusSelect,
+      });
+
+      if (!currentTicket) {
+        throw new NotFoundException('Ticket not found');
+      }
+
+      if (currentTicket.status === nextStatus) {
+        return {
+          statusChanged: false,
+          previousTicket: currentTicket,
+          updatedTicket: currentTicket,
+        };
+      }
+
+      const claimed = await transaction.ticket.updateMany({
+        where: {
+          id,
+          status: currentTicket.status,
+        },
+        data: {
+          status: nextStatus,
+          resolveAt: shouldSetResolveAt ? new Date() : null,
+        },
+      });
+
+      if (claimed.count !== 1) {
+        throw new ConflictException(
+          'Ticket status changed concurrently. Please retry',
+        );
+      }
+
+      const updatedTicket = await transaction.ticket.findUnique({
+        where: {
+          id,
+        },
+        select: ticketStatusSelect,
+      });
+
+      if (!updatedTicket) {
+        throw new NotFoundException('Ticket not found');
+      }
+
+      await this.createHistory(
+        {
+          ticketId: id,
+          userId: currentUser.userId,
+          action: TicketHistoryAction.STATUS_CHANGED,
+          oldValue: currentTicket.status,
+          newValue: updatedTicket.status,
+        },
+        transaction,
+      );
+
+      await this.auditLogsService.create(
+        {
+          actorId: currentUser.userId,
+          entity: AuditLogEntity.TICKET,
+          entityId: currentTicket.id,
+          action: AuditLogAction.STATUS_CHANGED,
+          description: `Changed status of ticket ${currentTicket.title}.`,
+          oldValues: {
+            status: currentTicket.status,
+          },
+          newValues: {
+            status: updatedTicket.status,
+          },
+          ipAddress: currentUser.ipAddress,
+          userAgent: currentUser.userAgent,
+        },
+        transaction,
+      );
+
+      return {
+        statusChanged: true,
+        previousTicket: currentTicket,
+        updatedTicket,
+      };
     });
 
-    if (!ticket) {
-      throw new NotFoundException('Ticket not found');
+    if (result.statusChanged) {
+      const recipientIds = [
+        result.previousTicket.createdBy.id,
+        result.previousTicket.assignedTo?.id,
+      ].filter((userId): userId is number => Boolean(userId));
+
+      const actor = await this.prisma.user.findUnique({
+        where: { id: currentUser.userId },
+        select: {
+          name: true,
+        },
+      });
+
+      this.eventEmitter.emit(
+        'ticket.status_changed',
+        new TicketStatusChangedEvent(
+          id,
+          result.previousTicket.title,
+          currentUser.userId,
+          actor?.name || 'Someone',
+          result.previousTicket.status,
+          result.updatedTicket.status,
+          recipientIds,
+        ),
+      );
     }
 
-    const updatedTicket = await this.prisma.$transaction(
-      async (transaction) => {
-        const result = await transaction.ticket.update({
-          where: { id },
-          data: {
-            status: updateStatusDto.status,
-            resolveAt: shouldSetResolveAt ? new Date() : null,
-          },
-          select: {
-            id: true,
-            title: true,
-            description: true,
-            status: true,
-            priority: true,
-            dueAt: true,
-            resolveAt: true,
-            isOverdue: true,
-            createdAt: true,
-            updatedAt: true,
-            createdBy: {
-              select: {
-                id: true,
-                name: true,
-                email: true,
-              },
-            },
-            assignedTo: {
-              select: {
-                id: true,
-                name: true,
-                email: true,
-              },
-            },
-            category: {
-              select: {
-                id: true,
-                name: true,
-              },
-            },
-          },
-        });
-
-        await this.createHistory(
-          {
-            ticketId: id,
-            userId: currentUser.userId,
-            action: TicketHistoryAction.STATUS_CHANGED,
-            oldValue: ticket.status,
-            newValue: result.status,
-          },
-          transaction,
-        );
-
-        if (ticket.status !== result.status) {
-          await this.auditLogsService.create(
-            {
-              actorId: currentUser.userId,
-              entity: AuditLogEntity.TICKET,
-              entityId: ticket.id,
-              action: AuditLogAction.STATUS_CHANGED,
-              description: `Changed status of ticket ${ticket.title}.`,
-              oldValues: {
-                status: ticket.status,
-              },
-              newValues: {
-                status: result.status,
-              },
-              ipAddress: currentUser.ipAddress,
-              userAgent: currentUser.userAgent,
-            },
-            transaction,
-          );
-        }
-
-        return result;
-      },
-    );
-
-    const recipientIds = [ticket.createdById, ticket.assignedToId].filter(
-      (userId): userId is number => Boolean(userId),
-    );
-
-    const actor = await this.prisma.user.findUnique({
-      where: { id: currentUser.userId },
-      select: {
-        name: true,
-      },
-    });
-
-    this.eventEmitter.emit(
-      'ticket.status_changed',
-      new TicketStatusChangedEvent(
-        id,
-        ticket.title,
-        currentUser.userId,
-        actor?.name || 'Someone',
-        ticket.status,
-        updatedTicket.status,
-        recipientIds,
-      ),
-    );
-
-    return updatedTicket;
+    return result.updatedTicket;
   }
 
   async assign(
@@ -741,6 +794,7 @@ export class TicketsService {
       select: {
         id: true,
         role: true,
+        isActive: true,
       },
     });
 
@@ -753,6 +807,10 @@ export class TicketsService {
       assigned.role !== UserRole.ADMIN
     ) {
       throw new BadRequestException('Assignee must be IT staff or admin');
+    }
+
+    if (!assigned.isActive) {
+      throw new BadRequestException('Cannot assign ticket to an inactive user');
     }
 
     const updatedTicket = await this.prisma.$transaction(
@@ -1001,8 +1059,8 @@ export class TicketsService {
         ticketId: params.ticketId,
         userId: params.userId,
         action: params.action,
-        oldValue: params.oldValue,
-        newValue: params.newValue,
+        oldValue: params.oldValue?.slice(0, MAX_TICKET_HISTORY_VALUE_LENGTH),
+        newValue: params.newValue?.slice(0, MAX_TICKET_HISTORY_VALUE_LENGTH),
       },
     });
   }
@@ -1016,25 +1074,39 @@ export class TicketsService {
   ) {
     await this.canAccessTicket(ticketId, currentUser);
 
-    const comment = await this.prisma.ticketComment.create({
-      data: {
-        ticketId,
-        authorId: currentUser.userId,
-        content: createCommentDto.content,
-      },
-      select: {
-        id: true,
-        content: true,
-        createdAt: true,
-        author: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-            role: true,
+    const comment = await this.prisma.$transaction(async (transaction) => {
+      const createdComment = await transaction.ticketComment.create({
+        data: {
+          ticketId,
+          authorId: currentUser.userId,
+          content: createCommentDto.content,
+        },
+        select: {
+          id: true,
+          content: true,
+          createdAt: true,
+          author: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+              role: true,
+            },
           },
         },
-      },
+      });
+
+      await this.createHistory(
+        {
+          ticketId,
+          userId: currentUser.userId,
+          action: TicketHistoryAction.COMMENTED,
+          newValue: createdComment.content,
+        },
+        transaction,
+      );
+
+      return createdComment;
     });
 
     const ticket = await this.prisma.ticket.findUnique({
@@ -1064,12 +1136,6 @@ export class TicketsService {
       );
     }
 
-    await this.createHistory({
-      ticketId,
-      userId: currentUser.userId,
-      action: TicketHistoryAction.COMMENTED,
-      newValue: comment.content,
-    });
     return comment;
   }
 

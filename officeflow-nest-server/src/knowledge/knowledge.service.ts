@@ -157,24 +157,28 @@ export class KnowledgeService {
       ...this.buildReadScope(currentUser),
     };
 
-    if (query.keyword) {
-      where.OR = [
-        {
-          title: {
-            contains: query.keyword,
+    if (query.keyword?.trim()) {
+      const keyword = query.keyword.trim();
+
+      where.AND = {
+        OR: [
+          {
+            title: {
+              contains: keyword,
+            },
           },
-        },
-        {
-          summary: {
-            contains: query.keyword,
+          {
+            summary: {
+              contains: keyword,
+            },
           },
-        },
-        {
-          content: {
-            contains: query.keyword,
+          {
+            content: {
+              contains: keyword,
+            },
           },
-        },
-      ];
+        ],
+      };
     }
 
     if (query.tag) {
@@ -242,6 +246,7 @@ export class KnowledgeService {
         title: true,
         slug: true,
         summary: true,
+        content: true,
         tags: true,
         isPublished: true,
         viewCount: true,
@@ -273,7 +278,7 @@ export class KnowledgeService {
       throw new ForbiddenException('Forbidden');
     }
 
-    await this.prisma.knowledgeArticle.update({
+    const updatedArticle = await this.prisma.knowledgeArticle.update({
       where: {
         id,
       },
@@ -282,9 +287,15 @@ export class KnowledgeService {
           increment: 1,
         },
       },
+      select: {
+        viewCount: true,
+      },
     });
 
-    return article;
+    return {
+      ...article,
+      viewCount: updatedArticle.viewCount,
+    };
   }
 
   async update(

@@ -14,14 +14,6 @@ export async function getTicketCategoriesApi() {
   return response.data.data;
 }
 
-export async function getTicketCategoryApi(id: number) {
-  const response = await api.get<ApiResponse<TicketCategory>>(
-    `/ticket-categories/${id}`,
-  );
-
-  return response.data.data;
-}
-
 export async function createTicketCategoryApi(
   input: CreateTicketCategoryInput,
 ) {

@@ -1,4 +1,3 @@
-import type { PaginatedData } from "@/types/api";
 import type { AssetStatus, AssetType } from "@/features/assets/types";
 
 export type TicketStatus =
@@ -81,8 +80,6 @@ export type GetTicketsParams = {
   isOverdue?: boolean;
   slaState?: TicketSlaFilter;
 };
-
-export type TicketsList = PaginatedData<Ticket>;
 
 export type CreateTicketInput = {
   title: string;

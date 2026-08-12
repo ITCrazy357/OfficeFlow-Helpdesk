@@ -50,7 +50,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
 
     if (exception instanceof Prisma.PrismaClientKnownRequestError) {
       if (exception.code === 'P2002') {
-        statusCode = HttpStatus.BAD_REQUEST;
+        statusCode = HttpStatus.CONFLICT;
         message = 'Duplicate value violates unique constraint';
       }
 
@@ -60,7 +60,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
       }
 
       if (exception.code === 'P2003') {
-        statusCode = HttpStatus.BAD_REQUEST;
+        statusCode = HttpStatus.CONFLICT;
         message = 'Foreign key constraint failed';
       }
     }

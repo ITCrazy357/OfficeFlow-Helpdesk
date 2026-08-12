@@ -324,6 +324,10 @@ export class AssetsService {
   ) {
     const asset = await this.getAssetOrThrow(id);
 
+    if (Object.keys(updateAssetDto).length === 0) {
+      throw new BadRequestException('At least one field is required');
+    }
+
     if (updateAssetDto.assetTag) {
       const duplicate = await this.prisma.asset.findFirst({
         where: {

@@ -20,13 +20,7 @@ export async function getHealthApi() {
 }
 
 export async function getDbHealthApi() {
-  try {
-    const res = await api.get<HealthResponse>("/db-health");
+  const res = await api.get<HealthResponse>("/db-health");
 
-    return toHealthStatus(res.data);
-  } catch {
-    const res = await api.get<HealthResponse>("/health/db");
-
-    return toHealthStatus(res.data);
-  }
+  return toHealthStatus(res.data);
 }

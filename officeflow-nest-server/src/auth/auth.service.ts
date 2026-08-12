@@ -1,5 +1,4 @@
 import {
-  ForbiddenException,
   Injectable,
   NotFoundException,
   UnauthorizedException,
@@ -27,6 +26,9 @@ type SessionUser = {
 };
 
 class RefreshTokenRaceError extends Error {}
+
+const DUMMY_PASSWORD_HASH =
+  '$2b$10$wMxyAWyEicp9orrrzO4aHOOTQ30632.PdBZxO1D2f69A4lBikKabK';
 
 function generateRefreshToken() {
   return randomBytes(32).toString('base64url');
@@ -81,20 +83,12 @@ export class AuthService {
       },
     });
 
-    if (!user) {
-      throw new UnauthorizedException('Invalid email or password');
-    }
-
-    if (user.isActive === false) {
-      throw new ForbiddenException('Account is inactive');
-    }
-
     const passwordMatch = await bcrypt.compare(
       loginDto.password,
-      user.passwordHash,
+      user?.passwordHash ?? DUMMY_PASSWORD_HASH,
     );
 
-    if (!passwordMatch) {
+    if (!user || !passwordMatch || !user.isActive) {
       throw new UnauthorizedException('Invalid email or password');
     }
 
