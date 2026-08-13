@@ -11,6 +11,7 @@ import {
   History,
   Link2,
   Loader2,
+  MailCheck,
   PackageOpen,
   RotateCcw,
   Search,
@@ -228,6 +229,10 @@ export default function AssetDetailPage() {
     }
 
     try {
+      const selectedUser = (usersQuery.data ?? []).find(
+        (item) => item.id === userId,
+      );
+
       await assignAsset.mutateAsync({
         id: asset.id,
         input: { userId },
@@ -235,7 +240,7 @@ export default function AssetDetailPage() {
       setSelectedUserId("");
       setUserSearch("");
       setFeedback({
-        message: "Đã gán tài sản cho người dùng.",
+        message: `Đã cấp phát tài sản cho ${selectedUser?.name ?? "người dùng đã chọn"}. Email thông báo sẽ được gửi nếu tính năng email đang bật.`,
         tone: "success",
       });
     } catch (error) {
@@ -251,13 +256,15 @@ export default function AssetDetailPage() {
 
   async function handleReturn() {
     try {
+      const previousAssigneeName = asset.assignedTo?.name;
+
       await returnAsset.mutateAsync({
         id: asset.id,
         input: { notes: returnNotes.trim() || undefined },
       });
       setReturnNotes("");
       setFeedback({
-        message: "Đã ghi nhận thu hồi tài sản.",
+        message: `Đã thu hồi tài sản${previousAssigneeName ? ` từ ${previousAssigneeName}` : ""}. Email xác nhận sẽ được gửi nếu tính năng email đang bật.`,
         tone: "success",
       });
     } catch (error) {
@@ -663,6 +670,13 @@ export default function AssetDetailPage() {
                         ) : null}
                       </SelectContent>
                     </Select>
+                    <div className="flex items-start gap-2 rounded-lg border border-sky-200/80 bg-sky-50/70 p-3 text-xs leading-5 text-sky-900">
+                      <MailCheck className="mt-0.5 size-3.5 shrink-0" />
+                      <p>
+                        Người nhận sẽ được gửi email cấp phát nếu tính năng
+                        email đang bật.
+                      </p>
+                    </div>
                     <Button
                       type="button"
                       onClick={handleAssign}
@@ -700,6 +714,13 @@ export default function AssetDetailPage() {
                     maxLength={1000}
                     disabled={isReturning}
                   />
+                </div>
+                <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-white/70 p-3 text-xs leading-5 text-amber-950">
+                  <MailCheck className="mt-0.5 size-3.5 shrink-0" />
+                  <p>
+                    Người đang sử dụng sẽ được gửi email xác nhận thu hồi nếu
+                    tính năng email đang bật.
+                  </p>
                 </div>
                 <Button
                   type="button"

@@ -1,6 +1,12 @@
 "use client";
 
-import { ArrowLeft, CircleCheck, FilePlus2, Sparkles } from "lucide-react";
+import {
+  ArrowLeft,
+  CircleCheck,
+  FilePlus2,
+  MailCheck,
+  Sparkles,
+} from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { CSSProperties } from "react";
@@ -48,12 +54,14 @@ export default function NewTicketPage() {
             input: { assetId: Number(selectedAssetId) },
           });
         } catch {
-          router.push(`/tickets/${ticket.id}?assetLink=failed`);
+          router.push(
+            `/tickets/${ticket.id}?created=success&assetLink=failed`,
+          );
           return;
         }
       }
 
-      router.push(`/tickets/${ticket.id}`);
+      router.push(`/tickets/${ticket.id}?created=success`);
     } catch (error) {
       setFormError(
         getApiErrorMessage(error, "Không thể tạo ticket. Vui lòng thử lại."),
@@ -122,8 +130,8 @@ export default function NewTicketPage() {
               text: "Chọn độ ưu tiên phù hợp để đội IT sắp xếp xử lý.",
             },
             {
-              icon: FilePlus2,
-              text: "Ticket mới sẽ ở trạng thái Mở sau khi tạo.",
+              icon: MailCheck,
+              text: "Ticket sẽ ở trạng thái Mở; email xác nhận được gửi nếu tính năng email đang bật.",
             },
           ].map((item, index) => {
             const Icon = item.icon;

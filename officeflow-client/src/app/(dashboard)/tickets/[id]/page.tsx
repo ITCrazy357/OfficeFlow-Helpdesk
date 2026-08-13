@@ -14,6 +14,7 @@ import {
   Eye,
   History,
   Loader2,
+  MailCheck,
   MessageSquareText,
   SendHorizontal,
   ShieldAlert,
@@ -280,6 +281,11 @@ export default function TicketDetailPage() {
   const [assignError, setAssignError] = useState<string | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [commentError, setCommentError] = useState<string | null>(null);
+  const [actionFeedback, setActionFeedback] = useState<string | null>(() =>
+    searchParams.get("created") === "success"
+      ? "Đã tạo ticket. Email xác nhận sẽ được gửi nếu tính năng email đang bật."
+      : null,
+  );
 
   if (!ticketId) {
     return (
@@ -357,12 +363,22 @@ export default function TicketDetailPage() {
     }
 
     setStatusError(null);
+    setActionFeedback(null);
 
     try {
       await updateStatus.mutateAsync({
         id: ticket.id,
         input: { status },
       });
+      const statusLabel =
+        ticketStatusOptions.find((item) => item.value === status)?.label ??
+        status;
+
+      setActionFeedback(
+        status === "RESOLVED"
+          ? `Đã chuyển ticket sang ${statusLabel}. Email kết quả sẽ được gửi cho người tạo nếu tính năng email đang bật.`
+          : `Đã chuyển ticket sang ${statusLabel}.`,
+      );
     } catch (error) {
       setStatusError(
         getApiErrorMessage(
@@ -375,6 +391,7 @@ export default function TicketDetailPage() {
 
   async function handleAssign(assignedToId: number) {
     setAssignError(null);
+    setActionFeedback(null);
 
     if (!Number.isInteger(assignedToId) || assignedToId <= 0) {
       setAssignError("ID người xử lý không hợp lệ.");
@@ -382,10 +399,16 @@ export default function TicketDetailPage() {
     }
 
     try {
+      const assignee = staffUsers.find((staff) => staff.id === assignedToId);
+      const actionLabel = ticket.assignedTo ? "chuyển người xử lý" : "gán";
+
       await assignTicket.mutateAsync({
         id: ticket.id,
         input: { assignedToId },
       });
+      setActionFeedback(
+        `Đã ${actionLabel} cho ${assignee?.name ?? "nhân viên đã chọn"}. Email thông báo sẽ được gửi nếu tính năng email đang bật.`,
+      );
     } catch (error) {
       setAssignError(
         getApiErrorMessage(error, "Không thể gán ticket. Vui lòng thử lại."),
@@ -512,6 +535,16 @@ export default function TicketDetailPage() {
       {deleteError ? (
         <div className="rounded-lg border border-destructive/25 bg-destructive/10 px-3 py-2 text-sm font-medium text-destructive motion-toast">
           {deleteError}
+        </div>
+      ) : null}
+
+      {actionFeedback ? (
+        <div
+          role="status"
+          className="flex items-start gap-3 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900 motion-toast"
+        >
+          <MailCheck className="mt-0.5 size-4 shrink-0 text-emerald-700" />
+          <p className="font-medium leading-5">{actionFeedback}</p>
         </div>
       ) : null}
 
@@ -823,11 +856,26 @@ export default function TicketDetailPage() {
                   <SelectContent>
                     {ticketStatusOptions.map((status) => (
                       <SelectItem key={status.value} value={status.value}>
-                        {status.label}
+                        <span className="flex items-center gap-2">
+                          {status.label}
+                          {status.value === "RESOLVED" ? (
+                            <MailCheck
+                              className="size-3.5 text-emerald-700"
+                              aria-label="Có email thông báo"
+                            />
+                          ) : null}
+                        </span>
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
+                <div className="flex items-start gap-2 rounded-lg border border-emerald-200/80 bg-emerald-50/70 p-3 text-xs leading-5 text-emerald-900">
+                  <MailCheck className="mt-0.5 size-3.5 shrink-0" />
+                  <p>
+                    Chuyển sang Đã xử lý sẽ gửi email kết quả cho người tạo nếu
+                    tính năng email đang bật.
+                  </p>
+                </div>
                 {statusError ? (
                   <p className="text-sm font-medium text-destructive">
                     {statusError}
@@ -925,6 +973,13 @@ export default function TicketDetailPage() {
                         Đang gán người xử lý...
                       </p>
                     ) : null}
+                    <div className="flex items-start gap-2 rounded-lg border border-sky-200/80 bg-sky-50/70 p-3 text-xs leading-5 text-sky-900">
+                      <MailCheck className="mt-0.5 size-3.5 shrink-0" />
+                      <p>
+                        Khi gán hoặc chuyển người xử lý, hệ thống gửi email cho
+                        người được chọn nếu tính năng email đang bật.
+                      </p>
+                    </div>
                     {staffUsers.length === 0 &&
                     !staffUsersQuery.isLoading &&
                     !staffUsersQuery.isError ? (

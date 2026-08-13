@@ -8,6 +8,7 @@ import {
   KeyRound,
   Lock,
   LockOpen,
+  MailCheck,
   Pencil,
   Plus,
   Shield,
@@ -123,7 +124,9 @@ export default function UsersPage() {
         departmentId: Number(values.departmentId),
       });
       setPanel(null);
-      setActionMessage(`Đã tạo tài khoản ${values.email}.`);
+      setActionMessage(
+        `Đã tạo tài khoản ${values.email}. Email thông báo sẽ được gửi nếu tính năng email đang bật.`,
+      );
     } catch (error) {
       setActionError(
         getApiErrorMessage(error, "Không thể tạo tài khoản người dùng."),
@@ -179,7 +182,9 @@ export default function UsersPage() {
       }
 
       setPanel(null);
-      setActionMessage(`Đã đặt lại mật khẩu cho ${panel.user.email}.`);
+      setActionMessage(
+        `Đã đặt lại mật khẩu cho ${panel.user.email}. Email thông báo sẽ được gửi nếu tính năng email đang bật.`,
+      );
     } catch (error) {
       setActionError(getApiErrorMessage(error, "Không thể đặt lại mật khẩu."));
     }
@@ -292,9 +297,10 @@ export default function UsersPage() {
       {actionMessage ? (
         <div
           role="status"
-          className="rounded-lg border border-teal-200 bg-teal-50 px-4 py-3 text-sm font-medium text-teal-800 motion-toast"
+          className="flex items-start gap-3 rounded-lg border border-teal-200 bg-teal-50 px-4 py-3 text-sm font-medium text-teal-800 motion-toast"
         >
-          {actionMessage}
+          <MailCheck className="mt-0.5 size-4 shrink-0" />
+          <p className="leading-5">{actionMessage}</p>
         </div>
       ) : null}
 
@@ -442,7 +448,7 @@ export default function UsersPage() {
         {panel ? (
           <Card className="shadow-sm xl:sticky xl:top-6">
             <CardHeader className="border-b">
-              <CardTitle>
+              <CardTitle className="flex items-center gap-2">
                 {panel.type === "create"
                   ? "Tạo tài khoản"
                   : panel.type === "edit"
@@ -452,14 +458,17 @@ export default function UsersPage() {
                       : panel.user.isActive
                         ? "Khóa tài khoản"
                         : "Mở khóa tài khoản"}
+                {panel.type === "create" || panel.type === "reset" ? (
+                  <MailCheck className="size-4 text-teal-700" />
+                ) : null}
               </CardTitle>
               <CardDescription>
                 {panel.type === "create"
-                  ? "ADMIN cấp thông tin đăng nhập ban đầu cho người dùng."
+                  ? "ADMIN cấp thông tin đăng nhập ban đầu. Email thông báo tài khoản được gửi nếu tính năng email đang bật."
                   : panel.type === "edit"
                     ? `Cập nhật thông tin của ${panel.user.email}.`
                     : panel.type === "reset"
-                      ? `Thiết lập mật khẩu mới cho ${panel.user.email}.`
+                      ? `Thiết lập mật khẩu mới cho ${panel.user.email}. Email thông báo được gửi nếu tính năng email đang bật.`
                       : `Xác nhận thay đổi trạng thái của ${panel.user.email}.`}
               </CardDescription>
             </CardHeader>
