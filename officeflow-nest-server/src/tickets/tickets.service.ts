@@ -26,6 +26,8 @@ import {
 import type { CurrentUserPayload } from '../common/decorators/current-user.decorator';
 import { TicketAssignedEvent } from '../notifications/events/ticket-assigned.event';
 import { TicketCommentedEvent } from '../notifications/events/ticket-commented.event';
+import { TicketCreatedEvent } from '../notifications/events/ticket-created.event';
+import { TicketResolvedEvent } from '../notifications/events/ticket-resolved.event';
 import { TicketStatusChangedEvent } from '../notifications/events/ticket-status-changed.event';
 import { PrismaService } from '../prisma/prisma.service';
 
@@ -323,7 +325,7 @@ export class TicketsService {
 
     const dueAt = calculateDueAt(createTicketDto.priority);
 
-    return this.prisma.$transaction(async (transaction) => {
+    const ticket = await this.prisma.$transaction(async (transaction) => {
       const ticket = await transaction.ticket.create({
         data: {
           title: createTicketDto.title,
@@ -383,6 +385,10 @@ export class TicketsService {
 
       return ticket;
     });
+
+    this.eventEmitter.emit('ticket.created', new TicketCreatedEvent(ticket.id));
+
+    return ticket;
   }
 
   async canGetById(id: number, currentUser: CurrentUserPayload) {
@@ -759,6 +765,19 @@ export class TicketsService {
           recipientIds,
         ),
       );
+
+      if (result.updatedTicket.status === TicketStatus.RESOLVED) {
+        this.eventEmitter.emit(
+          'ticket.resolved',
+          new TicketResolvedEvent(
+            id,
+            result.previousTicket.title,
+            currentUser.userId,
+            actor?.name || 'Someone',
+            recipientIds,
+          ),
+        );
+      }
     }
 
     return result.updatedTicket;
@@ -899,15 +918,17 @@ export class TicketsService {
 
     if (!actor) throw new NotFoundException('Actor not found');
 
-    this.eventEmitter.emit(
-      'ticket.assigned',
-      new TicketAssignedEvent(
-        id,
-        ticket.title,
-        assignTicketDto.assignedToId,
-        actor.name || 'Someone',
-      ),
-    );
+    if (ticket.assignedToId !== assignTicketDto.assignedToId) {
+      this.eventEmitter.emit(
+        'ticket.assigned',
+        new TicketAssignedEvent(
+          id,
+          ticket.title,
+          assignTicketDto.assignedToId,
+          actor.name || 'Someone',
+        ),
+      );
+    }
 
     return updatedTicket;
   }

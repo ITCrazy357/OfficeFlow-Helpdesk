@@ -3,6 +3,7 @@ import {
   ConflictException,
   NotFoundException,
 } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { Test, TestingModule } from '@nestjs/testing';
 import { AuditLogAction, AuditLogEntity, UserRole } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
@@ -55,6 +56,10 @@ const mockAuditLogsService = {
   create: jest.fn(),
 };
 
+const mockEventEmitter = {
+  emit: jest.fn(),
+};
+
 const currentUser = {
   userId: 1,
   role: UserRole.ADMIN,
@@ -98,6 +103,10 @@ describe('UsersService', () => {
           provide: AuditLogsService,
           useValue: mockAuditLogsService,
         },
+        {
+          provide: EventEmitter2,
+          useValue: mockEventEmitter,
+        },
       ],
     }).compile();
 
@@ -138,6 +147,12 @@ describe('UsersService', () => {
         action: AuditLogAction.CREATE,
       }),
       mockTransactionClient,
+    );
+    expect(mockEventEmitter.emit).toHaveBeenCalledWith(
+      'user.created',
+      expect.objectContaining({
+        userId: storedUser.id,
+      }),
     );
   });
 
@@ -262,5 +277,14 @@ describe('UsersService', () => {
     expect(
       JSON.stringify(mockAuditLogsService.create.mock.calls),
     ).not.toContain('hashed-password');
+    expect(mockEventEmitter.emit).toHaveBeenCalledWith(
+      'user.password-reset',
+      expect.objectContaining({
+        userId: storedUser.id,
+      }),
+    );
+    expect(JSON.stringify(mockEventEmitter.emit.mock.calls)).not.toContain(
+      'new-strong-password-123',
+    );
   });
 });

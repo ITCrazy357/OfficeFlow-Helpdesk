@@ -4,6 +4,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import {
   AuditLogAction,
   AuditLogEntity,
@@ -14,6 +15,8 @@ import * as bcrypt from 'bcrypt';
 
 import { AuditLogsService } from '../audit-logs/audit-logs.service';
 import type { CurrentUserPayload } from '../common/decorators/current-user.decorator';
+import { UserCreatedEvent } from '../notifications/events/user-created.event';
+import { UserPasswordResetEvent } from '../notifications/events/user-password-reset.event';
 import { PrismaService } from '../prisma/prisma.service';
 
 import { ChangeUserStatusDto } from './dto/change-user-status.dto';
@@ -42,6 +45,7 @@ export class UsersService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly auditLogsService: AuditLogsService,
+    private readonly eventEmitter: EventEmitter2,
   ) {}
 
   async create(createUserDto: CreateUserDto, currentUser: CurrentUserPayload) {
@@ -75,7 +79,7 @@ export class UsersService {
 
     const passwordHash = await bcrypt.hash(createUserDto.password, 10);
 
-    return this.prisma.$transaction(async (transaction) => {
+    const user = await this.prisma.$transaction(async (transaction) => {
       const user = await transaction.user.create({
         data: {
           name: createUserDto.name.trim(),
@@ -109,6 +113,10 @@ export class UsersService {
 
       return user;
     });
+
+    this.eventEmitter.emit('user.created', new UserCreatedEvent(user.id));
+
+    return user;
   }
 
   async findAll() {
@@ -288,7 +296,7 @@ export class UsersService {
     const user = await this.getUserOrThrow(id);
     const passwordHash = await bcrypt.hash(resetUserPasswordDto.password, 10);
 
-    return this.prisma.$transaction(async (transaction) => {
+    const updatedUser = await this.prisma.$transaction(async (transaction) => {
       const updatedUser = await transaction.user.update({
         where: {
           id,
@@ -327,6 +335,13 @@ export class UsersService {
 
       return updatedUser;
     });
+
+    this.eventEmitter.emit(
+      'user.password-reset',
+      new UserPasswordResetEvent(updatedUser.id),
+    );
+
+    return updatedUser;
   }
 
   private async getUserOrThrow(id: number) {

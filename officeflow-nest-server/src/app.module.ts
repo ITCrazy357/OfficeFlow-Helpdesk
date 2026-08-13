@@ -11,6 +11,7 @@ import { AuthModule } from './auth/auth.module';
 import { DashboardModule } from './dashboard/dashboard.module';
 import { DepartmentsModule } from './departments/departments.module';
 import { KnowledgeModule } from './knowledge/knowledge.module';
+import { MailModule } from './mail/mail.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { SlaModule } from './sla/sla.module';
@@ -41,6 +42,7 @@ import { TicketCategoriesModule } from './ticket-categories/ticket-categories.mo
     AssetsModule,
     TicketCategoriesModule,
     AuditLogsModule,
+    MailModule,
   ],
   controllers: [AppController],
   providers: [
