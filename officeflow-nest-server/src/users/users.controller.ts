@@ -17,6 +17,7 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 
+import { AccountService } from './accounts.service';
 import { UsersService } from './users.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import {
@@ -27,6 +28,7 @@ import { Message } from '../common/decorators/message.decorator';
 import { Roles } from '../common/decorators/roles.decorator';
 import { RolesGuard } from '../common/guards/roles.guard';
 
+import { ChangeAccountLockDto } from './dto/change-account-lock.dto';
 import { ChangeUserStatusDto } from './dto/change-user-status.dto';
 import { CreateUserDto } from './dto/create-user.dto';
 import { ResetUserPasswordDto } from './dto/reset-user-password.dto';
@@ -37,7 +39,10 @@ import { UpdateUserDto } from './dto/update-user.dto';
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Controller('users')
 export class UsersController {
-  constructor(private readonly usersService: UsersService) {}
+  constructor(
+    private readonly usersService: UsersService,
+    private readonly accountService: AccountService,
+  ) {}
 
   @Post()
   @Roles(UserRole.ADMIN)
@@ -81,15 +86,41 @@ export class UsersController {
 
   @Patch(':id/status')
   @Roles(UserRole.ADMIN)
-  @Message('Change user status successfully')
-  @ApiOperation({ summary: 'Lock or unlock a user account' })
+  @Message('Change user activation status successfully')
+  @ApiOperation({ summary: 'Activate or deactivate an organization user' })
   @ApiParam({ name: 'id', example: 1 })
-  changeStatus(
+  @ApiResponse({ status: 200, description: 'User activation status changed' })
+  @ApiResponse({ status: 403, description: 'Operation is not permitted' })
+  @ApiResponse({ status: 404, description: 'User not found' })
+  changeActivationStatus(
     @Param('id', ParseIntPipe) id: number,
     @Body() changeUserStatusDto: ChangeUserStatusDto,
     @CurrentUser() currentUser: CurrentUserPayload,
   ) {
-    return this.usersService.changeStatus(id, changeUserStatusDto, currentUser);
+    return this.usersService.changeActivationStatus(
+      id,
+      changeUserStatusDto,
+      currentUser,
+    );
+  }
+
+  @Patch(':id/lock-status')
+  @Roles(UserRole.ADMIN, UserRole.IT_STAFF)
+  @Message('Change account lock status successfully')
+  @ApiOperation({ summary: 'Temporarily lock or unlock a user account' })
+  @ApiParam({ name: 'id', example: 1 })
+  @ApiResponse({ status: 200, description: 'Account lock status changed' })
+  @ApiResponse({ status: 403, description: 'Operation is not permitted' })
+  @ApiResponse({ status: 404, description: 'User not found' })
+  @ApiResponse({ status: 409, description: 'Account state changed' })
+  changeAccountLock(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() changeAccountLockDto: ChangeAccountLockDto,
+    @CurrentUser() currentUser: CurrentUserPayload,
+  ) {
+    return changeAccountLockDto.isLocked
+      ? this.accountService.lockUser(currentUser, id)
+      : this.accountService.unlockUser(currentUser, id);
   }
 
   @Patch(':id/reset-password')

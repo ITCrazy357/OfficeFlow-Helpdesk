@@ -23,6 +23,7 @@ type SessionUser = {
   email: string;
   role: UserRole;
   isActive: boolean;
+  isLocked: boolean;
 };
 
 class RefreshTokenRaceError extends Error {}
@@ -88,7 +89,7 @@ export class AuthService {
       user?.passwordHash ?? DUMMY_PASSWORD_HASH,
     );
 
-    if (!user || !passwordMatch || !user.isActive) {
+    if (!user || !passwordMatch || !user.isActive || user.isLocked) {
       throw new UnauthorizedException('Invalid email or password');
     }
 
@@ -105,6 +106,7 @@ export class AuthService {
         email: user.email,
         role: user.role,
         isActive: user.isActive,
+        isLocked: user.isLocked,
       },
     };
   }
@@ -121,6 +123,7 @@ export class AuthService {
             email: true,
             role: true,
             isActive: true,
+            isLocked: true,
           },
         },
       },
@@ -137,7 +140,11 @@ export class AuthService {
 
     const now = new Date();
 
-    if (currentToken.expiresAt <= now || !currentToken.user.isActive) {
+    if (
+      currentToken.expiresAt <= now ||
+      !currentToken.user.isActive ||
+      currentToken.user.isLocked
+    ) {
       await this.revokeTokenFamily(currentToken.familyId);
       throw new UnauthorizedException('Invalid or expired refresh token');
     }
@@ -244,6 +251,7 @@ export class AuthService {
         email: true,
         role: true,
         isActive: true,
+        isLocked: true,
         department: {
           select: {
             id: true,

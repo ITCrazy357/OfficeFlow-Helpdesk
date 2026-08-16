@@ -6,6 +6,7 @@ export type AuthUser = {
   email: string;
   role: UserRole;
   isActive?: boolean;
+  isLocked?: boolean;
   departmentId?: number | null;
   createdAt?: string;
   department?: {

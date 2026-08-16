@@ -73,6 +73,11 @@ const storedUser = {
   email: 'employee@officeflow.com',
   role: UserRole.EMPLOYEE,
   isActive: true,
+  isLocked: false,
+  lockedAt: null,
+  lockedById: null,
+  unlockedAt: null,
+  unlockedById: null,
   departmentId: 1,
   createdAt: new Date(),
   department: {
@@ -192,45 +197,58 @@ describe('UsersService', () => {
     ).rejects.toThrow(NotFoundException);
   });
 
-  it('should revoke sessions when an account is locked', async () => {
-    mockPrismaService.user.findUnique.mockResolvedValue(storedUser);
-    mockPrismaService.user.update.mockResolvedValue({
+  it('should deactivate a user without changing the lock state', async () => {
+    const deactivatedUser = {
       ...storedUser,
       isActive: false,
-    });
-
-    await service.changeStatus(2, { isActive: false }, currentUser);
-
-    const revokeArgs = mockPrismaService.refreshToken.updateMany.mock
-      .calls[0][0] as {
-      where: {
-        userId: 2;
-        revokedAt: null;
-      };
-      data: {
-        revokedAt: Date;
-      };
     };
+    mockPrismaService.user.findUnique.mockResolvedValue(storedUser);
+    mockPrismaService.user.update.mockResolvedValue(deactivatedUser);
 
-    expect(revokeArgs).toEqual({
-      where: {
-        userId: 2,
-        revokedAt: null,
-      },
-      data: {
-        revokedAt: revokeArgs.data.revokedAt,
-      },
-    });
-    expect(revokeArgs.data.revokedAt).toBeInstanceOf(Date);
+    await expect(
+      service.changeActivationStatus(2, { isActive: false }, currentUser),
+    ).resolves.toEqual(deactivatedUser);
+
+    expect(mockPrismaService.user.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: {
+          isActive: false,
+        },
+      }),
+    );
     expect(mockAuditLogsService.create).toHaveBeenCalledWith(
       expect.objectContaining({
         action: AuditLogAction.DEACTIVATED,
+        newValues: {
+          isActive: false,
+        },
       }),
       mockTransactionClient,
     );
+    expect(mockPrismaService.refreshToken.updateMany).toHaveBeenCalled();
   });
 
-  it('should not let an admin lock their own account', async () => {
+  it('should reactivate a user without unlocking the account', async () => {
+    const inactiveLockedUser = {
+      ...storedUser,
+      isActive: false,
+      isLocked: true,
+    };
+    const reactivatedUser = {
+      ...inactiveLockedUser,
+      isActive: true,
+    };
+    mockPrismaService.user.findUnique.mockResolvedValue(inactiveLockedUser);
+    mockPrismaService.user.update.mockResolvedValue(reactivatedUser);
+
+    await expect(
+      service.changeActivationStatus(2, { isActive: true }, currentUser),
+    ).resolves.toEqual(reactivatedUser);
+    expect(reactivatedUser.isLocked).toBe(true);
+    expect(mockPrismaService.refreshToken.updateMany).not.toHaveBeenCalled();
+  });
+
+  it('should not let an admin deactivate their own account', async () => {
     mockPrismaService.user.findUnique.mockResolvedValue({
       ...storedUser,
       id: currentUser.userId,
@@ -238,7 +256,7 @@ describe('UsersService', () => {
     });
 
     await expect(
-      service.changeStatus(
+      service.changeActivationStatus(
         currentUser.userId,
         { isActive: false },
         currentUser,

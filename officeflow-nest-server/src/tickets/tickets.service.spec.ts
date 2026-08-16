@@ -358,6 +358,30 @@ describe('TicketsService', () => {
     expect(mockPrismaService.$transaction).not.toHaveBeenCalled();
   });
 
+  it('should reject assigning a ticket to a locked IT user', async () => {
+    mockPrismaService.ticket.findUnique.mockResolvedValue({
+      id: 5,
+      title: 'VPN issue',
+      assignedToId: null,
+    });
+    mockPrismaService.user.findUnique.mockResolvedValue({
+      id: 20,
+      role: UserRole.IT_STAFF,
+      isActive: true,
+      isLocked: true,
+    });
+
+    await expect(
+      service.assign(
+        5,
+        { assignedToId: 20 },
+        { userId: 1, role: UserRole.ADMIN },
+      ),
+    ).rejects.toThrow('Cannot assign ticket to a locked user');
+
+    expect(mockPrismaService.$transaction).not.toHaveBeenCalled();
+  });
+
   it('should create a comment and bounded history in one transaction', async () => {
     const longComment = 'x'.repeat(300);
     const comment = {

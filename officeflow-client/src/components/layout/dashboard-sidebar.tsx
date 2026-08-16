@@ -69,7 +69,7 @@ const navigationItems: NavigationItem[] = [
     label: "Người dùng",
     description: "Quản lý tài khoản",
     icon: Users,
-    roles: ["ADMIN"],
+    roles: ["ADMIN", "IT_STAFF"],
   },
   {
     href: "/ticket-categories",

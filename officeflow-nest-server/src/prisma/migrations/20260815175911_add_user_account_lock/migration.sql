@@ -1,0 +1,4 @@
+-- AlterTable
+ALTER TABLE `Users` ADD COLUMN `isLocked` BOOLEAN NOT NULL DEFAULT false,
+    ADD COLUMN `lockedAt` DATETIME(3) NULL,
+    ADD COLUMN `lockedById` VARCHAR(191) NULL;

@@ -88,6 +88,7 @@ describe('AuthService', () => {
         passwordHash: 'hashed-password',
         role: UserRole.EMPLOYEE,
         isActive: true,
+        isLocked: false,
       };
 
       mockPrismaService.user.findUnique.mockResolvedValue(user);
@@ -125,6 +126,7 @@ describe('AuthService', () => {
         email: user.email,
         role: user.role,
         isActive: user.isActive,
+        isLocked: user.isLocked,
       });
     });
 
@@ -162,6 +164,24 @@ describe('AuthService', () => {
       expect(mockJwtService.sign).not.toHaveBeenCalled();
     });
 
+    it('should return UnauthorizedException when account is locked', async () => {
+      mockPrismaService.user.findUnique.mockResolvedValue({
+        id: 1,
+        email: loginDto.email,
+        passwordHash: 'password-hash',
+        role: UserRole.EMPLOYEE,
+        isActive: true,
+        isLocked: true,
+      });
+      mockBcryptCompare.mockResolvedValue(true);
+
+      await expect(service.login(loginDto)).rejects.toThrow(
+        UnauthorizedException,
+      );
+      expect(mockJwtService.sign).not.toHaveBeenCalled();
+      expect(mockPrismaService.refreshToken.create).not.toHaveBeenCalled();
+    });
+
     it('should throw UnauthorizedException when password is invalid', async () => {
       mockPrismaService.user.findUnique.mockResolvedValue({
         id: 1,
@@ -170,6 +190,7 @@ describe('AuthService', () => {
         passwordHash: 'hashed-password',
         role: UserRole.EMPLOYEE,
         isActive: true,
+        isLocked: false,
       });
       mockBcryptCompare.mockResolvedValue(false);
 
@@ -199,6 +220,7 @@ describe('AuthService', () => {
         email: 'test@example.com',
         role: UserRole.EMPLOYEE,
         isActive: true,
+        isLocked: false,
       },
     };
 
@@ -289,6 +311,41 @@ describe('AuthService', () => {
       expect(revokeArgs.data.revokedAt).toBeInstanceOf(Date);
       expect(mockJwtService.sign).not.toHaveBeenCalled();
     });
+
+    it('should reject refresh and revoke the token family when account is locked', async () => {
+      mockPrismaService.refreshToken.findUnique.mockResolvedValue({
+        ...storedToken,
+        user: {
+          ...storedToken.user,
+          isLocked: true,
+        },
+      });
+
+      await expect(service.refresh('locked-refresh-token')).rejects.toThrow(
+        UnauthorizedException,
+      );
+      const revokeArgs = mockPrismaService.refreshToken.updateMany.mock
+        .calls[0][0] as {
+        where: {
+          familyId: string;
+          revokedAt: null;
+        };
+        data: {
+          revokedAt: Date;
+        };
+      };
+      expect(revokeArgs).toEqual({
+        where: {
+          familyId: storedToken.familyId,
+          revokedAt: null,
+        },
+        data: {
+          revokedAt: revokeArgs.data.revokedAt,
+        },
+      });
+      expect(revokeArgs.data.revokedAt).toBeInstanceOf(Date);
+      expect(mockJwtService.sign).not.toHaveBeenCalled();
+    });
   });
 
   describe('getMe', () => {
@@ -299,6 +356,7 @@ describe('AuthService', () => {
         email: 'test@example.com',
         role: UserRole.EMPLOYEE,
         isActive: true,
+        isLocked: false,
         department: {
           id: 1,
           name: 'Engineering',
@@ -317,6 +375,7 @@ describe('AuthService', () => {
           email: true,
           role: true,
           isActive: true,
+          isLocked: true,
           department: {
             select: {
               id: true,
@@ -339,6 +398,7 @@ describe('AuthService', () => {
           email: true,
           role: true,
           isActive: true,
+          isLocked: true,
           department: {
             select: {
               id: true,

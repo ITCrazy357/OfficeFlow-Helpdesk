@@ -112,6 +112,13 @@ model User {
   role         UserRole @default(EMPLOYEE)
   isActive     Boolean  @default(true)
 
+  isLocked   Boolean   @default(false)
+  lockedAt   DateTime?
+  lockedById Int?
+
+  unlockedAt   DateTime?
+  unlockedById Int?
+
   departmentId Int?
   department   Department? @relation(fields: [departmentId], references: [id])
 

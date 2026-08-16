@@ -1,6 +1,7 @@
 import { api } from "@/lib/axios";
 import type { ApiResponse } from "@/types/api";
 import type {
+  ChangeAccountLockInput,
   ChangeUserStatusInput,
   CreateUserInput,
   ResetUserPasswordInput,
@@ -20,6 +21,17 @@ export async function createUserApi(input: CreateUserInput) {
 
 export async function updateUserApi(id: number, input: UpdateUserInput) {
   const res = await api.patch<ApiResponse<UserListItem>>(`/users/${id}`, input);
+  return res.data.data;
+}
+
+export async function changeAccountLockApi(
+  id: number,
+  input: ChangeAccountLockInput,
+) {
+  const res = await api.patch<ApiResponse<UserListItem>>(
+    `/users/${id}/lock-status`,
+    input,
+  );
   return res.data.data;
 }
 

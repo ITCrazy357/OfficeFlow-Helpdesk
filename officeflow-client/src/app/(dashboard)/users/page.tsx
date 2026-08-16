@@ -39,6 +39,7 @@ import { ResetPasswordForm } from "@/features/users/components/reset-password-fo
 import { UserForm } from "@/features/users/components/user-form";
 import { userRoleLabels } from "@/features/users/constants";
 import {
+  useChangeAccountLock,
   useChangeUserStatus,
   useCreateUser,
   useResetUserPassword,
@@ -56,7 +57,8 @@ type UserPanel =
   | { type: "create" }
   | { type: "edit"; user: UserListItem }
   | { type: "reset"; user: UserListItem }
-  | { type: "status"; user: UserListItem }
+  | { type: "activation"; user: UserListItem }
+  | { type: "lock"; user: UserListItem }
   | null;
 
 function formatDate(value: string) {
@@ -91,10 +93,12 @@ export default function UsersPage() {
   const { data: me } = useMe();
   const logout = useLogout();
   const isAdmin = me?.role === "ADMIN";
-  const usersQuery = useUsers(isAdmin);
+  const canManageAccountLocks = isAdmin || me?.role === "IT_STAFF";
+  const usersQuery = useUsers(canManageAccountLocks);
   const departmentsQuery = useDepartments(isAdmin);
   const createUser = useCreateUser();
   const updateUser = useUpdateUser();
+  const changeAccountLock = useChangeAccountLock();
   const changeUserStatus = useChangeUserStatus();
   const resetUserPassword = useResetUserPassword();
   const [panel, setPanel] = useState<UserPanel>(null);
@@ -190,26 +194,26 @@ export default function UsersPage() {
     }
   };
 
-  const handleChangeStatus = async () => {
-    if (!panel || panel.type !== "status") {
+  const handleChangeAccountLock = async () => {
+    if (!panel || panel.type !== "lock") {
       return;
     }
 
-    const nextStatus = !panel.user.isActive;
+    const nextLockedState = !panel.user.isLocked;
     setActionError(null);
 
     try {
-      await changeUserStatus.mutateAsync({
+      await changeAccountLock.mutateAsync({
         id: panel.user.id,
         input: {
-          isActive: nextStatus,
+          isLocked: nextLockedState,
         },
       });
       setPanel(null);
       setActionMessage(
-        nextStatus
-          ? `Đã mở khóa tài khoản ${panel.user.email}.`
-          : `Đã khóa tài khoản ${panel.user.email}.`,
+        nextLockedState
+          ? `Đã khóa tài khoản ${panel.user.email}.`
+          : `Đã mở khóa tài khoản ${panel.user.email}.`,
       );
     } catch (error) {
       setActionError(
@@ -218,7 +222,35 @@ export default function UsersPage() {
     }
   };
 
-  if (me && !isAdmin) {
+  const handleChangeActivationStatus = async () => {
+    if (!panel || panel.type !== "activation") {
+      return;
+    }
+
+    const nextActiveState = !panel.user.isActive;
+    setActionError(null);
+
+    try {
+      await changeUserStatus.mutateAsync({
+        id: panel.user.id,
+        input: {
+          isActive: nextActiveState,
+        },
+      });
+      setPanel(null);
+      setActionMessage(
+        nextActiveState
+          ? `Đã kích hoạt lại nhân viên ${panel.user.email}.`
+          : `Đã vô hiệu hóa nhân viên ${panel.user.email}.`,
+      );
+    } catch (error) {
+      setActionError(
+        getApiErrorMessage(error, "Không thể thay đổi trạng thái nhân viên."),
+      );
+    }
+  };
+
+  if (me && !canManageAccountLocks) {
     return (
       <Card className="border-destructive/20 bg-destructive/5 motion-enter">
         <CardContent className="flex items-start gap-3 pt-0">
@@ -228,7 +260,7 @@ export default function UsersPage() {
           <div>
             <CardTitle>Không có quyền truy cập</CardTitle>
             <CardDescription className="mt-1">
-              Chỉ ADMIN có quyền quản lý tài khoản người dùng.
+              Chỉ ADMIN hoặc IT_STAFF có quyền truy cập quản lý tài khoản.
             </CardDescription>
           </div>
         </CardContent>
@@ -263,7 +295,9 @@ export default function UsersPage() {
 
   const users = usersQuery.data ?? [];
   const departments = departmentsQuery.data ?? [];
-  const activeCount = users.filter((user) => user.isActive).length;
+  const loginEnabledCount = users.filter(
+    (user) => user.isActive && !user.isLocked,
+  ).length;
   const managementCount = users.filter(
     (user) => user.role === "ADMIN" || user.role === "MANAGER",
   ).length;
@@ -288,10 +322,12 @@ export default function UsersPage() {
           </p>
         </div>
 
-        <Button type="button" onClick={() => openPanel({ type: "create" })}>
-          <Plus className="size-4" />
-          Tạo tài khoản
-        </Button>
+        {isAdmin ? (
+          <Button type="button" onClick={() => openPanel({ type: "create" })}>
+            <Plus className="size-4" />
+            Tạo tài khoản
+          </Button>
+        ) : null}
       </section>
 
       {actionMessage ? (
@@ -307,7 +343,7 @@ export default function UsersPage() {
       <section className="grid gap-4 sm:grid-cols-3">
         {[
           ["Tổng tài khoản", users.length],
-          ["Đang hoạt động", activeCount],
+          ["Có thể đăng nhập", loginEnabledCount],
           ["Admin / Manager", managementCount],
         ].map(([label, value], index) => (
           <Card
@@ -339,7 +375,8 @@ export default function UsersPage() {
           <CardHeader className="border-b">
             <CardTitle>Danh sách tài khoản</CardTitle>
             <CardDescription>
-              Chỉ ADMIN có thể tạo, chỉnh sửa, khóa hoặc đặt lại mật khẩu.
+              ADMIN quản lý tài khoản; ADMIN và IT_STAFF có thể khóa hoặc mở
+              khóa theo phạm vi được cấp.
             </CardDescription>
           </CardHeader>
           <CardContent className="pt-0">
@@ -350,7 +387,8 @@ export default function UsersPage() {
                     <TableHead>Người dùng</TableHead>
                     <TableHead>Vai trò</TableHead>
                     <TableHead>Phòng ban</TableHead>
-                    <TableHead>Trạng thái</TableHead>
+                    <TableHead>Tổ chức</TableHead>
+                    <TableHead>Bảo mật</TableHead>
                     <TableHead>Ngày tạo</TableHead>
                     <TableHead className="text-right">Thao tác</TableHead>
                   </TableRow>
@@ -380,51 +418,91 @@ export default function UsersPage() {
                           className={
                             user.isActive
                               ? "border-teal-200 bg-teal-50 text-teal-700"
-                              : "border-red-200 bg-red-50 text-red-700"
+                              : "border-slate-200 bg-slate-100 text-slate-700"
                           }
                         >
-                          {user.isActive ? "Đang hoạt động" : "Đã khóa"}
+                          {user.isActive ? "Đang làm việc" : "Đã nghỉ việc"}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <Badge
+                          variant="outline"
+                          className={
+                            user.isLocked
+                              ? "border-red-200 bg-red-50 text-red-700"
+                              : "border-teal-200 bg-teal-50 text-teal-700"
+                          }
+                        >
+                          {user.isLocked ? "Tạm khóa" : "Bình thường"}
                         </Badge>
                       </TableCell>
                       <TableCell>{formatDate(user.createdAt)}</TableCell>
                       <TableCell>
                         <div className="flex justify-end gap-1">
+                          {isAdmin ? (
+                            <>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="xs"
+                                onClick={() =>
+                                  openPanel({ type: "edit", user })
+                                }
+                              >
+                                <Pencil className="size-3.5" />
+                                Sửa
+                              </Button>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="xs"
+                                onClick={() =>
+                                  openPanel({ type: "reset", user })
+                                }
+                              >
+                                <KeyRound className="size-3.5" />
+                                Mật khẩu
+                              </Button>
+                              <Button
+                                type="button"
+                                variant={user.isActive ? "outline" : "default"}
+                                size="xs"
+                                title={
+                                  user.id === me.id
+                                    ? "Không thể vô hiệu hóa tài khoản đang đăng nhập"
+                                    : undefined
+                                }
+                                disabled={user.id === me.id}
+                                onClick={() =>
+                                  openPanel({ type: "activation", user })
+                                }
+                              >
+                                {user.isActive ? "Vô hiệu hóa" : "Kích hoạt"}
+                              </Button>
+                            </>
+                          ) : null}
                           <Button
                             type="button"
-                            variant="ghost"
-                            size="xs"
-                            onClick={() => openPanel({ type: "edit", user })}
-                          >
-                            <Pencil className="size-3.5" />
-                            Sửa
-                          </Button>
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="xs"
-                            onClick={() => openPanel({ type: "reset", user })}
-                          >
-                            <KeyRound className="size-3.5" />
-                            Mật khẩu
-                          </Button>
-                          <Button
-                            type="button"
-                            variant={user.isActive ? "destructive" : "outline"}
+                            variant={user.isLocked ? "outline" : "destructive"}
                             size="xs"
                             title={
                               user.id === me.id
-                                ? "Không thể khóa tài khoản đang đăng nhập"
-                                : undefined
+                                ? "Không thể khóa hoặc mở khóa tài khoản đang đăng nhập"
+                                : user.role === "ADMIN"
+                                  ? "Không thể khóa hoặc mở khóa tài khoản ADMIN"
+                                  : undefined
                             }
-                            disabled={user.id === me.id && user.isActive}
-                            onClick={() => openPanel({ type: "status", user })}
+                            disabled={
+                              user.id === me.id || user.role === "ADMIN"
+                            }
+                            onClick={() => openPanel({ type: "lock", user })}
                           >
-                            {user.isActive ? (
-                              <Lock className="size-3.5" />
-                            ) : (
+                            {user.isLocked ? (
                               <LockOpen className="size-3.5" />
+                            ) : (
+                              <Lock className="size-3.5" />
                             )}
-                            {user.isActive ? "Khóa" : "Mở khóa"}
+                            {user.isLocked ? "Mở khóa" : "Khóa"}
                           </Button>
                         </div>
                       </TableCell>
@@ -455,9 +533,13 @@ export default function UsersPage() {
                     ? "Chỉnh sửa người dùng"
                     : panel.type === "reset"
                       ? "Đặt lại mật khẩu"
-                      : panel.user.isActive
-                        ? "Khóa tài khoản"
-                        : "Mở khóa tài khoản"}
+                      : panel.type === "activation"
+                        ? panel.user.isActive
+                          ? "Vô hiệu hóa nhân viên"
+                          : "Kích hoạt lại nhân viên"
+                        : panel.user.isLocked
+                          ? "Mở khóa tài khoản"
+                          : "Khóa tài khoản"}
                 {panel.type === "create" || panel.type === "reset" ? (
                   <MailCheck className="size-4 text-teal-700" />
                 ) : null}
@@ -469,7 +551,9 @@ export default function UsersPage() {
                     ? `Cập nhật thông tin của ${panel.user.email}.`
                     : panel.type === "reset"
                       ? `Thiết lập mật khẩu mới cho ${panel.user.email}. Email thông báo được gửi nếu tính năng email đang bật.`
-                      : `Xác nhận thay đổi trạng thái của ${panel.user.email}.`}
+                      : panel.type === "activation"
+                        ? `Xác nhận thay đổi trạng thái thuộc tổ chức của ${panel.user.email}.`
+                        : `Xác nhận thay đổi trạng thái khóa bảo mật của ${panel.user.email}.`}
               </CardDescription>
             </CardHeader>
             <CardContent className="pt-0">
@@ -519,7 +603,7 @@ export default function UsersPage() {
                 />
               ) : null}
 
-              {panel.type === "status" ? (
+              {panel.type === "activation" || panel.type === "lock" ? (
                 <div className="grid gap-5">
                   <div className="rounded-lg border bg-muted/40 p-4">
                     <p className="font-medium">{panel.user.name}</p>
@@ -529,9 +613,13 @@ export default function UsersPage() {
                   </div>
 
                   <p className="text-sm leading-6 text-muted-foreground">
-                    {panel.user.isActive
-                      ? "Tài khoản sẽ không thể đăng nhập và mọi phiên hiện tại sẽ bị thu hồi."
-                      : "Tài khoản sẽ được phép đăng nhập lại bằng mật khẩu hiện có."}
+                    {panel.type === "activation"
+                      ? panel.user.isActive
+                        ? "Nhân viên nghỉ việc hoặc không còn thuộc tổ chức. Tài khoản sẽ bị vô hiệu hóa lâu dài và mọi phiên hiện tại bị thu hồi."
+                        : "Nhân viên sẽ được kích hoạt lại trong tổ chức. Trạng thái khóa bảo mật vẫn được giữ nguyên."
+                      : panel.user.isLocked
+                        ? "Khóa bảo mật tạm thời sẽ được gỡ. Tài khoản chỉ đăng nhập được nếu nhân viên vẫn đang hoạt động."
+                        : "Tài khoản sẽ bị khóa tạm thời để xử lý rủi ro bảo mật và mọi phiên hiện tại sẽ bị thu hồi."}
                   </p>
 
                   {actionError ? (
@@ -545,26 +633,56 @@ export default function UsersPage() {
                       type="button"
                       variant="outline"
                       onClick={closePanel}
-                      disabled={changeUserStatus.isPending}
+                      disabled={
+                        panel.type === "activation"
+                          ? changeUserStatus.isPending
+                          : changeAccountLock.isPending
+                      }
                     >
                       Hủy
                     </Button>
                     <Button
                       type="button"
-                      variant={panel.user.isActive ? "destructive" : "default"}
-                      onClick={handleChangeStatus}
-                      disabled={changeUserStatus.isPending}
+                      variant={
+                        panel.type === "activation"
+                          ? panel.user.isActive
+                            ? "destructive"
+                            : "default"
+                          : panel.user.isLocked
+                            ? "default"
+                            : "destructive"
+                      }
+                      onClick={
+                        panel.type === "activation"
+                          ? handleChangeActivationStatus
+                          : handleChangeAccountLock
+                      }
+                      disabled={
+                        panel.type === "activation"
+                          ? changeUserStatus.isPending
+                          : changeAccountLock.isPending
+                      }
                     >
-                      {panel.user.isActive ? (
-                        <Lock className="size-4" />
-                      ) : (
+                      {panel.type === "activation" ? (
+                        <UserCheck className="size-4" />
+                      ) : panel.user.isLocked ? (
                         <LockOpen className="size-4" />
+                      ) : (
+                        <Lock className="size-4" />
                       )}
-                      {changeUserStatus.isPending
+                      {(
+                        panel.type === "activation"
+                          ? changeUserStatus.isPending
+                          : changeAccountLock.isPending
+                      )
                         ? "Đang cập nhật..."
-                        : panel.user.isActive
-                          ? "Xác nhận khóa"
-                          : "Xác nhận mở khóa"}
+                        : panel.type === "activation"
+                          ? panel.user.isActive
+                            ? "Xác nhận vô hiệu hóa"
+                            : "Xác nhận kích hoạt"
+                          : panel.user.isLocked
+                            ? "Xác nhận mở khóa"
+                            : "Xác nhận khóa"}
                     </Button>
                   </div>
                 </div>

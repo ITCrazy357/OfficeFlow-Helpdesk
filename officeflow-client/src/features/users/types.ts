@@ -6,6 +6,11 @@ export type UserListItem = {
   email: string;
   role: UserRole;
   isActive: boolean;
+  isLocked: boolean;
+  lockedAt: string | null;
+  lockedById: number | null;
+  unlockedAt: string | null;
+  unlockedById: number | null;
   departmentId: number | null;
   createdAt: string;
   department?: {
@@ -27,6 +32,10 @@ export type UpdateUserInput = {
   email: string;
   role: UserRole;
   departmentId: number;
+};
+
+export type ChangeAccountLockInput = {
+  isLocked: boolean;
 };
 
 export type ChangeUserStatusInput = {

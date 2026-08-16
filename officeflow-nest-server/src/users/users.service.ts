@@ -19,8 +19,8 @@ import { UserCreatedEvent } from '../notifications/events/user-created.event';
 import { UserPasswordResetEvent } from '../notifications/events/user-password-reset.event';
 import { PrismaService } from '../prisma/prisma.service';
 
-import { ChangeUserStatusDto } from './dto/change-user-status.dto';
 import { CreateUserDto } from './dto/create-user.dto';
+import { ChangeUserStatusDto } from './dto/change-user-status.dto';
 import { ResetUserPasswordDto } from './dto/reset-user-password.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 
@@ -30,6 +30,11 @@ const userSelect = {
   email: true,
   role: true,
   isActive: true,
+  isLocked: true,
+  lockedAt: true,
+  lockedById: true,
+  unlockedAt: true,
+  unlockedById: true,
   departmentId: true,
   createdAt: true,
   department: {
@@ -126,6 +131,40 @@ export class UsersService {
         createdAt: 'desc',
       },
     });
+  }
+
+  private async getUserOrThrow(id: number) {
+    const user = await this.prisma.user.findUnique({
+      where: {
+        id,
+      },
+      select: userSelect,
+    });
+
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    return user;
+  }
+
+  private async ensureDepartmentExists(departmentId: number | null) {
+    if (departmentId === null) {
+      return;
+    }
+
+    const department = await this.prisma.department.findUnique({
+      where: {
+        id: departmentId,
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    if (!department) {
+      throw new NotFoundException('Department not found');
+    }
   }
 
   async update(
@@ -225,7 +264,7 @@ export class UsersService {
     });
   }
 
-  async changeStatus(
+  async changeActivationStatus(
     id: number,
     changeUserStatusDto: ChangeUserStatusDto,
     currentUser: CurrentUserPayload,
@@ -233,7 +272,7 @@ export class UsersService {
     const user = await this.getUserOrThrow(id);
 
     if (id === currentUser.userId && !changeUserStatusDto.isActive) {
-      throw new BadRequestException('Cannot lock your own account');
+      throw new BadRequestException('Cannot deactivate your own account');
     }
 
     if (user.isActive === changeUserStatusDto.isActive) {
@@ -342,39 +381,5 @@ export class UsersService {
     );
 
     return updatedUser;
-  }
-
-  private async getUserOrThrow(id: number) {
-    const user = await this.prisma.user.findUnique({
-      where: {
-        id,
-      },
-      select: userSelect,
-    });
-
-    if (!user) {
-      throw new NotFoundException('User not found');
-    }
-
-    return user;
-  }
-
-  private async ensureDepartmentExists(departmentId: number | null) {
-    if (departmentId === null) {
-      return;
-    }
-
-    const department = await this.prisma.department.findUnique({
-      where: {
-        id: departmentId,
-      },
-      select: {
-        id: true,
-      },
-    });
-
-    if (!department) {
-      throw new NotFoundException('Department not found');
-    }
   }
 }

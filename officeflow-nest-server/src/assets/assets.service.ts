@@ -441,6 +441,7 @@ export class AssetsService {
           id: true,
           name: true,
           isActive: true,
+          isLocked: true,
         },
       }),
 
@@ -466,6 +467,10 @@ export class AssetsService {
       throw new BadRequestException(
         'Cannot assign an asset to an inactive user',
       );
+    }
+
+    if (targetUser.isLocked) {
+      throw new BadRequestException('Cannot assign an asset to a locked user');
     }
 
     if (asset.assignedToId) {

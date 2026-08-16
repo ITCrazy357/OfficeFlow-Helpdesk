@@ -4,6 +4,7 @@ import { authQueryKeys } from "@/features/auth/hooks";
 import type { AuthUser } from "@/features/auth/types";
 
 import {
+  changeAccountLockApi,
   changeUserStatusApi,
   createUserApi,
   getUsersApi,
@@ -11,6 +12,7 @@ import {
   updateUserApi,
 } from "./api";
 import type {
+  ChangeAccountLockInput,
   ChangeUserStatusInput,
   ResetUserPasswordInput,
   UpdateUserInput,
@@ -62,6 +64,22 @@ export function useUpdateUser() {
   });
 }
 
+export function useChangeAccountLock() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({
+      id,
+      input,
+    }: {
+      id: number;
+      input: ChangeAccountLockInput;
+    }) => changeAccountLockApi(id, input),
+    onSuccess: () =>
+      queryClient.invalidateQueries({ queryKey: usersQueryKeys.all }),
+  });
+}
+
 export function useChangeUserStatus() {
   const queryClient = useQueryClient();
 
@@ -95,7 +113,8 @@ export function useTicketAssignees(enabled = true) {
       users.filter(
         (user) =>
           (user.role === "ADMIN" || user.role === "IT_STAFF") &&
-          user.isActive,
+          user.isActive &&
+          !user.isLocked,
       ),
   });
 }

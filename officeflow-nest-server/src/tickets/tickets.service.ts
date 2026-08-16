@@ -814,6 +814,7 @@ export class TicketsService {
         id: true,
         role: true,
         isActive: true,
+        isLocked: true,
       },
     });
 
@@ -830,6 +831,10 @@ export class TicketsService {
 
     if (!assigned.isActive) {
       throw new BadRequestException('Cannot assign ticket to an inactive user');
+    }
+
+    if (assigned.isLocked) {
+      throw new BadRequestException('Cannot assign ticket to a locked user');
     }
 
     const updatedTicket = await this.prisma.$transaction(

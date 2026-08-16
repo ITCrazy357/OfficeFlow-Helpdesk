@@ -65,6 +65,7 @@ export class JwtAuthGuard implements CanActivate {
             select: {
               role: true,
               isActive: true,
+              isLocked: true,
             },
           },
         },
@@ -76,7 +77,8 @@ export class JwtAuthGuard implements CanActivate {
         session.usedAt ||
         session.revokedAt ||
         session.expiresAt <= new Date() ||
-        !session.user.isActive
+        !session.user.isActive ||
+        session.user.isLocked
       ) {
         throw new UnauthorizedException('Session is no longer active');
       }
