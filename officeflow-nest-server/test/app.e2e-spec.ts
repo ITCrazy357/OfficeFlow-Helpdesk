@@ -101,4 +101,18 @@ describe('AppController (e2e)', () => {
       })
       .expect(404);
   });
+
+  it('/api/users/:id/status should be registered and protected', () => {
+    return request(httpServer)
+      .patch('/api/users/16/status')
+      .send({ isActive: false })
+      .expect(401);
+  });
+
+  it('/api/users/:id/lock-status should be registered and protected', () => {
+    return request(httpServer)
+      .patch('/api/users/16/lock-status')
+      .send({ isLocked: true })
+      .expect(401);
+  });
 });
