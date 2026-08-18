@@ -92,6 +92,13 @@ enum AuditLogAction {
   UNLINKED
 }
 
+enum LeaveStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
 model Department {
   id   Int    @id @default(autoincrement())
   name String @unique
@@ -118,6 +125,10 @@ model User {
 
   unlockedAt   DateTime?
   unlockedById Int?
+
+  managerId    Int?
+  manager      User?  @relation("UserManager", fields: [managerId], references: [id], onDelete: SetNull)
+  subordinates User[] @relation("UserManager")
 
   departmentId Int?
   department   Department? @relation(fields: [departmentId], references: [id])
@@ -147,10 +158,46 @@ model User {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  leaveRequestsRequested LeaveRequest[] @relation("LeaveRequester")
+  leaveRequestsToApprove LeaveRequest[] @relation("LeaveApprover")
+  leaveRequestsReviewed  LeaveRequest[] @relation("LeaveReviewer")
+
   @@index([departmentId])
   @@index([role])
   @@index([isActive])
+  @@index([managerId])
   @@map("Users")
+}
+
+model LeaveRequest {
+  id Int @id @default(autoincrement())
+
+  requesterId  Int
+  approverId   Int
+  reviewedById Int?
+
+  startDate DateTime @db.Date
+  endDate   DateTime @db.Date
+
+  reason String @db.Text
+
+  status LeaveStatus @default(PENDING)
+
+  reviewNote String?   @db.Text
+  reviewedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  requester  User  @relation("LeaveRequester", fields: [requesterId], references: [id], onDelete: Restrict)
+  approver   User  @relation("LeaveApprover", fields: [approverId], references: [id], onDelete: Restrict)
+  reviewedBy User? @relation("LeaveReviewer", fields: [reviewedById], references: [id], onDelete: Restrict)
+
+  @@index([requesterId, createdAt])
+  @@index([approverId, status, createdAt])
+  @@index([requesterId, status, startDate])
+  @@index([reviewedById, reviewedAt])
+  @@map("Leave_requests")
 }
 
 model RefreshToken {
