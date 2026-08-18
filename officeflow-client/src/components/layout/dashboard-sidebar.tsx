@@ -4,6 +4,7 @@ import {
   BookOpenText,
   Boxes,
   Building2,
+  CalendarRange,
   CircleCheck,
   LayoutDashboard,
   ScrollText,
@@ -45,6 +46,12 @@ const navigationItems: NavigationItem[] = [
     label: "Tickets",
     description: "Yêu cầu hỗ trợ",
     icon: TicketCheck,
+  },
+  {
+    href: "/leave-requests",
+    label: "Nghỉ phép",
+    description: "Đơn nghỉ và phê duyệt",
+    icon: CalendarRange,
   },
   {
     href: "/assets",

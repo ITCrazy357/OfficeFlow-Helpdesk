@@ -332,7 +332,7 @@ export function NotificationBell() {
                     Chưa có thông báo
                   </p>
                   <p className="mt-1 text-xs text-muted-foreground">
-                    Các cập nhật ticket sẽ xuất hiện tại đây.
+                    Các cập nhật công việc sẽ xuất hiện tại đây.
                   </p>
                 </div>
               </div>

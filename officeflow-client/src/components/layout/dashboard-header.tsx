@@ -50,6 +50,16 @@ function getInitials(name: string) {
 }
 
 function getCurrentPageLabel(pathname: string) {
+  if (pathname.startsWith("/leave-requests/")) {
+    return pathname.endsWith("/new")
+      ? "Tạo đơn nghỉ phép"
+      : "Chi tiết đơn nghỉ phép";
+  }
+
+  if (pathname.startsWith("/leave-requests")) {
+    return "Nghỉ phép";
+  }
+
   if (pathname.startsWith("/tickets/")) {
     return pathname.endsWith("/new") ? "Tạo ticket" : "Chi tiết ticket";
   }
