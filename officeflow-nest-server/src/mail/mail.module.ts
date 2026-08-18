@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 
 import { PrismaModule } from '../prisma/prisma.module';
 import { AssetEmailListener } from './listeners/asset-email.listener';
+import { LeaveEmailListener } from './listeners/leave-email.listener';
 import { TicketEmailListener } from './listeners/ticket-email.listener';
 import { UserEmailListener } from './listeners/user-email.listener';
 import { MailService } from './mail.service';
@@ -11,6 +12,7 @@ import { MailService } from './mail.service';
   providers: [
     MailService,
     AssetEmailListener,
+    LeaveEmailListener,
     TicketEmailListener,
     UserEmailListener,
   ],

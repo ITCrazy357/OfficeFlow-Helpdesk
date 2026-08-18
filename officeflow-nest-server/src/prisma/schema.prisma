@@ -47,6 +47,10 @@ enum NotificationType {
   KNOWLEDGE_PUBLISHED
   ASSET_ASSIGNED
   ASSET_RETURNED
+  LEAVE_REQUESTED
+  LEAVE_APPROVED
+  LEAVE_REJECTED
+  LEAVE_CANCELLED
 }
 
 enum AssetType {
@@ -75,6 +79,7 @@ enum AuditLogEntity {
   TICKET
   KNOWLEDGE_ARTICLE
   ASSET
+  LEAVE_REQUEST
 }
 
 enum AuditLogAction {

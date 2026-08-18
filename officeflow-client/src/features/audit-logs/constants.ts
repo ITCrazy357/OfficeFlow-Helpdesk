@@ -9,6 +9,7 @@ export const auditLogEntityOptions: Array<{
   { value: "TICKET", label: "Ticket" },
   { value: "KNOWLEDGE_ARTICLE", label: "Bài viết Knowledge" },
   { value: "ASSET", label: "Tài sản" },
+  { value: "LEAVE_REQUEST", label: "Đơn nghỉ phép" },
 ];
 
 export const auditLogActionOptions: Array<{

@@ -1,6 +1,10 @@
 import {
   AlertTriangle,
   BookOpenText,
+  CalendarCheck,
+  CalendarClock,
+  CalendarMinus,
+  CalendarX,
   PackageCheck,
   PackageMinus,
   MessageSquareText,
@@ -59,6 +63,30 @@ export const notificationMeta: Record<NotificationType, NotificationMeta> = {
     icon: PackageMinus,
     tone: "border-amber-200 bg-amber-50 text-amber-800",
     iconTone: "bg-amber-50 text-amber-700 ring-amber-100",
+  },
+  LEAVE_REQUESTED: {
+    label: "Đơn nghỉ phép mới",
+    icon: CalendarClock,
+    tone: "border-indigo-200 bg-indigo-50 text-indigo-800",
+    iconTone: "bg-indigo-50 text-indigo-700 ring-indigo-100",
+  },
+  LEAVE_APPROVED: {
+    label: "Nghỉ phép được duyệt",
+    icon: CalendarCheck,
+    tone: "border-emerald-200 bg-emerald-50 text-emerald-800",
+    iconTone: "bg-emerald-50 text-emerald-700 ring-emerald-100",
+  },
+  LEAVE_REJECTED: {
+    label: "Nghỉ phép bị từ chối",
+    icon: CalendarX,
+    tone: "border-red-200 bg-red-50 text-red-800",
+    iconTone: "bg-red-50 text-red-700 ring-red-100",
+  },
+  LEAVE_CANCELLED: {
+    label: "Đơn nghỉ phép đã hủy",
+    icon: CalendarMinus,
+    tone: "border-slate-200 bg-slate-50 text-slate-800",
+    iconTone: "bg-slate-50 text-slate-700 ring-slate-100",
   },
 };
 

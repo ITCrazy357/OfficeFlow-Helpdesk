@@ -7,7 +7,11 @@ export type NotificationType =
   | "TICKET_OVERDUE"
   | "KNOWLEDGE_PUBLISHED"
   | "ASSET_ASSIGNED"
-  | "ASSET_RETURNED";
+  | "ASSET_RETURNED"
+  | "LEAVE_REQUESTED"
+  | "LEAVE_APPROVED"
+  | "LEAVE_REJECTED"
+  | "LEAVE_CANCELLED";
 
 export type NotificationItem = {
   id: number;

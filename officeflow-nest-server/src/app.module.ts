@@ -11,6 +11,7 @@ import { AuthModule } from './auth/auth.module';
 import { DashboardModule } from './dashboard/dashboard.module';
 import { DepartmentsModule } from './departments/departments.module';
 import { KnowledgeModule } from './knowledge/knowledge.module';
+import { LeaveRequestsModule } from './leave-requests/leave-requests.module';
 import { MailModule } from './mail/mail.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { PrismaModule } from './prisma/prisma.module';
@@ -38,6 +39,7 @@ import { TicketCategoriesModule } from './ticket-categories/ticket-categories.mo
     SlaModule,
     DashboardModule,
     KnowledgeModule,
+    LeaveRequestsModule,
     NotificationsModule,
     AssetsModule,
     TicketCategoriesModule,
