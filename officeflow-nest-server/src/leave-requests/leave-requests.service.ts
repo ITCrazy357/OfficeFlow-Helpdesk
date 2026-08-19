@@ -351,6 +351,97 @@ export class LeaveRequestService {
     return leaveRequest;
   }
 
+  private async review(
+    leaveRequestId: number,
+    actor: CurrentUserPayload,
+    newStatus: typeof LeaveStatus.APPROVED | typeof LeaveStatus.REJECTED,
+    reviewNote?: string,
+  ) {
+    if (actor.role !== UserRole.MANAGER && actor.role !== UserRole.ADMIN) {
+      throw new ForbiddenException('Forbidden');
+    }
+
+    const normalizedReviewNote = reviewNote?.trim();
+
+    if (newStatus === LeaveStatus.REJECTED && !normalizedReviewNote) {
+      throw new BadRequestException('Review note is required for rejection');
+    }
+
+    return this.prisma.$transaction(async (tx) => {
+      const existing = await tx.leaveRequest.findFirst({
+        where: {
+          id: leaveRequestId,
+          approverId: actor.userId,
+        },
+        select: {
+          id: true,
+          requesterId: true,
+          status: true,
+        },
+      });
+
+      if (!existing) {
+        throw new NotFoundException('Leave request not found');
+      }
+
+      if (existing.requesterId === actor.userId) {
+        throw new ForbiddenException(
+          'You cannot review your own leave request',
+        );
+      }
+
+      if (existing.status !== LeaveStatus.PENDING) {
+        throw new ConflictException('Leave request has already been processed');
+      }
+
+      const reviewedAt = new Date();
+      const result = await tx.leaveRequest.updateMany({
+        where: {
+          id: leaveRequestId,
+          approverId: actor.userId,
+          status: LeaveStatus.PENDING,
+        },
+        data: {
+          status: newStatus,
+          reviewNote:
+            newStatus === LeaveStatus.REJECTED ? normalizedReviewNote : null,
+          reviewedAt,
+          reviewedById: actor.userId,
+        },
+      });
+
+      if (result.count !== 1) {
+        throw new ConflictException('Leave request is no longer pending');
+      }
+
+      await this.auditLogsService.create(
+        {
+          actorId: actor.userId,
+          entity: AuditLogEntity.LEAVE_REQUEST,
+          entityId: leaveRequestId,
+          action: AuditLogAction.STATUS_CHANGED,
+          description: `${newStatus === LeaveStatus.APPROVED ? 'Approved' : 'Rejected'} leave request ${leaveRequestId}.`,
+          oldValues: {
+            status: LeaveStatus.PENDING,
+          },
+          newValues: {
+            status: newStatus,
+            reviewedAt: reviewedAt.toISOString(),
+            reviewedById: actor.userId,
+          },
+          ipAddress: actor.ipAddress,
+          userAgent: actor.userAgent,
+        },
+        tx,
+      );
+
+      return tx.leaveRequest.findUniqueOrThrow({
+        where: { id: leaveRequestId },
+        select: leaveRequestDetailSelect,
+      });
+    });
+  }
+
   async approve(leaveRequestId: number, actor: CurrentUserPayload) {
     const leaveRequest = await this.review(
       leaveRequestId,
@@ -455,96 +546,5 @@ export class LeaveRequestService {
     );
 
     return leaveRequest;
-  }
-
-  private async review(
-    leaveRequestId: number,
-    actor: CurrentUserPayload,
-    newStatus: typeof LeaveStatus.APPROVED | typeof LeaveStatus.REJECTED,
-    reviewNote?: string,
-  ) {
-    if (actor.role !== UserRole.MANAGER && actor.role !== UserRole.ADMIN) {
-      throw new ForbiddenException('Forbidden');
-    }
-
-    const normalizedReviewNote = reviewNote?.trim();
-
-    if (newStatus === LeaveStatus.REJECTED && !normalizedReviewNote) {
-      throw new BadRequestException('Review note is required for rejection');
-    }
-
-    return this.prisma.$transaction(async (tx) => {
-      const existing = await tx.leaveRequest.findFirst({
-        where: {
-          id: leaveRequestId,
-          approverId: actor.userId,
-        },
-        select: {
-          id: true,
-          requesterId: true,
-          status: true,
-        },
-      });
-
-      if (!existing) {
-        throw new NotFoundException('Leave request not found');
-      }
-
-      if (existing.requesterId === actor.userId) {
-        throw new ForbiddenException(
-          'You cannot review your own leave request',
-        );
-      }
-
-      if (existing.status !== LeaveStatus.PENDING) {
-        throw new ConflictException('Leave request has already been processed');
-      }
-
-      const reviewedAt = new Date();
-      const result = await tx.leaveRequest.updateMany({
-        where: {
-          id: leaveRequestId,
-          approverId: actor.userId,
-          status: LeaveStatus.PENDING,
-        },
-        data: {
-          status: newStatus,
-          reviewNote:
-            newStatus === LeaveStatus.REJECTED ? normalizedReviewNote : null,
-          reviewedAt,
-          reviewedById: actor.userId,
-        },
-      });
-
-      if (result.count !== 1) {
-        throw new ConflictException('Leave request is no longer pending');
-      }
-
-      await this.auditLogsService.create(
-        {
-          actorId: actor.userId,
-          entity: AuditLogEntity.LEAVE_REQUEST,
-          entityId: leaveRequestId,
-          action: AuditLogAction.STATUS_CHANGED,
-          description: `${newStatus === LeaveStatus.APPROVED ? 'Approved' : 'Rejected'} leave request ${leaveRequestId}.`,
-          oldValues: {
-            status: LeaveStatus.PENDING,
-          },
-          newValues: {
-            status: newStatus,
-            reviewedAt: reviewedAt.toISOString(),
-            reviewedById: actor.userId,
-          },
-          ipAddress: actor.ipAddress,
-          userAgent: actor.userAgent,
-        },
-        tx,
-      );
-
-      return tx.leaveRequest.findUniqueOrThrow({
-        where: { id: leaveRequestId },
-        select: leaveRequestDetailSelect,
-      });
-    });
   }
 }
