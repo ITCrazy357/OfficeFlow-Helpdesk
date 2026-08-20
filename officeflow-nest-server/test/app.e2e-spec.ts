@@ -115,4 +115,14 @@ describe('AppController (e2e)', () => {
       .send({ isLocked: true })
       .expect(401);
   });
+
+  it('/api/users/me/password should be registered and protected', () => {
+    return request(httpServer)
+      .patch('/api/users/me/password')
+      .send({
+        currentPassword: 'temporary-password-123',
+        newPassword: 'new-secure-password-456',
+      })
+      .expect(401);
+  });
 });

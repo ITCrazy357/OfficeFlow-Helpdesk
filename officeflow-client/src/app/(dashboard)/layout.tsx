@@ -33,12 +33,17 @@ export default function DashboardLayout({ children }: Props) {
   const { data: user, isError, isLoading } = useMe();
 
   useEffect(() => {
+    if (user?.mustChangePassword) {
+      router.replace("/change-password");
+      return;
+    }
+
     if (isError) {
       void logout().finally(() => router.replace("/login"));
     }
-  }, [isError, logout, router]);
+  }, [isError, logout, router, user?.mustChangePassword]);
 
-  if (isLoading) {
+  if (isLoading || user?.mustChangePassword) {
     return <DashboardLoading />;
   }
 

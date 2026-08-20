@@ -11,8 +11,12 @@ export default function HomePage() {
     let active = true;
 
     void restoreSessionApi()
-      .then(() => {
-        if (active) router.replace("/dashboard");
+      .then((user) => {
+        if (active) {
+          router.replace(
+            user.mustChangePassword ? "/change-password" : "/dashboard",
+          );
+        }
       })
       .catch(() => {
         if (active) router.replace("/login");

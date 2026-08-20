@@ -1,6 +1,12 @@
 import { api, refreshAccessToken } from "@/lib/axios";
 import type { ApiResponse } from "@/types/api";
-import type { AuthUser, LoginInput, LoginResponse } from "./types";
+import type {
+  AuthUser,
+  ChangePasswordInput,
+  ChangePasswordResponse,
+  LoginInput,
+  LoginResponse,
+} from "./types";
 
 export async function loginApi(input: LoginInput) {
   const res = await api.post<ApiResponse<LoginResponse>>("/auth/login", input);
@@ -13,7 +19,16 @@ export async function getMeApi() {
 }
 
 export async function restoreSessionApi() {
-  return refreshAccessToken();
+  await refreshAccessToken();
+  return getMeApi();
+}
+
+export async function changePasswordApi(input: ChangePasswordInput) {
+  const res = await api.patch<ApiResponse<ChangePasswordResponse>>(
+    "/users/me/password",
+    input,
+  );
+  return res.data.data;
 }
 
 export async function logoutApi() {

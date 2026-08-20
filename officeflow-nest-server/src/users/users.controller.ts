@@ -6,8 +6,10 @@ import {
   ParseIntPipe,
   Patch,
   Post,
+  Res,
   UseGuards,
 } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { UserRole } from '@prisma/client';
 import {
   ApiBearerAuth,
@@ -16,10 +18,13 @@ import {
   ApiResponse,
   ApiTags,
 } from '@nestjs/swagger';
+import type { Response } from 'express';
 
 import { AccountService } from './accounts.service';
 import { UsersService } from './users.service';
+import { clearRefreshCookie } from '../auth/auth-cookie';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { AllowPasswordChangeRequired } from '../common/decorators/allow-password-change-required.decorator';
 import {
   CurrentUser,
   type CurrentUserPayload,
@@ -33,6 +38,7 @@ import { ChangeUserStatusDto } from './dto/change-user-status.dto';
 import { CreateUserDto } from './dto/create-user.dto';
 import { ResetUserPasswordDto } from './dto/reset-user-password.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
+import { ChangeMyPasswordDto } from './dto/change-my-password.dto';
 
 @ApiTags('Users')
 @ApiBearerAuth()
@@ -124,7 +130,8 @@ export class UsersController {
   }
 
   @Patch(':id/reset-password')
-  @Roles(UserRole.ADMIN)
+  @Roles(UserRole.ADMIN, UserRole.IT_STAFF)
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
   @Message('Reset user password successfully')
   @ApiOperation({ summary: 'Set a new password for a user' })
   @ApiParam({ name: 'id', example: 1 })
@@ -133,10 +140,36 @@ export class UsersController {
     @Body() resetUserPasswordDto: ResetUserPasswordDto,
     @CurrentUser() currentUser: CurrentUserPayload,
   ) {
-    return this.usersService.resetPassword(
+    return this.accountService.resetPassword(
       id,
       resetUserPasswordDto,
       currentUser,
     );
+  }
+
+  @Patch('me/password')
+  @AllowPasswordChangeRequired()
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
+  @Message('Change my password successfully')
+  @ApiOperation({ summary: "Change the current user's password" })
+  @ApiResponse({ status: 200, description: 'Password changed' })
+  @ApiResponse({
+    status: 400,
+    description: 'Current or new password is invalid',
+  })
+  @ApiResponse({ status: 409, description: 'Password changed concurrently' })
+  async changeMyPassword(
+    @Body() changeMyPasswordDto: ChangeMyPasswordDto,
+    @CurrentUser() currentUser: CurrentUserPayload,
+    @Res({ passthrough: true }) response: Response,
+  ) {
+    const result = await this.accountService.changeOwnPassword(
+      changeMyPasswordDto,
+      currentUser,
+    );
+
+    clearRefreshCookie(response);
+
+    return result;
   }
 }

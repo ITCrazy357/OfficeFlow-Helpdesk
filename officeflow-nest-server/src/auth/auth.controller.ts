@@ -23,6 +23,7 @@ import {
 import { AuthService } from './auth.service';
 import { JwtAuthGuard } from './jwt-auth.guard';
 import { LoginDto } from './dto/login.dto';
+import { AllowPasswordChangeRequired } from '../common/decorators/allow-password-change-required.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { Message } from '../common/decorators/message.decorator';
 import {
@@ -128,6 +129,7 @@ export class AuthController {
   @Post('logout-all')
   @HttpCode(HttpStatus.OK)
   @UseGuards(TrustedOriginGuard, JwtAuthGuard)
+  @AllowPasswordChangeRequired()
   @Throttle({ default: { limit: 10, ttl: 60_000 } })
   @Message('Logout all sessions successfully')
   async logoutAll(
@@ -141,6 +143,7 @@ export class AuthController {
   }
 
   @UseGuards(JwtAuthGuard)
+  @AllowPasswordChangeRequired()
   @Get('me')
   @Message('Get current user successfully')
   @ApiBearerAuth()

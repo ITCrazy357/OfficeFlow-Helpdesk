@@ -47,8 +47,12 @@ export default function LoginPage() {
     let active = true;
 
     void restoreSessionApi()
-      .then(() => {
-        if (active) router.replace("/dashboard");
+      .then((user) => {
+        if (active) {
+          router.replace(
+            user.mustChangePassword ? "/change-password" : "/dashboard",
+          );
+        }
       })
       .catch(() => undefined)
       .finally(() => {
@@ -68,8 +72,10 @@ export default function LoginPage() {
     setFormError(null);
 
     try {
-      await loginMutation.mutateAsync(values);
-      router.replace("/dashboard");
+      const result = await loginMutation.mutateAsync(values);
+      router.replace(
+        result.user.mustChangePassword ? "/change-password" : "/dashboard",
+      );
     } catch (error) {
       setFormError(
         getApiErrorMessage(error, "Đăng nhập thất bại. Vui lòng thử lại."),

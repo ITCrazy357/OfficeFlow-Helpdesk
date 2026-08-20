@@ -24,6 +24,7 @@ type SessionUser = {
   role: UserRole;
   isActive: boolean;
   isLocked: boolean;
+  mustChangePassword: boolean;
 };
 
 class RefreshTokenRaceError extends Error {}
@@ -107,6 +108,7 @@ export class AuthService {
         role: user.role,
         isActive: user.isActive,
         isLocked: user.isLocked,
+        mustChangePassword: user.mustChangePassword,
       },
     };
   }
@@ -124,6 +126,7 @@ export class AuthService {
             role: true,
             isActive: true,
             isLocked: true,
+            mustChangePassword: true,
           },
         },
       },
@@ -252,6 +255,7 @@ export class AuthService {
         role: true,
         isActive: true,
         isLocked: true,
+        mustChangePassword: true,
         department: {
           select: {
             id: true,

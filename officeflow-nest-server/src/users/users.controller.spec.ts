@@ -3,6 +3,7 @@ import { AccountService } from './accounts.service';
 import { UsersController } from './users.controller';
 import { UsersService } from './users.service';
 import { UserRole } from '@prisma/client';
+import type { Response } from 'express';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
 
@@ -11,12 +12,13 @@ const mockUsersService = {
   findAll: jest.fn(),
   update: jest.fn(),
   changeActivationStatus: jest.fn(),
-  resetPassword: jest.fn(),
 };
 
 const mockAccountService = {
   lockUser: jest.fn(),
   unlockUser: jest.fn(),
+  resetPassword: jest.fn(),
+  changeOwnPassword: jest.fn(),
 };
 
 describe('UsersController', () => {
@@ -124,5 +126,48 @@ describe('UsersController', () => {
 
     expect(mockAccountService.unlockUser).toHaveBeenCalledWith(currentUser, 2);
     expect(mockAccountService.lockUser).not.toHaveBeenCalled();
+  });
+
+  it('should reset a password through AccountService', async () => {
+    const currentUser = { userId: 1, role: UserRole.IT_STAFF };
+    const dto = { password: 'temporary-password-123' };
+
+    await controller.resetPassword(2, dto, currentUser);
+
+    expect(mockAccountService.resetPassword).toHaveBeenCalledWith(
+      2,
+      dto,
+      currentUser,
+    );
+  });
+
+  it('should change the current password and clear the refresh cookie', async () => {
+    const currentUser = { userId: 1, role: UserRole.EMPLOYEE };
+    const dto = {
+      currentPassword: 'temporary-password-123',
+      newPassword: 'new-secure-password-456',
+    };
+    const setHeader = jest.fn();
+    const clearCookie = jest.fn();
+    const response = {
+      setHeader,
+      clearCookie,
+    } as unknown as Response;
+    mockAccountService.changeOwnPassword.mockResolvedValue({
+      passwordChanged: true,
+      mustChangePassword: false,
+    });
+
+    await expect(
+      controller.changeMyPassword(dto, currentUser, response),
+    ).resolves.toEqual({
+      passwordChanged: true,
+      mustChangePassword: false,
+    });
+    expect(mockAccountService.changeOwnPassword).toHaveBeenCalledWith(
+      dto,
+      currentUser,
+    );
+    expect(clearCookie).toHaveBeenCalled();
   });
 });

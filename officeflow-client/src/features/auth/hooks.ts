@@ -1,7 +1,13 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback } from "react";
 import { removeAccessToken, setAccessToken } from "@/lib/token";
-import { getMeApi, loginApi, logoutAllApi, logoutApi } from "./api";
+import {
+  changePasswordApi,
+  getMeApi,
+  loginApi,
+  logoutAllApi,
+  logoutApi,
+} from "./api";
 
 export const authQueryKeys = {
   me: ["auth", "me"] as const,
@@ -49,4 +55,16 @@ export function useLogoutAll() {
     removeAccessToken();
     queryClient.clear();
   }, [queryClient]);
+}
+
+export function useChangePassword() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: changePasswordApi,
+    onSuccess: () => {
+      removeAccessToken();
+      queryClient.clear();
+    },
+  });
 }

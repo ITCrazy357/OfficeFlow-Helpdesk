@@ -263,46 +263,4 @@ describe('UsersService', () => {
       ),
     ).rejects.toThrow(BadRequestException);
   });
-
-  it('should reset a password without writing it to the audit log', async () => {
-    mockPrismaService.user.findUnique.mockResolvedValue(storedUser);
-    mockPrismaService.user.update.mockResolvedValue(storedUser);
-
-    await service.resetPassword(
-      storedUser.id,
-      { password: 'new-strong-password-123' },
-      currentUser,
-    );
-
-    expect(mockPrismaService.user.update).toHaveBeenCalledWith(
-      expect.objectContaining({
-        data: {
-          passwordHash: 'hashed-password',
-        },
-      }),
-    );
-    expect(mockAuditLogsService.create).toHaveBeenCalledWith(
-      expect.objectContaining({
-        newValues: {
-          sessionsRevoked: true,
-        },
-      }),
-      mockTransactionClient,
-    );
-    expect(
-      JSON.stringify(mockAuditLogsService.create.mock.calls),
-    ).not.toContain('new-strong-password-123');
-    expect(
-      JSON.stringify(mockAuditLogsService.create.mock.calls),
-    ).not.toContain('hashed-password');
-    expect(mockEventEmitter.emit).toHaveBeenCalledWith(
-      'user.password-reset',
-      expect.objectContaining({
-        userId: storedUser.id,
-      }),
-    );
-    expect(JSON.stringify(mockEventEmitter.emit.mock.calls)).not.toContain(
-      'new-strong-password-123',
-    );
-  });
 });

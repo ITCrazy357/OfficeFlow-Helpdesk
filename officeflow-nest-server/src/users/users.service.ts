@@ -16,12 +16,10 @@ import * as bcrypt from 'bcrypt';
 import { AuditLogsService } from '../audit-logs/audit-logs.service';
 import type { CurrentUserPayload } from '../common/decorators/current-user.decorator';
 import { UserCreatedEvent } from '../notifications/events/user-created.event';
-import { UserPasswordResetEvent } from '../notifications/events/user-password-reset.event';
 import { PrismaService } from '../prisma/prisma.service';
 
 import { CreateUserDto } from './dto/create-user.dto';
 import { ChangeUserStatusDto } from './dto/change-user-status.dto';
-import { ResetUserPasswordDto } from './dto/reset-user-password.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 
 const userSelect = {
@@ -325,61 +323,5 @@ export class UsersService {
 
       return updatedUser;
     });
-  }
-
-  async resetPassword(
-    id: number,
-    resetUserPasswordDto: ResetUserPasswordDto,
-    currentUser: CurrentUserPayload,
-  ) {
-    const user = await this.getUserOrThrow(id);
-    const passwordHash = await bcrypt.hash(resetUserPasswordDto.password, 10);
-
-    const updatedUser = await this.prisma.$transaction(async (transaction) => {
-      const updatedUser = await transaction.user.update({
-        where: {
-          id,
-        },
-        data: {
-          passwordHash,
-        },
-        select: userSelect,
-      });
-
-      await transaction.refreshToken.updateMany({
-        where: {
-          userId: id,
-          revokedAt: null,
-        },
-        data: {
-          revokedAt: new Date(),
-        },
-      });
-
-      await this.auditLogsService.create(
-        {
-          actorId: currentUser.userId,
-          entity: AuditLogEntity.USER,
-          entityId: user.id,
-          action: AuditLogAction.UPDATE,
-          description: `Reset password for user ${updatedUser.email}.`,
-          newValues: {
-            sessionsRevoked: true,
-          },
-          ipAddress: currentUser.ipAddress,
-          userAgent: currentUser.userAgent,
-        },
-        transaction,
-      );
-
-      return updatedUser;
-    });
-
-    this.eventEmitter.emit(
-      'user.password-reset',
-      new UserPasswordResetEvent(updatedUser.id),
-    );
-
-    return updatedUser;
   }
 }

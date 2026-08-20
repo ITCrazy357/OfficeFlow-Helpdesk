@@ -2,7 +2,6 @@
 
 import type { CSSProperties } from "react";
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import {
   AlertCircle,
   KeyRound,
@@ -33,7 +32,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { useLogout, useMe } from "@/features/auth/hooks";
+import { useMe } from "@/features/auth/hooks";
 import { useDepartments } from "@/features/departments/hooks";
 import { ResetPasswordForm } from "@/features/users/components/reset-password-form";
 import { UserForm } from "@/features/users/components/user-form";
@@ -89,9 +88,7 @@ function UsersSkeleton() {
 }
 
 export default function UsersPage() {
-  const router = useRouter();
   const { data: me } = useMe();
-  const logout = useLogout();
   const isAdmin = me?.role === "ADMIN";
   const canManageAccountLocks = isAdmin || me?.role === "IT_STAFF";
   const usersQuery = useUsers(canManageAccountLocks);
@@ -178,12 +175,6 @@ export default function UsersPage() {
           password: values.password,
         },
       });
-
-      if (panel.user.id === me?.id) {
-        await logout().catch(() => undefined);
-        router.replace("/login");
-        return;
-      }
 
       setPanel(null);
       setActionMessage(
@@ -454,17 +445,6 @@ export default function UsersPage() {
                               </Button>
                               <Button
                                 type="button"
-                                variant="ghost"
-                                size="xs"
-                                onClick={() =>
-                                  openPanel({ type: "reset", user })
-                                }
-                              >
-                                <KeyRound className="size-3.5" />
-                                Mật khẩu
-                              </Button>
-                              <Button
-                                type="button"
                                 variant={user.isActive ? "outline" : "default"}
                                 size="xs"
                                 title={
@@ -481,6 +461,25 @@ export default function UsersPage() {
                               </Button>
                             </>
                           ) : null}
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="xs"
+                            title={
+                              user.id === me.id
+                                ? "Hãy dùng chức năng đổi mật khẩu cá nhân"
+                                : user.role === "ADMIN"
+                                  ? "Không thể reset mật khẩu tài khoản ADMIN"
+                                  : undefined
+                            }
+                            disabled={
+                              user.id === me.id || user.role === "ADMIN"
+                            }
+                            onClick={() => openPanel({ type: "reset", user })}
+                          >
+                            <KeyRound className="size-3.5" />
+                            Mật khẩu
+                          </Button>
                           <Button
                             type="button"
                             variant={user.isLocked ? "outline" : "destructive"}

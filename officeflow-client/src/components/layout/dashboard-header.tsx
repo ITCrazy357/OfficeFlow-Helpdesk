@@ -2,6 +2,7 @@
 
 import {
   ChevronRight,
+  KeyRound,
   LogOut,
   Menu,
   ShieldAlert,
@@ -177,6 +178,16 @@ export function DashboardHeader({ user, onMenuClick }: DashboardHeaderProps) {
               {user.department?.name ? ` / ${user.department.name}` : ""}
             </p>
           </div>
+
+          <Button
+            type="button"
+            variant="outline"
+            className="px-3 sm:px-4"
+            onClick={() => router.push("/change-password")}
+          >
+            <KeyRound className="size-4" />
+            <span className="hidden lg:inline">Đổi mật khẩu</span>
+          </Button>
 
           <AlertDialog
             open={isLogoutDialogOpen}

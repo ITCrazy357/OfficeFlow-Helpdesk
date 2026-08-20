@@ -7,6 +7,7 @@ export type AuthUser = {
   role: UserRole;
   isActive?: boolean;
   isLocked?: boolean;
+  mustChangePassword: boolean;
   departmentId?: number | null;
   createdAt?: string;
   department?: {
@@ -23,4 +24,14 @@ export type LoginResponse = {
 export type LoginInput = {
   email: string;
   password: string;
+};
+
+export type ChangePasswordInput = {
+  currentPassword: string;
+  newPassword: string;
+};
+
+export type ChangePasswordResponse = {
+  passwordChanged: true;
+  mustChangePassword: false;
 };

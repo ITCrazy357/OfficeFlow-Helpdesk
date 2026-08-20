@@ -1,10 +1,31 @@
-import { ForbiddenException, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  ForbiddenException,
+  NotFoundException,
+} from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { Test, TestingModule } from '@nestjs/testing';
 import { UserRole } from '@prisma/client';
+import * as bcrypt from 'bcrypt';
 
 import { AuditLogsService } from '../audit-logs/audit-logs.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { AccountService } from './accounts.service';
+
+jest.mock('bcrypt', () => ({
+  compare: jest.fn(),
+  hash: jest.fn(),
+}));
+
+const mockBcryptCompare = bcrypt.compare as unknown as jest.Mock<
+  Promise<boolean>,
+  [string, string]
+>;
+const mockBcryptHash = bcrypt.hash as unknown as jest.Mock<
+  Promise<string>,
+  [string, number]
+>;
 
 const mockUserModel = {
   findUnique: jest.fn<Promise<unknown>, [unknown]>(),
@@ -32,6 +53,10 @@ const mockAuditLogsService = {
   create: jest.fn<Promise<unknown>, [unknown, unknown]>(),
 };
 
+const mockEventEmitter = {
+  emit: jest.fn(),
+};
+
 const baseUser = {
   id: 2,
   name: 'Target User',
@@ -43,6 +68,7 @@ const baseUser = {
   lockedById: null,
   unlockedAt: null,
   unlockedById: null,
+  mustChangePassword: false,
   departmentId: 1,
   createdAt: new Date(),
   department: {
@@ -59,6 +85,8 @@ describe('AccountService', () => {
     mockUserModel.updateMany.mockResolvedValue({ count: 1 });
     mockRefreshTokenModel.updateMany.mockResolvedValue({ count: 1 });
     mockAuditLogsService.create.mockResolvedValue({});
+    mockBcryptCompare.mockResolvedValue(true);
+    mockBcryptHash.mockResolvedValue('new-password-hash');
     mockPrismaService.$transaction.mockImplementation((callback) =>
       callback(mockTransactionClient),
     );
@@ -73,6 +101,10 @@ describe('AccountService', () => {
         {
           provide: AuditLogsService,
           useValue: mockAuditLogsService,
+        },
+        {
+          provide: EventEmitter2,
+          useValue: mockEventEmitter,
         },
       ],
     }).compile();
@@ -246,5 +278,185 @@ describe('AccountService', () => {
       service.lockUser({ userId: 1, role: UserRole.ADMIN }, baseUser.id),
     ).resolves.toEqual(lockedUser);
     expect(mockAuditLogsService.create).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    [UserRole.ADMIN, UserRole.EMPLOYEE],
+    [UserRole.ADMIN, UserRole.MANAGER],
+    [UserRole.ADMIN, UserRole.IT_STAFF],
+    [UserRole.IT_STAFF, UserRole.EMPLOYEE],
+    [UserRole.IT_STAFF, UserRole.MANAGER],
+    [UserRole.IT_STAFF, UserRole.IT_STAFF],
+  ])('allows %s to reset %s password', async (actorRole, targetRole) => {
+    const target = { ...baseUser, role: targetRole };
+    const updated = { ...target, mustChangePassword: true };
+    mockUserModel.findUnique
+      .mockResolvedValueOnce(target)
+      .mockResolvedValueOnce(updated);
+
+    await expect(
+      service.resetPassword(
+        target.id,
+        { password: 'temporary-password-123' },
+        { userId: 1, role: actorRole },
+      ),
+    ).resolves.toEqual(updated);
+
+    expect(mockUserModel.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          id: target.id,
+          role: {
+            in: [UserRole.EMPLOYEE, UserRole.MANAGER, UserRole.IT_STAFF],
+          },
+        },
+        data: {
+          passwordHash: 'new-password-hash',
+          mustChangePassword: true,
+        },
+      }),
+    );
+    expect(mockRefreshTokenModel.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { userId: target.id, revokedAt: null },
+      }),
+    );
+    expect(mockEventEmitter.emit).toHaveBeenCalledWith(
+      'user.password-reset',
+      expect.objectContaining({ userId: target.id }),
+    );
+    expect(
+      JSON.stringify(mockAuditLogsService.create.mock.calls),
+    ).not.toContain('temporary-password-123');
+  });
+
+  it.each([UserRole.ADMIN, UserRole.IT_STAFF])(
+    'forbids %s from resetting an ADMIN password',
+    async (actorRole) => {
+      mockUserModel.findUnique.mockResolvedValue({
+        ...baseUser,
+        role: UserRole.ADMIN,
+      });
+
+      await expect(
+        service.resetPassword(
+          baseUser.id,
+          { password: 'temporary-password-123' },
+          { userId: 1, role: actorRole },
+        ),
+      ).rejects.toThrow(ForbiddenException);
+      expect(mockBcryptHash).not.toHaveBeenCalled();
+    },
+  );
+
+  it('forbids resetting your own password through the administrative operation', async () => {
+    mockUserModel.findUnique.mockResolvedValue({ ...baseUser, id: 1 });
+
+    await expect(
+      service.resetPassword(
+        1,
+        { password: 'temporary-password-123' },
+        { userId: 1, role: UserRole.IT_STAFF },
+      ),
+    ).rejects.toThrow(ForbiddenException);
+  });
+
+  it('changes the current password, clears the forced-change flag, and revokes sessions', async () => {
+    mockUserModel.findUnique.mockResolvedValue({
+      id: 1,
+      email: 'user@officeflow.com',
+      passwordHash: 'current-password-hash',
+      mustChangePassword: true,
+    });
+
+    await expect(
+      service.changeOwnPassword(
+        {
+          currentPassword: 'temporary-password-123',
+          newPassword: 'new-secure-password-456',
+        },
+        { userId: 1, role: UserRole.EMPLOYEE },
+      ),
+    ).resolves.toEqual({
+      passwordChanged: true,
+      mustChangePassword: false,
+    });
+
+    expect(mockUserModel.updateMany).toHaveBeenCalledWith({
+      where: {
+        id: 1,
+        passwordHash: 'current-password-hash',
+      },
+      data: {
+        passwordHash: 'new-password-hash',
+        mustChangePassword: false,
+      },
+    });
+    expect(mockRefreshTokenModel.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { userId: 1, revokedAt: null } }),
+    );
+    expect(
+      JSON.stringify(mockAuditLogsService.create.mock.calls),
+    ).not.toContain('new-secure-password-456');
+  });
+
+  it('rejects an incorrect current password before hashing', async () => {
+    mockUserModel.findUnique.mockResolvedValue({
+      id: 1,
+      email: 'user@officeflow.com',
+      passwordHash: 'current-password-hash',
+      mustChangePassword: false,
+    });
+    mockBcryptCompare.mockResolvedValue(false);
+
+    await expect(
+      service.changeOwnPassword(
+        { currentPassword: 'wrong-password', newPassword: 'new-password-123' },
+        { userId: 1, role: UserRole.EMPLOYEE },
+      ),
+    ).rejects.toThrow(BadRequestException);
+    expect(mockBcryptHash).not.toHaveBeenCalled();
+    expect(mockPrismaService.$transaction).not.toHaveBeenCalled();
+  });
+
+  it('rejects reusing the current password', async () => {
+    mockUserModel.findUnique.mockResolvedValue({
+      id: 1,
+      email: 'user@officeflow.com',
+      passwordHash: 'current-password-hash',
+      mustChangePassword: false,
+    });
+
+    await expect(
+      service.changeOwnPassword(
+        {
+          currentPassword: 'same-password-123',
+          newPassword: 'same-password-123',
+        },
+        { userId: 1, role: UserRole.EMPLOYEE },
+      ),
+    ).rejects.toThrow(BadRequestException);
+    expect(mockBcryptHash).not.toHaveBeenCalled();
+  });
+
+  it('rejects a concurrent password change', async () => {
+    mockUserModel.findUnique.mockResolvedValue({
+      id: 1,
+      email: 'user@officeflow.com',
+      passwordHash: 'current-password-hash',
+      mustChangePassword: false,
+    });
+    mockUserModel.updateMany.mockResolvedValue({ count: 0 });
+
+    await expect(
+      service.changeOwnPassword(
+        {
+          currentPassword: 'current-password-123',
+          newPassword: 'new-password-456',
+        },
+        { userId: 1, role: UserRole.EMPLOYEE },
+      ),
+    ).rejects.toThrow(ConflictException);
+    expect(mockRefreshTokenModel.updateMany).not.toHaveBeenCalled();
   });
 });

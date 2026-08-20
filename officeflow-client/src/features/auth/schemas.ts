@@ -9,3 +9,29 @@ export const loginSchema = z.object({
 });
 
 export type LoginFormValues = z.infer<typeof loginSchema>;
+
+export const changePasswordSchema = z
+  .object({
+    currentPassword: z
+      .string()
+      .min(1, "Vui lòng nhập mật khẩu hiện tại")
+      .max(128, "Mật khẩu tối đa 128 ký tự"),
+    newPassword: z
+      .string()
+      .min(12, "Mật khẩu mới phải có ít nhất 12 ký tự")
+      .max(128, "Mật khẩu tối đa 128 ký tự"),
+    confirmPassword: z
+      .string()
+      .min(1, "Vui lòng xác nhận mật khẩu mới")
+      .max(128, "Mật khẩu tối đa 128 ký tự"),
+  })
+  .refine((values) => values.newPassword !== values.currentPassword, {
+    message: "Mật khẩu mới không được trùng mật khẩu hiện tại",
+    path: ["newPassword"],
+  })
+  .refine((values) => values.newPassword === values.confirmPassword, {
+    message: "Mật khẩu xác nhận không khớp",
+    path: ["confirmPassword"],
+  });
+
+export type ChangePasswordFormValues = z.infer<typeof changePasswordSchema>;

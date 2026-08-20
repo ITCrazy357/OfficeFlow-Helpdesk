@@ -131,6 +131,8 @@ model User {
   unlockedAt   DateTime?
   unlockedById Int?
 
+  mustChangePassword Boolean @default(false)
+
   managerId    Int?
   manager      User?  @relation("UserManager", fields: [managerId], references: [id], onDelete: SetNull)
   subordinates User[] @relation("UserManager")

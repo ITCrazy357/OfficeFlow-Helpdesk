@@ -1,4 +1,9 @@
-import { ExecutionContext, UnauthorizedException } from '@nestjs/common';
+import {
+  ExecutionContext,
+  ForbiddenException,
+  UnauthorizedException,
+} from '@nestjs/common';
+import { Reflector } from '@nestjs/core';
 import { JwtService } from '@nestjs/jwt';
 import { Test, TestingModule } from '@nestjs/testing';
 import { UserRole } from '@prisma/client';
@@ -16,6 +21,10 @@ const mockPrismaService = {
   },
 };
 
+const mockReflector = {
+  getAllAndOverride: jest.fn(),
+};
+
 function createContext() {
   const request = {
     headers: {
@@ -25,6 +34,8 @@ function createContext() {
     ip: '127.0.0.1',
   };
   const context = {
+    getHandler: () => createContext,
+    getClass: () => JwtAuthGuard,
     switchToHttp: () => ({
       getRequest: () => request,
     }),
@@ -38,6 +49,7 @@ describe('JwtAuthGuard', () => {
 
   beforeEach(async () => {
     jest.resetAllMocks();
+    mockReflector.getAllAndOverride.mockReturnValue(false);
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -49,6 +61,10 @@ describe('JwtAuthGuard', () => {
         {
           provide: PrismaService,
           useValue: mockPrismaService,
+        },
+        {
+          provide: Reflector,
+          useValue: mockReflector,
         },
       ],
     }).compile();
@@ -72,6 +88,7 @@ describe('JwtAuthGuard', () => {
         role: UserRole.ADMIN,
         isActive: true,
         isLocked: false,
+        mustChangePassword: false,
       },
     });
 
@@ -95,11 +112,51 @@ describe('JwtAuthGuard', () => {
         role: UserRole.IT_STAFF,
         isActive: true,
         isLocked: true,
+        mustChangePassword: false,
       },
     });
 
     await expect(guard.canActivate(context)).rejects.toThrow(
       UnauthorizedException,
     );
+  });
+
+  it('blocks protected operations while a password change is required', async () => {
+    const { context } = createContext();
+    mockPrismaService.refreshToken.findUnique.mockResolvedValue({
+      userId: 1,
+      usedAt: null,
+      revokedAt: null,
+      expiresAt: new Date(Date.now() + 60_000),
+      user: {
+        role: UserRole.EMPLOYEE,
+        isActive: true,
+        isLocked: false,
+        mustChangePassword: true,
+      },
+    });
+
+    await expect(guard.canActivate(context)).rejects.toThrow(
+      ForbiddenException,
+    );
+  });
+
+  it('allows explicitly marked operations while a password change is required', async () => {
+    const { context } = createContext();
+    mockReflector.getAllAndOverride.mockReturnValue(true);
+    mockPrismaService.refreshToken.findUnique.mockResolvedValue({
+      userId: 1,
+      usedAt: null,
+      revokedAt: null,
+      expiresAt: new Date(Date.now() + 60_000),
+      user: {
+        role: UserRole.EMPLOYEE,
+        isActive: true,
+        isLocked: false,
+        mustChangePassword: true,
+      },
+    });
+
+    await expect(guard.canActivate(context)).resolves.toBe(true);
   });
 });

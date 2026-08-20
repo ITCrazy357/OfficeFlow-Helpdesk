@@ -89,6 +89,7 @@ describe('AuthService', () => {
         role: UserRole.EMPLOYEE,
         isActive: true,
         isLocked: false,
+        mustChangePassword: true,
       };
 
       mockPrismaService.user.findUnique.mockResolvedValue(user);
@@ -127,6 +128,7 @@ describe('AuthService', () => {
         role: user.role,
         isActive: user.isActive,
         isLocked: user.isLocked,
+        mustChangePassword: user.mustChangePassword,
       });
     });
 
@@ -191,6 +193,7 @@ describe('AuthService', () => {
         role: UserRole.EMPLOYEE,
         isActive: true,
         isLocked: false,
+        mustChangePassword: false,
       });
       mockBcryptCompare.mockResolvedValue(false);
 
@@ -221,6 +224,7 @@ describe('AuthService', () => {
         role: UserRole.EMPLOYEE,
         isActive: true,
         isLocked: false,
+        mustChangePassword: false,
       },
     };
 
@@ -357,6 +361,7 @@ describe('AuthService', () => {
         role: UserRole.EMPLOYEE,
         isActive: true,
         isLocked: false,
+        mustChangePassword: false,
         department: {
           id: 1,
           name: 'Engineering',
@@ -376,6 +381,7 @@ describe('AuthService', () => {
           role: true,
           isActive: true,
           isLocked: true,
+          mustChangePassword: true,
           department: {
             select: {
               id: true,
@@ -399,6 +405,7 @@ describe('AuthService', () => {
           role: true,
           isActive: true,
           isLocked: true,
+          mustChangePassword: true,
           department: {
             select: {
               id: true,

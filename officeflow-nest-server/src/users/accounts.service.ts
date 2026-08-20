@@ -1,18 +1,26 @@
 import {
-  Injectable,
-  ForbiddenException,
+  BadRequestException,
   ConflictException,
+  ForbiddenException,
+  Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { PrismaService } from '../prisma/prisma.service';
-import { AuditLogsService } from '../audit-logs/audit-logs.service';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import {
-  type Prisma,
-  UserRole,
   AuditLogAction,
   AuditLogEntity,
+  type Prisma,
+  UserRole,
 } from '@prisma/client';
+import * as bcrypt from 'bcrypt';
+
+import { AuditLogsService } from '../audit-logs/audit-logs.service';
 import { type CurrentUserPayload } from '../common/decorators/current-user.decorator';
+import { UserPasswordResetEvent } from '../notifications/events/user-password-reset.event';
+import { PrismaService } from '../prisma/prisma.service';
+
+import { ChangeMyPasswordDto } from './dto/change-my-password.dto';
+import { ResetUserPasswordDto } from './dto/reset-user-password.dto';
 
 const accountUserSelect = {
   id: true,
@@ -25,6 +33,7 @@ const accountUserSelect = {
   lockedById: true,
   unlockedAt: true,
   unlockedById: true,
+  mustChangePassword: true,
   departmentId: true,
   createdAt: true,
   department: {
@@ -50,12 +59,13 @@ export class AccountService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly auditLogsService: AuditLogsService,
+    private readonly eventEmitter: EventEmitter2,
   ) {}
 
   private assertCanManageAccount(
     actor: CurrentUserPayload,
     target: Pick<AccountUser, 'id' | 'role'>,
-    operation: 'lock' | 'unlock',
+    operation: 'lock' | 'unlock' | 'reset password',
   ) {
     if (actor.userId === target.id) {
       throw new ForbiddenException(`Cannot ${operation} your own account`);
@@ -275,6 +285,193 @@ export class AccountService {
         transaction,
       );
       return updatedUser;
+    });
+  }
+
+  async resetPassword(
+    id: number,
+    resetUserPasswordDto: ResetUserPasswordDto,
+    currentUser: CurrentUserPayload,
+  ) {
+    const user = await this.getUserOrThrow(id);
+
+    this.assertCanManageAccount(currentUser, user, 'reset password');
+
+    const passwordHash = await bcrypt.hash(resetUserPasswordDto.password, 10);
+    const now = new Date();
+
+    const updatedUser = await this.prisma.$transaction(async (transaction) => {
+      const result = await transaction.user.updateMany({
+        where: {
+          id,
+          role: {
+            in: MANAGEABLE_TARGET_ROLES,
+          },
+        },
+        data: {
+          passwordHash,
+          mustChangePassword: true,
+        },
+      });
+
+      if (result.count !== 1) {
+        const currentTarget = await transaction.user.findUnique({
+          where: { id },
+          select: accountUserSelect,
+        });
+
+        if (!currentTarget) {
+          throw new NotFoundException('User not found');
+        }
+
+        this.assertCanManageAccount(
+          currentUser,
+          currentTarget,
+          'reset password',
+        );
+
+        throw new ConflictException(
+          'Account changed while resetting the password. Please retry',
+        );
+      }
+
+      const updatedUser = await transaction.user.findUnique({
+        where: { id },
+        select: accountUserSelect,
+      });
+
+      if (!updatedUser) {
+        throw new NotFoundException('User not found');
+      }
+
+      await transaction.refreshToken.updateMany({
+        where: {
+          userId: id,
+          revokedAt: null,
+        },
+        data: {
+          revokedAt: now,
+        },
+      });
+
+      await this.auditLogsService.create(
+        {
+          actorId: currentUser.userId,
+          entity: AuditLogEntity.USER,
+          entityId: user.id,
+          action: AuditLogAction.UPDATE,
+          description: `Reset password for user ${updatedUser.email}.`,
+          oldValues: {
+            mustChangePassword: user.mustChangePassword,
+          },
+          newValues: {
+            mustChangePassword: updatedUser.mustChangePassword,
+            sessionsRevoked: true,
+          },
+          ipAddress: currentUser.ipAddress,
+          userAgent: currentUser.userAgent,
+        },
+        transaction,
+      );
+
+      return updatedUser;
+    });
+
+    this.eventEmitter.emit(
+      'user.password-reset',
+      new UserPasswordResetEvent(updatedUser.id),
+    );
+
+    return updatedUser;
+  }
+
+  async changeOwnPassword(dto: ChangeMyPasswordDto, actor: CurrentUserPayload) {
+    const user = await this.prisma.user.findUnique({
+      where: {
+        id: actor.userId,
+      },
+      select: {
+        id: true,
+        email: true,
+        passwordHash: true,
+        mustChangePassword: true,
+      },
+    });
+
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    const currentPasswordMatches = await bcrypt.compare(
+      dto.currentPassword,
+      user.passwordHash,
+    );
+
+    if (!currentPasswordMatches) {
+      throw new BadRequestException('Current password is incorrect');
+    }
+
+    if (dto.newPassword === dto.currentPassword) {
+      throw new BadRequestException(
+        'New password cannot be the same as the current password',
+      );
+    }
+
+    const passwordHash = await bcrypt.hash(dto.newPassword, 10);
+    const changedAt = new Date();
+
+    return this.prisma.$transaction(async (transaction) => {
+      const result = await transaction.user.updateMany({
+        where: {
+          id: actor.userId,
+          passwordHash: user.passwordHash,
+        },
+        data: {
+          passwordHash,
+          mustChangePassword: false,
+        },
+      });
+
+      if (result.count !== 1) {
+        throw new ConflictException(
+          'Password changed in another request. Please sign in again',
+        );
+      }
+
+      await transaction.refreshToken.updateMany({
+        where: {
+          userId: actor.userId,
+          revokedAt: null,
+        },
+        data: {
+          revokedAt: changedAt,
+        },
+      });
+
+      await this.auditLogsService.create(
+        {
+          actorId: actor.userId,
+          entity: AuditLogEntity.USER,
+          entityId: user.id,
+          action: AuditLogAction.UPDATE,
+          description: 'Changed own password.',
+          oldValues: {
+            mustChangePassword: user.mustChangePassword,
+          },
+          newValues: {
+            mustChangePassword: false,
+            sessionsRevoked: true,
+          },
+          ipAddress: actor.ipAddress,
+          userAgent: actor.userAgent,
+        },
+        transaction,
+      );
+
+      return {
+        passwordChanged: true,
+        mustChangePassword: false,
+      };
     });
   }
 }
