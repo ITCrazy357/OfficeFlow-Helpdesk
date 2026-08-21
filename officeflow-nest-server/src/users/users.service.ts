@@ -233,6 +233,16 @@ export class UsersService {
         select: userSelect,
       });
 
+      const emailChanged = updatedUser.email !== user.email;
+
+      if (emailChanged) {
+        await transaction.passwordResetToken.deleteMany({
+          where: {
+            userId: id,
+          },
+        });
+      }
+
       await this.auditLogsService.create(
         {
           actorId: currentUser.userId,
@@ -251,6 +261,7 @@ export class UsersService {
             email: updatedUser.email,
             role: updatedUser.role,
             departmentId: updatedUser.departmentId,
+            passwordResetTokensInvalidated: emailChanged,
           },
           ipAddress: currentUser.ipAddress,
           userAgent: currentUser.userAgent,
@@ -298,6 +309,12 @@ export class UsersService {
             revokedAt: new Date(),
           },
         });
+
+        await transaction.passwordResetToken.deleteMany({
+          where: {
+            userId: id,
+          },
+        });
       }
 
       await this.auditLogsService.create(
@@ -314,6 +331,7 @@ export class UsersService {
           },
           newValues: {
             isActive: updatedUser.isActive,
+            passwordResetTokensInvalidated: !updatedUser.isActive,
           },
           ipAddress: currentUser.ipAddress,
           userAgent: currentUser.userAgent,

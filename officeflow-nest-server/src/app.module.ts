@@ -14,6 +14,7 @@ import { KnowledgeModule } from './knowledge/knowledge.module';
 import { LeaveRequestsModule } from './leave-requests/leave-requests.module';
 import { MailModule } from './mail/mail.module';
 import { NotificationsModule } from './notifications/notifications.module';
+import { PasswordRecoveryModule } from './password-recovery/password-recovery.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { SlaModule } from './sla/sla.module';
 import { TicketsModule } from './tickets/tickets.module';
@@ -41,6 +42,7 @@ import { TicketCategoriesModule } from './ticket-categories/ticket-categories.mo
     KnowledgeModule,
     LeaveRequestsModule,
     NotificationsModule,
+    PasswordRecoveryModule,
     AssetsModule,
     TicketCategoriesModule,
     AuditLogsModule,

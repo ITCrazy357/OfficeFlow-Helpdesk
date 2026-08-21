@@ -2,6 +2,7 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { ArrowRight, CheckCircle2, LockKeyhole, LogIn } from "lucide-react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { CSSProperties } from "react";
 import { useEffect, useState } from "react";
@@ -158,7 +159,15 @@ export default function LoginPage() {
               </div>
 
               <div className="grid gap-2">
-                <Label htmlFor="password">Mật khẩu</Label>
+                <div className="flex items-center justify-between gap-3">
+                  <Label htmlFor="password">Mật khẩu</Label>
+                  <Link
+                    href="/forgot-password"
+                    className="text-sm font-medium text-teal-800 hover:text-teal-950 hover:underline"
+                  >
+                    Quên mật khẩu?
+                  </Link>
+                </div>
                 <Input
                   id="password"
                   type="password"

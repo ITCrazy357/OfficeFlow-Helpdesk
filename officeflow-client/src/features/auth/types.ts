@@ -35,3 +35,20 @@ export type ChangePasswordResponse = {
   passwordChanged: true;
   mustChangePassword: false;
 };
+
+export type ForgotPasswordInput = {
+  email: string;
+};
+
+export type ForgotPasswordResponse = {
+  accepted: true;
+};
+
+export type ResetForgottenPasswordInput = {
+  token: string;
+  newPassword: string;
+};
+
+export type ResetForgottenPasswordResponse = {
+  passwordReset: true;
+};

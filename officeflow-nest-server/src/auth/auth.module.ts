@@ -39,6 +39,6 @@ import { TrustedOriginGuard } from './trusted-origin.guard';
     RefreshTokenCleanupService,
     TrustedOriginGuard,
   ],
-  exports: [JwtAuthGuard, JwtModule],
+  exports: [JwtAuthGuard, JwtModule, TrustedOriginGuard],
 })
 export class AuthModule {}

@@ -4,8 +4,12 @@ import type {
   AuthUser,
   ChangePasswordInput,
   ChangePasswordResponse,
+  ForgotPasswordInput,
+  ForgotPasswordResponse,
   LoginInput,
   LoginResponse,
+  ResetForgottenPasswordInput,
+  ResetForgottenPasswordResponse,
 } from "./types";
 
 export async function loginApi(input: LoginInput) {
@@ -26,6 +30,24 @@ export async function restoreSessionApi() {
 export async function changePasswordApi(input: ChangePasswordInput) {
   const res = await api.patch<ApiResponse<ChangePasswordResponse>>(
     "/users/me/password",
+    input,
+  );
+  return res.data.data;
+}
+
+export async function forgotPasswordApi(input: ForgotPasswordInput) {
+  const res = await api.post<ApiResponse<ForgotPasswordResponse>>(
+    "/auth/forgot-password",
+    input,
+  );
+  return res.data.data;
+}
+
+export async function resetForgottenPasswordApi(
+  input: ResetForgottenPasswordInput,
+) {
+  const res = await api.post<ApiResponse<ResetForgottenPasswordResponse>>(
+    "/auth/reset-password",
     input,
   );
   return res.data.data;

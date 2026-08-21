@@ -36,9 +36,14 @@ const mockRefreshTokenModel = {
   updateMany: jest.fn<Promise<{ count: number }>, [unknown]>(),
 };
 
+const mockPasswordResetTokenModel = {
+  deleteMany: jest.fn<Promise<{ count: number }>, [unknown]>(),
+};
+
 const mockTransactionClient = {
   user: mockUserModel,
   refreshToken: mockRefreshTokenModel,
+  passwordResetToken: mockPasswordResetTokenModel,
 };
 
 const mockPrismaService = {
@@ -84,6 +89,7 @@ describe('AccountService', () => {
     jest.resetAllMocks();
     mockUserModel.updateMany.mockResolvedValue({ count: 1 });
     mockRefreshTokenModel.updateMany.mockResolvedValue({ count: 1 });
+    mockPasswordResetTokenModel.deleteMany.mockResolvedValue({ count: 1 });
     mockAuditLogsService.create.mockResolvedValue({});
     mockBcryptCompare.mockResolvedValue(true);
     mockBcryptHash.mockResolvedValue('new-password-hash');
@@ -154,6 +160,9 @@ describe('AccountService', () => {
       },
     });
     expect(revokeArgs.data.revokedAt).toBeInstanceOf(Date);
+    expect(mockPasswordResetTokenModel.deleteMany).toHaveBeenCalledWith({
+      where: { userId: target.id },
+    });
     expect(mockAuditLogsService.create).toHaveBeenCalledWith(
       expect.objectContaining({
         actorId: 1,
@@ -321,6 +330,9 @@ describe('AccountService', () => {
         where: { userId: target.id, revokedAt: null },
       }),
     );
+    expect(mockPasswordResetTokenModel.deleteMany).toHaveBeenCalledWith({
+      where: { userId: target.id },
+    });
     expect(mockEventEmitter.emit).toHaveBeenCalledWith(
       'user.password-reset',
       expect.objectContaining({ userId: target.id }),
@@ -395,6 +407,9 @@ describe('AccountService', () => {
     expect(mockRefreshTokenModel.updateMany).toHaveBeenCalledWith(
       expect.objectContaining({ where: { userId: 1, revokedAt: null } }),
     );
+    expect(mockPasswordResetTokenModel.deleteMany).toHaveBeenCalledWith({
+      where: { userId: 1 },
+    });
     expect(
       JSON.stringify(mockAuditLogsService.create.mock.calls),
     ).not.toContain('new-secure-password-456');

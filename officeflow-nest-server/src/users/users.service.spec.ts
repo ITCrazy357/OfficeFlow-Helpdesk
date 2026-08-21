@@ -37,9 +37,14 @@ const mockRefreshTokenModel = {
   updateMany: jest.fn<Promise<{ count: number }>, [unknown]>(),
 };
 
+const mockPasswordResetTokenModel = {
+  deleteMany: jest.fn<Promise<{ count: number }>, [unknown]>(),
+};
+
 const mockTransactionClient = {
   user: mockUserModel,
   refreshToken: mockRefreshTokenModel,
+  passwordResetToken: mockPasswordResetTokenModel,
 };
 
 const mockPrismaService = {
@@ -93,6 +98,7 @@ describe('UsersService', () => {
     jest.resetAllMocks();
     mockBcryptHash.mockResolvedValue('hashed-password');
     mockPrismaService.refreshToken.updateMany.mockResolvedValue({ count: 1 });
+    mockPasswordResetTokenModel.deleteMany.mockResolvedValue({ count: 1 });
     mockPrismaService.$transaction.mockImplementation((callback) =>
       callback(mockTransactionClient),
     );
@@ -197,6 +203,28 @@ describe('UsersService', () => {
     ).rejects.toThrow(NotFoundException);
   });
 
+  it('should invalidate password reset tokens when the email changes', async () => {
+    const updatedUser = {
+      ...storedUser,
+      email: 'new-email@officeflow.com',
+    };
+    mockPrismaService.user.findUnique.mockResolvedValue(storedUser);
+    mockPrismaService.user.findFirst.mockResolvedValue(null);
+    mockPrismaService.user.update.mockResolvedValue(updatedUser);
+
+    await expect(
+      service.update(
+        storedUser.id,
+        { email: ' NEW-EMAIL@officeflow.com ' },
+        currentUser,
+      ),
+    ).resolves.toEqual(updatedUser);
+
+    expect(mockPasswordResetTokenModel.deleteMany).toHaveBeenCalledWith({
+      where: { userId: storedUser.id },
+    });
+  });
+
   it('should deactivate a user without changing the lock state', async () => {
     const deactivatedUser = {
       ...storedUser,
@@ -221,11 +249,15 @@ describe('UsersService', () => {
         action: AuditLogAction.DEACTIVATED,
         newValues: {
           isActive: false,
+          passwordResetTokensInvalidated: true,
         },
       }),
       mockTransactionClient,
     );
     expect(mockPrismaService.refreshToken.updateMany).toHaveBeenCalled();
+    expect(mockPasswordResetTokenModel.deleteMany).toHaveBeenCalledWith({
+      where: { userId: storedUser.id },
+    });
   });
 
   it('should reactivate a user without unlocking the account', async () => {
@@ -246,6 +278,7 @@ describe('UsersService', () => {
     ).resolves.toEqual(reactivatedUser);
     expect(reactivatedUser.isLocked).toBe(true);
     expect(mockPrismaService.refreshToken.updateMany).not.toHaveBeenCalled();
+    expect(mockPasswordResetTokenModel.deleteMany).not.toHaveBeenCalled();
   });
 
   it('should not let an admin deactivate their own account', async () => {

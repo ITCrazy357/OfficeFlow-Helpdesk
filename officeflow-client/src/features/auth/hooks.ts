@@ -3,10 +3,12 @@ import { useCallback } from "react";
 import { removeAccessToken, setAccessToken } from "@/lib/token";
 import {
   changePasswordApi,
+  forgotPasswordApi,
   getMeApi,
   loginApi,
   logoutAllApi,
   logoutApi,
+  resetForgottenPasswordApi,
 } from "./api";
 
 export const authQueryKeys = {
@@ -62,6 +64,24 @@ export function useChangePassword() {
 
   return useMutation({
     mutationFn: changePasswordApi,
+    onSuccess: () => {
+      removeAccessToken();
+      queryClient.clear();
+    },
+  });
+}
+
+export function useForgotPassword() {
+  return useMutation({
+    mutationFn: forgotPasswordApi,
+  });
+}
+
+export function useResetForgottenPassword() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: resetForgottenPasswordApi,
     onSuccess: () => {
       removeAccessToken();
       queryClient.clear();

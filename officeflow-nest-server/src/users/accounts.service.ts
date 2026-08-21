@@ -180,6 +180,12 @@ export class AccountService {
         },
       });
 
+      await transaction.passwordResetToken.deleteMany({
+        where: {
+          userId: targetUserId,
+        },
+      });
+
       await this.auditLogsService.create(
         {
           actorId: actor.userId,
@@ -201,6 +207,7 @@ export class AccountService {
             unlockedAt: updatedUser.unlockedAt,
             unlockedById: updatedUser.unlockedById,
             sessionsRevoked: true,
+            passwordResetTokensInvalidated: true,
           },
           ipAddress: actor.ipAddress,
           userAgent: actor.userAgent,
@@ -354,6 +361,12 @@ export class AccountService {
         },
       });
 
+      await transaction.passwordResetToken.deleteMany({
+        where: {
+          userId: id,
+        },
+      });
+
       await this.auditLogsService.create(
         {
           actorId: currentUser.userId,
@@ -367,6 +380,7 @@ export class AccountService {
           newValues: {
             mustChangePassword: updatedUser.mustChangePassword,
             sessionsRevoked: true,
+            passwordResetTokensInvalidated: true,
           },
           ipAddress: currentUser.ipAddress,
           userAgent: currentUser.userAgent,
@@ -448,6 +462,12 @@ export class AccountService {
         },
       });
 
+      await transaction.passwordResetToken.deleteMany({
+        where: {
+          userId: actor.userId,
+        },
+      });
+
       await this.auditLogsService.create(
         {
           actorId: actor.userId,
@@ -461,6 +481,7 @@ export class AccountService {
           newValues: {
             mustChangePassword: false,
             sessionsRevoked: true,
+            passwordResetTokensInvalidated: true,
           },
           ipAddress: actor.ipAddress,
           userAgent: actor.userAgent,

@@ -13,11 +13,16 @@ const mockPrismaService = {
   department: {
     findMany: jest.fn(),
   },
+  user: {
+    findUnique: jest.fn(),
+  },
 };
 
 type SuccessResponseBody = {
   success: boolean;
   statusCode: number;
+  message?: string;
+  data?: unknown;
 };
 
 type ErrorResponseBody = SuccessResponseBody & {
@@ -100,6 +105,45 @@ describe('AppController (e2e)', () => {
         password: 'strong-password-123',
       })
       .expect(404);
+  });
+
+  it('/api/auth/forgot-password should not reveal account eligibility', async () => {
+    mockPrismaService.user.findUnique
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce({
+        id: 7,
+        isActive: false,
+        isLocked: false,
+      });
+
+    const unknownAccount = await request(httpServer)
+      .post('/api/auth/forgot-password')
+      .send({ email: ' Missing@Example.com ' })
+      .expect(202);
+    const ineligibleAccount = await request(httpServer)
+      .post('/api/auth/forgot-password')
+      .send({ email: 'inactive@example.com' })
+      .expect(202);
+
+    expect(unknownAccount.body).toEqual(ineligibleAccount.body);
+    expect(mockPrismaService.user.findUnique).toHaveBeenNthCalledWith(1, {
+      where: { email: 'missing@example.com' },
+      select: {
+        id: true,
+        isActive: true,
+        isLocked: true,
+      },
+    });
+  });
+
+  it('/api/auth/reset-password should validate the token shape', () => {
+    return request(httpServer)
+      .post('/api/auth/reset-password')
+      .send({
+        token: 'invalid-token',
+        newPassword: 'new-secure-password-456',
+      })
+      .expect(400);
   });
 
   it('/api/users/:id/status should be registered and protected', () => {
