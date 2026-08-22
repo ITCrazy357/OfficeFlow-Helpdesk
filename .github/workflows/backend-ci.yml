@@ -19,7 +19,7 @@ permissions:
 
 concurrency:
   group: backend-${{ github.event_name }}-${{ github.ref }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  cancel-in-progress: true
 
 jobs:
   verify:
@@ -27,13 +27,27 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: officeflow_ci
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping --host=127.0.0.1 --password=root"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+
     defaults:
       run:
         working-directory: officeflow-nest-server
 
     env:
       NODE_ENV: test
-      DATABASE_URL: mysql://root:root@localhost:3306/officeflow_ci
+      DATABASE_URL: mysql://root:root@127.0.0.1:3306/officeflow_ci
       JWT_ACCESS_SECRET: ci-test-secret-at-least-32-bytes
 
     steps:
@@ -55,6 +69,12 @@ jobs:
       - name: Generate Prisma Client
         run: npx prisma generate
 
+      - name: Validate Prisma schema
+        run: npx prisma validate
+
+      - name: Verify migrations on clean database
+        run: npm run migrate:deploy
+
       - name: Lint
         run: npm run lint
 
@@ -65,7 +85,7 @@ jobs:
         run: npm run test:e2e -- --runInBand
 
       - name: Build
-        run: npm run build
+        run: npm run build:ci
 
   deploy:
     name: Deploy Backend to Render
@@ -75,7 +95,7 @@ jobs:
       github.ref == 'refs/heads/main' &&
       vars.RENDER_DEPLOY_ENABLED == 'true'
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 20
     environment: production
 
     steps:
@@ -103,3 +123,51 @@ jobs:
             --max-time 30 \
             --request POST \
             "${RENDER_DEPLOY_HOOK_URL}${separator}ref=${GITHUB_SHA}"
+
+      - name: Wait for the verified commit to become healthy
+        env:
+          BACKEND_HEALTH_URL: ${{ vars.BACKEND_HEALTH_URL }}
+        run: |
+          set -euo pipefail
+
+          if [ -z "${BACKEND_HEALTH_URL}" ]; then
+            echo "::error::Missing BACKEND_HEALTH_URL production variable"
+            exit 1
+          fi
+
+          response_file="${RUNNER_TEMP}/backend-health.json"
+          deadline=$((SECONDS + 900))
+
+          while [ "${SECONDS}" -lt "${deadline}" ]; do
+            if curl \
+              --fail \
+              --silent \
+              --show-error \
+              --connect-timeout 10 \
+              --max-time 20 \
+              --output "${response_file}" \
+              "${BACKEND_HEALTH_URL}"; then
+              deployed_commit="$(node -e '
+                const fs = require("node:fs");
+                const body = JSON.parse(fs.readFileSync(process.argv[1], "utf8"));
+                process.stdout.write(body?.data?.version ?? body?.version ?? "");
+              ' "${response_file}" 2>/dev/null || true)"
+
+              if [ "${deployed_commit}" = "${GITHUB_SHA}" ]; then
+                echo "Production is healthy on commit ${GITHUB_SHA}"
+                echo "### Backend production deployment" >> "${GITHUB_STEP_SUMMARY}"
+                echo "- Commit: \`${GITHUB_SHA}\`" >> "${GITHUB_STEP_SUMMARY}"
+                echo "- Database health check: passed" >> "${GITHUB_STEP_SUMMARY}"
+                exit 0
+              fi
+
+              echo "Render is currently serving ${deployed_commit:-an unknown commit}; waiting for ${GITHUB_SHA}"
+            else
+              echo "Production health check is not ready yet"
+            fi
+
+            sleep 10
+          done
+
+          echo "::error::Render did not serve healthy commit ${GITHUB_SHA} within 15 minutes"
+          exit 1

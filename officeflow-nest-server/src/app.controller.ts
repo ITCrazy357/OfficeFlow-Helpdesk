@@ -7,6 +7,10 @@ import { PrismaService } from './prisma/prisma.service';
 export class AppController {
   constructor(private readonly prisma: PrismaService) {}
 
+  private getDeploymentVersion() {
+    return process.env.RENDER_GIT_COMMIT ?? 'local';
+  }
+
   @Get()
   @Message('Welcome to OfficeFlow Helpdesk API')
   getApiInfo() {
@@ -22,6 +26,7 @@ export class AppController {
   getHealth() {
     return {
       status: 'ok',
+      version: this.getDeploymentVersion(),
     };
   }
 
@@ -29,5 +34,10 @@ export class AppController {
   @Message('Database connected successfully')
   async getDbHealth() {
     await this.prisma.$queryRaw`SELECT 1`;
+
+    return {
+      status: 'ok',
+      version: this.getDeploymentVersion(),
+    };
   }
 }

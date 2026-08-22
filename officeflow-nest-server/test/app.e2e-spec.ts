@@ -10,6 +10,7 @@ import { ResponseInterceptor } from '../src/common/interceptors/response.interce
 import { PrismaService } from '../src/prisma/prisma.service';
 
 const mockPrismaService = {
+  $queryRaw: jest.fn().mockResolvedValue([{ connected: 1 }]),
   department: {
     findMany: jest.fn(),
   },
@@ -77,6 +78,25 @@ describe('AppController (e2e)', () => {
 
         expect(body.success).toBe(true);
         expect(body.statusCode).toBe(200);
+        expect(body.data).toEqual({
+          status: 'ok',
+          version: 'local',
+        });
+      });
+  });
+
+  it('/api/db-health (GET)', () => {
+    return request(httpServer)
+      .get('/api/db-health')
+      .expect(200)
+      .expect((res) => {
+        const body = res.body as SuccessResponseBody;
+
+        expect(body.success).toBe(true);
+        expect(body.data).toEqual({
+          status: 'ok',
+          version: 'local',
+        });
       });
   });
   it('/api/auth/login should return validation error when email is missing', () => {

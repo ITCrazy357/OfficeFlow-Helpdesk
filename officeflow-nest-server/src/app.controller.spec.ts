@@ -30,6 +30,7 @@ describe('AppController', () => {
     it('should return the API health status', () => {
       expect(appController.getHealth()).toEqual({
         status: 'ok',
+        version: 'local',
       });
     });
   });
@@ -38,7 +39,10 @@ describe('AppController', () => {
     it('should check the database connection', async () => {
       mockPrismaService.$queryRaw.mockResolvedValue([{ connected: 1 }]);
 
-      await expect(appController.getDbHealth()).resolves.toBeUndefined();
+      await expect(appController.getDbHealth()).resolves.toEqual({
+        status: 'ok',
+        version: 'local',
+      });
       expect(mockPrismaService.$queryRaw).toHaveBeenCalledTimes(1);
     });
   });

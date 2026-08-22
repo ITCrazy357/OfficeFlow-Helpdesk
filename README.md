@@ -81,3 +81,6 @@ npm run prisma:seed
 - exact production origin validation, CORS credentials, Helmet, validation whitelist, and request throttling
 
 Never commit `.env` files or real credentials. Rotate any credential that has previously appeared in Git history before a public or production deployment.
+
+Production deployment, migration, health verification, and rollback procedures
+are documented in [the backend production runbook](docs/backend-production-runbook.md).
