@@ -6,7 +6,6 @@ OfficeFlow is an internal helpdesk system built as a feature-based modular monol
 
 - `officeflow-nest-server` — active NestJS API on port `5001`
 - `officeflow-client` — active Next.js client on port `3000`
-- `officeflow-server` — legacy Express API on port `5000`; kept for reference and not used by the active client
 
 Main backend modules include authentication, users, departments, tickets and SLA, attachments, dashboard reports, knowledge base, notifications, assets, ticket categories, and audit logs.
 
