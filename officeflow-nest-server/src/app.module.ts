@@ -20,10 +20,13 @@ import { SlaModule } from './sla/sla.module';
 import { TicketsModule } from './tickets/tickets.module';
 import { UsersModule } from './users/users.module';
 import { TicketCategoriesModule } from './ticket-categories/ticket-categories.module';
+import { RedisModule } from './redis/redis.module';
 
 @Module({
   imports: [
     EventEmitterModule.forRoot(),
+    RedisModule,
+
     ScheduleModule.forRoot(),
     ThrottlerModule.forRoot([
       {
