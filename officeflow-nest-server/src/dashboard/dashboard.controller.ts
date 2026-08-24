@@ -13,13 +13,17 @@ import {
   type CurrentUserPayload,
 } from '../common/decorators/current-user.decorator';
 import { Message } from '../common/decorators/message.decorator';
+import { RedisService } from 'src/redis/redis.service';
 
 @ApiTags('Dashboard')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard)
 @Controller('dashboard')
 export class DashboardController {
-  constructor(private readonly dashboardService: DashboardService) {}
+  constructor(
+    private readonly dashboardService: DashboardService,
+    private readonly redis: RedisService,
+  ) {}
 
   @Get('summary')
   @Message('Get dashboard summary successfully')
@@ -70,5 +74,14 @@ export class DashboardController {
   @ApiOperation({ summary: 'Get SLA overview' })
   getSlaOverview(@CurrentUser() currentUser: CurrentUserPayload) {
     return this.dashboardService.getSlaOverview(currentUser);
+  }
+
+  @Get('redis-test')
+  async redisTest() {
+    await this.redis.set('officeflow:test', 'hello redis', 30);
+
+    return {
+      value: await this.redis.get('officeflow:test'),
+    };
   }
 }

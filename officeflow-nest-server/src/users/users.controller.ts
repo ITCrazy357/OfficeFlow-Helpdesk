@@ -131,7 +131,7 @@ export class UsersController {
 
   @Patch(':id/reset-password')
   @Roles(UserRole.ADMIN, UserRole.IT_STAFF)
-  @Throttle({ default: { limit: 10, ttl: 60_000 } })
+  @Throttle({ default: { limit: 3, ttl: 60_000 } })
   @Message('Reset user password successfully')
   @ApiOperation({ summary: 'Set a new password for a user' })
   @ApiParam({ name: 'id', example: 1 })
@@ -149,7 +149,7 @@ export class UsersController {
 
   @Patch('me/password')
   @AllowPasswordChangeRequired()
-  @Throttle({ default: { limit: 5, ttl: 60_000 } })
+  @Throttle({ default: { limit: 3, ttl: 60_000 } })
   @Message('Change my password successfully')
   @ApiOperation({ summary: "Change the current user's password" })
   @ApiResponse({ status: 200, description: 'Password changed' })

@@ -42,6 +42,7 @@ import { LinkTicketAssetDto } from './dto/link-ticket-asset.dto';
 import { UpdateTicketStatusDto } from './dto/update-ticket-status.dto';
 import { UpdateTicketDto } from './dto/update-ticket.dto';
 import { calculateDueAt } from './ticket-sla.util';
+import { TicketMetricsChangedEvent } from 'src/dashboard/events/ticket-metrics-changed.event';
 
 export type TicketAttachmentFile = NonNullable<Request['file']>;
 
@@ -387,6 +388,10 @@ export class TicketsService {
     });
 
     this.eventEmitter.emit('ticket.created', new TicketCreatedEvent(ticket.id));
+    this.eventEmitter.emit(
+      'ticket.metrics_changed',
+      new TicketMetricsChangedEvent(ticket.id, 'CREATED'),
+    );
 
     return ticket;
   }
@@ -633,6 +638,11 @@ export class TicketsService {
         transaction,
       );
 
+      this.eventEmitter.emit(
+        'ticket.metrics_changed',
+        new TicketMetricsChangedEvent(updatedTicket.id, 'UPDATED'),
+      );
+
       return updatedTicket;
     });
   }
@@ -764,6 +774,11 @@ export class TicketsService {
           result.updatedTicket.status,
           recipientIds,
         ),
+      );
+
+      this.eventEmitter.emit(
+        'ticket.metrics_changed',
+        new TicketMetricsChangedEvent(id, 'STATUS_CHANGED'),
       );
 
       if (result.updatedTicket.status === TicketStatus.RESOLVED) {
@@ -1009,6 +1024,11 @@ export class TicketsService {
         transaction,
       );
     });
+
+    this.eventEmitter.emit(
+      'ticket.metrics_changed',
+      new TicketMetricsChangedEvent(id, 'DELETED'),
+    );
 
     return { id };
   }

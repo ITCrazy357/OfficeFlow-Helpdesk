@@ -42,4 +42,18 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
   async del(key: string) {
     await this.client.del(key);
   }
+
+  async incr(key: string) {
+    return this.client.incr(key);
+  }
+
+  getClient() {
+    return this.client;
+  }
+
+  async getDashboardVersion() {
+    const version = await this.get('dashboard:version');
+
+    return Number(version ?? 0);
+  }
 }

@@ -21,6 +21,11 @@ import { TicketsModule } from './tickets/tickets.module';
 import { UsersModule } from './users/users.module';
 import { TicketCategoriesModule } from './ticket-categories/ticket-categories.module';
 import { RedisModule } from './redis/redis.module';
+import {
+  RedisThrottlerStorage,
+  ThrottlerAlgorithm,
+} from '@nestjs-redis/throttler-storage';
+import { RedisService } from './redis/redis.service';
 
 @Module({
   imports: [
@@ -28,13 +33,24 @@ import { RedisModule } from './redis/redis.module';
     RedisModule,
 
     ScheduleModule.forRoot(),
-    ThrottlerModule.forRoot([
-      {
-        name: 'default',
-        ttl: 60_000,
-        limit: 120,
-      },
-    ]),
+    ThrottlerModule.forRootAsync({
+      imports: [RedisModule],
+      inject: [RedisService],
+      useFactory: (redisService: RedisService) => ({
+        throttlers: [
+          {
+            name: 'default',
+            ttl: 60_000,
+            limit: 120,
+          },
+        ],
+
+        storage: new RedisThrottlerStorage(
+          redisService.getClient(),
+          ThrottlerAlgorithm.SlidingWindowCounter,
+        ),
+      }),
+    }),
     PrismaModule,
     AuthModule,
     UsersModule,

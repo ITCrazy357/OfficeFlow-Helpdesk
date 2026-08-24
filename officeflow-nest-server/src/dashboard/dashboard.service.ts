@@ -1,6 +1,7 @@
 import { ForbiddenException, Injectable } from '@nestjs/common';
 import { Prisma, TicketStatus, UserRole } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { RedisService } from 'src/redis/redis.service';
 
 type CurrentUser = {
   userId: number;
@@ -9,7 +10,10 @@ type CurrentUser = {
 
 @Injectable()
 export class DashboardService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly redis: RedisService,
+  ) {}
 
   private async getTicketScopeWhere(
     currentUser: CurrentUser,
@@ -51,7 +55,33 @@ export class DashboardService {
     throw new ForbiddenException('Forbidden');
   }
 
+  private async getSummaryCacheKey(currentUser: CurrentUser) {
+    const version = await this.redis.getDashboardVersion();
+
+    switch (currentUser.role) {
+      case UserRole.ADMIN:
+        return 'dashboard:summary:admin';
+
+      case UserRole.IT_STAFF:
+        return 'dashboard:summary:it_staff';
+
+      case UserRole.MANAGER:
+        return `dashboard:summary:manager:${currentUser.userId}`;
+
+      case UserRole.EMPLOYEE:
+        return `dashboard:summary:employee:${currentUser.userId}`;
+    }
+  }
+
   async getSummary(currentUser: CurrentUser) {
+    const cacheKey = await this.getSummaryCacheKey(currentUser);
+
+    const cached = await this.redis.get(cacheKey);
+
+    if (cached) {
+      return JSON.parse(cached);
+    }
+
     const where = await this.getTicketScopeWhere(currentUser);
 
     const [
@@ -100,7 +130,7 @@ export class DashboardService {
       }),
     ]);
 
-    return {
+    const result = {
       totalTickets,
       openTickets,
       inProgressTickets,
@@ -108,6 +138,10 @@ export class DashboardService {
       closedTickets,
       overdueTickets,
     };
+
+    await this.redis.set(cacheKey, JSON.stringify(result), 606);
+
+    return result;
   }
 
   async getTicketsByStatus(currentUser: CurrentUser) {
