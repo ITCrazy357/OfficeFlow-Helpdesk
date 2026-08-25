@@ -57,6 +57,7 @@ const mockCloudinaryService = {
 
 const mockEventEmitter = {
   emit: jest.fn(),
+  emitAsync: jest.fn().mockResolvedValue([]),
 };
 
 const mockAuditLogsService = {

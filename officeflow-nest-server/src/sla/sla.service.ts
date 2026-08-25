@@ -5,6 +5,10 @@ import { TicketStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 
 import { EventEmitter2 } from '@nestjs/event-emitter';
+import {
+  DASHBOARD_CACHE_INVALIDATE_EVENT,
+  DashboardCacheInvalidatedEvent,
+} from '../dashboard/events/dashboard-cache-invalidated.event';
 import { TicketOverdueEvent } from '../notifications/events/ticket-overdue.event';
 
 @Injectable()
@@ -48,6 +52,7 @@ export class SlaService {
     }
 
     let markedCount = 0;
+    let lastMarkedTicketId: number | null = null;
 
     for (const ticket of overdueTickets) {
       const updated = await this.prisma.ticket.updateMany({
@@ -76,6 +81,7 @@ export class SlaService {
       }
 
       markedCount++;
+      lastMarkedTicketId = ticket.id;
       const recipientIds = [ticket.createdById, ticket.assignedToId].filter(
         (id): id is number => Boolean(id),
       );
@@ -83,6 +89,16 @@ export class SlaService {
       this.eventEmitter.emit(
         'ticket.overdue',
         new TicketOverdueEvent(ticket.id, ticket.title, recipientIds),
+      );
+    }
+
+    if (lastMarkedTicketId !== null) {
+      await this.eventEmitter.emitAsync(
+        DASHBOARD_CACHE_INVALIDATE_EVENT,
+        new DashboardCacheInvalidatedEvent(
+          'TICKET_OVERDUE',
+          lastMarkedTicketId,
+        ),
       );
     }
 

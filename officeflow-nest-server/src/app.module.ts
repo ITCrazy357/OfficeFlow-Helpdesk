@@ -22,9 +22,13 @@ import { UsersModule } from './users/users.module';
 import { TicketCategoriesModule } from './ticket-categories/ticket-categories.module';
 import { RedisModule } from './redis/redis.module';
 import {
-  RedisThrottlerStorage,
-  ThrottlerAlgorithm,
-} from '@nestjs-redis/throttler-storage';
+  createRateLimitKeyGenerator,
+  getIpTracker,
+  getLoginAccountTracker,
+  getLoginPairTracker,
+  isLoginRequest,
+} from './redis/rate-limit.config';
+import { ResilientThrottlerStorage } from './redis/resilient-throttler.storage';
 import { RedisService } from './redis/redis.service';
 
 @Module({
@@ -35,19 +39,42 @@ import { RedisService } from './redis/redis.service';
     ScheduleModule.forRoot(),
     ThrottlerModule.forRootAsync({
       imports: [RedisModule],
-      inject: [RedisService],
-      useFactory: (redisService: RedisService) => ({
+      inject: [RedisService, ResilientThrottlerStorage],
+      useFactory: (
+        redisService: RedisService,
+        throttlerStorage: ResilientThrottlerStorage,
+      ) => ({
         throttlers: [
           {
             name: 'default',
             ttl: 60_000,
             limit: 120,
           },
+          {
+            name: 'login-ip',
+            ttl: 60_000,
+            limit: 20,
+            skipIf: (context) => !isLoginRequest(context),
+            getTracker: getIpTracker,
+          },
+          {
+            name: 'login-pair',
+            ttl: 60_000,
+            limit: 5,
+            skipIf: (context) => !isLoginRequest(context),
+            getTracker: getLoginPairTracker,
+          },
+          {
+            name: 'login-account',
+            ttl: 5 * 60_000,
+            limit: 10,
+            skipIf: (context) =>   !isLoginRequest(context),
+            getTracker: getLoginAccountTracker,
+          },
         ],
-
-        storage: new RedisThrottlerStorage(
-          redisService.getClient(),
-          ThrottlerAlgorithm.SlidingWindowCounter,
+        storage: throttlerStorage,
+        generateKey: createRateLimitKeyGenerator(
+          redisService.key('rate-limit'),
         ),
       }),
     }),

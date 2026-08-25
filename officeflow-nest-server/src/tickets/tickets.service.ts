@@ -42,7 +42,10 @@ import { LinkTicketAssetDto } from './dto/link-ticket-asset.dto';
 import { UpdateTicketStatusDto } from './dto/update-ticket-status.dto';
 import { UpdateTicketDto } from './dto/update-ticket.dto';
 import { calculateDueAt } from './ticket-sla.util';
-import { TicketMetricsChangedEvent } from 'src/dashboard/events/ticket-metrics-changed.event';
+import {
+  DASHBOARD_CACHE_INVALIDATE_EVENT,
+  DashboardCacheInvalidatedEvent,
+} from '../dashboard/events/dashboard-cache-invalidated.event';
 
 export type TicketAttachmentFile = NonNullable<Request['file']>;
 
@@ -388,9 +391,9 @@ export class TicketsService {
     });
 
     this.eventEmitter.emit('ticket.created', new TicketCreatedEvent(ticket.id));
-    this.eventEmitter.emit(
-      'ticket.metrics_changed',
-      new TicketMetricsChangedEvent(ticket.id, 'CREATED'),
+    await this.eventEmitter.emitAsync(
+      DASHBOARD_CACHE_INVALIDATE_EVENT,
+      new DashboardCacheInvalidatedEvent('TICKET_CREATED', ticket.id),
     );
 
     return ticket;
@@ -561,90 +564,105 @@ export class TicketsService {
 
     await this.ensureCategoryExists(updateTicketDto.categoryId);
 
-    return this.prisma.$transaction(async (transaction) => {
-      const updatedTicket = await transaction.ticket.update({
-        where: { id },
-        data: {
-          title: updateTicketDto.title,
-          description: updateTicketDto.description,
-          priority: updateTicketDto.priority,
-          categoryId: updateTicketDto.categoryId,
-        },
-        select: {
-          id: true,
-          title: true,
-          description: true,
-          status: true,
-          priority: true,
-          dueAt: true,
-          resolveAt: true,
-          isOverdue: true,
-          createdAt: true,
-          updatedAt: true,
-          createdBy: {
-            select: {
-              id: true,
-              name: true,
-              email: true,
+    const updatedTicket = await this.prisma.$transaction(
+      async (transaction) => {
+        const updatedTicket = await transaction.ticket.update({
+          where: { id },
+          data: {
+            title: updateTicketDto.title,
+            description: updateTicketDto.description,
+            priority: updateTicketDto.priority,
+            categoryId: updateTicketDto.categoryId,
+          },
+          select: {
+            id: true,
+            title: true,
+            description: true,
+            status: true,
+            priority: true,
+            dueAt: true,
+            resolveAt: true,
+            isOverdue: true,
+            createdAt: true,
+            updatedAt: true,
+            createdBy: {
+              select: {
+                id: true,
+                name: true,
+                email: true,
+              },
+            },
+            assignedTo: {
+              select: {
+                id: true,
+                name: true,
+                email: true,
+              },
+            },
+            category: {
+              select: {
+                id: true,
+                name: true,
+              },
             },
           },
-          assignedTo: {
-            select: {
-              id: true,
-              name: true,
-              email: true,
+        });
+
+        await this.createHistory(
+          {
+            ticketId: id,
+            userId: currentUser.userId,
+            action: TicketHistoryAction.UPDATE,
+            oldValue: ticket.title,
+            newValue: updatedTicket.title,
+          },
+          transaction,
+        );
+
+        await this.auditLogsService.create(
+          {
+            actorId: currentUser.userId,
+            entity: AuditLogEntity.TICKET,
+            entityId: ticket.id,
+            action: AuditLogAction.UPDATE,
+            description: `Updated ticket ${updatedTicket.title}.`,
+            oldValues: {
+              title: ticket.title,
+              priority: ticket.priority,
+              categoryId: ticket.categoryId,
             },
-          },
-          category: {
-            select: {
-              id: true,
-              name: true,
+            newValues: {
+              title: updatedTicket.title,
+              priority: updatedTicket.priority,
+              categoryId: updatedTicket.category?.id ?? null,
             },
+            ipAddress: currentUser.ipAddress,
+            userAgent: currentUser.userAgent,
           },
-        },
-      });
+          transaction,
+        );
 
-      await this.createHistory(
-        {
-          ticketId: id,
-          userId: currentUser.userId,
-          action: TicketHistoryAction.UPDATE,
-          oldValue: ticket.title,
-          newValue: updatedTicket.title,
-        },
-        transaction,
+        return updatedTicket;
+      },
+    );
+
+    const reportFieldsChanged =
+      (updateTicketDto.priority !== undefined &&
+        updateTicketDto.priority !== ticket.priority) ||
+      (updateTicketDto.categoryId !== undefined &&
+        updateTicketDto.categoryId !== ticket.categoryId);
+
+    if (reportFieldsChanged) {
+      await this.eventEmitter.emitAsync(
+        DASHBOARD_CACHE_INVALIDATE_EVENT,
+        new DashboardCacheInvalidatedEvent(
+          'TICKET_REPORT_FIELDS_UPDATED',
+          updatedTicket.id,
+        ),
       );
+    }
 
-      await this.auditLogsService.create(
-        {
-          actorId: currentUser.userId,
-          entity: AuditLogEntity.TICKET,
-          entityId: ticket.id,
-          action: AuditLogAction.UPDATE,
-          description: `Updated ticket ${updatedTicket.title}.`,
-          oldValues: {
-            title: ticket.title,
-            priority: ticket.priority,
-            categoryId: ticket.categoryId,
-          },
-          newValues: {
-            title: updatedTicket.title,
-            priority: updatedTicket.priority,
-            categoryId: updatedTicket.category?.id ?? null,
-          },
-          ipAddress: currentUser.ipAddress,
-          userAgent: currentUser.userAgent,
-        },
-        transaction,
-      );
-
-      this.eventEmitter.emit(
-        'ticket.metrics_changed',
-        new TicketMetricsChangedEvent(updatedTicket.id, 'UPDATED'),
-      );
-
-      return updatedTicket;
-    });
+    return updatedTicket;
   }
 
   async updateStatus(
@@ -776,9 +794,9 @@ export class TicketsService {
         ),
       );
 
-      this.eventEmitter.emit(
-        'ticket.metrics_changed',
-        new TicketMetricsChangedEvent(id, 'STATUS_CHANGED'),
+      await this.eventEmitter.emitAsync(
+        DASHBOARD_CACHE_INVALIDATE_EVENT,
+        new DashboardCacheInvalidatedEvent('TICKET_STATUS_CHANGED', id),
       );
 
       if (result.updatedTicket.status === TicketStatus.RESOLVED) {
@@ -1025,9 +1043,9 @@ export class TicketsService {
       );
     });
 
-    this.eventEmitter.emit(
-      'ticket.metrics_changed',
-      new TicketMetricsChangedEvent(id, 'DELETED'),
+    await this.eventEmitter.emitAsync(
+      DASHBOARD_CACHE_INVALIDATE_EVENT,
+      new DashboardCacheInvalidatedEvent('TICKET_DELETED', id),
     );
 
     return { id };

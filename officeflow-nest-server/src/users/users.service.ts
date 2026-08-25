@@ -15,6 +15,10 @@ import * as bcrypt from 'bcrypt';
 
 import { AuditLogsService } from '../audit-logs/audit-logs.service';
 import type { CurrentUserPayload } from '../common/decorators/current-user.decorator';
+import {
+  DASHBOARD_CACHE_INVALIDATE_EVENT,
+  DashboardCacheInvalidatedEvent,
+} from '../dashboard/events/dashboard-cache-invalidated.event';
 import { UserCreatedEvent } from '../notifications/events/user-created.event';
 import { PrismaService } from '../prisma/prisma.service';
 
@@ -224,7 +228,7 @@ export class UsersService {
       await this.ensureDepartmentExists(updateUserDto.departmentId);
     }
 
-    return this.prisma.$transaction(async (transaction) => {
+    const updatedUser = await this.prisma.$transaction(async (transaction) => {
       const updatedUser = await transaction.user.update({
         where: {
           id,
@@ -271,6 +275,18 @@ export class UsersService {
 
       return updatedUser;
     });
+
+    if (updatedUser.departmentId !== user.departmentId) {
+      await this.eventEmitter.emitAsync(
+        DASHBOARD_CACHE_INVALIDATE_EVENT,
+        new DashboardCacheInvalidatedEvent(
+          'USER_DEPARTMENT_CHANGED',
+          updatedUser.id,
+        ),
+      );
+    }
+
+    return updatedUser;
   }
 
   async changeActivationStatus(

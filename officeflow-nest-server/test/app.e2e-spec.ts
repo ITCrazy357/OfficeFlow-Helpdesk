@@ -1,6 +1,7 @@
 import { INestApplication, ValidationPipe } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { Reflector } from '@nestjs/core';
+import { ThrottlerStorageService } from '@nestjs/throttler';
 import { Server } from 'node:http';
 import request from 'supertest';
 
@@ -8,6 +9,7 @@ import { AppModule } from '../src/app.module';
 import { HttpExceptionFilter } from '../src/common/filters/http-exception.filter';
 import { ResponseInterceptor } from '../src/common/interceptors/response.interceptor';
 import { PrismaService } from '../src/prisma/prisma.service';
+import { ResilientThrottlerStorage } from '../src/redis/resilient-throttler.storage';
 
 const mockPrismaService = {
   $queryRaw: jest.fn().mockResolvedValue([{ connected: 1 }]),
@@ -43,6 +45,8 @@ describe('AppController (e2e)', () => {
     })
       .overrideProvider(PrismaService)
       .useValue(mockPrismaService)
+      .overrideProvider(ResilientThrottlerStorage)
+      .useValue(new ThrottlerStorageService())
       .compile();
 
     app = moduleFixture.createNestApplication();
@@ -114,6 +118,22 @@ describe('AppController (e2e)', () => {
         expect(body.message).toBe('Validation failed');
         expect(body.path).toBe('/api/auth/login');
       });
+  });
+
+  it('/api/auth/login should enforce the login pair limit', async () => {
+    const payload = {
+      email: `not-an-email-${Date.now()}`,
+      password: 'invalid-password',
+    };
+
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      await request(httpServer)
+        .post('/api/auth/login')
+        .send(payload)
+        .expect(400);
+    }
+
+    await request(httpServer).post('/api/auth/login').send(payload).expect(429);
   });
 
   it('/api/auth/register should not exist', () => {

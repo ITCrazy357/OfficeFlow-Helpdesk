@@ -1,26 +1,103 @@
-import { Injectable, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
-import { createClient } from 'redis';
+import {
+  Injectable,
+  Logger,
+  OnModuleDestroy,
+  OnModuleInit,
+} from '@nestjs/common';
+import { createClient, type RedisClientType } from 'redis';
+
+const DEFAULT_REDIS_URL = 'redis://127.0.0.1:6379';
+const DEFAULT_CONNECT_TIMEOUT_MS = 3_000;
+const DEFAULT_COMMAND_TIMEOUT_MS = 1_500;
+const MAX_RECONNECT_DELAY_MS = 3_000;
+const DASHBOARD_VERSION_TTL_SECONDS = 24 * 60 * 60;
+
+function readPositiveInteger(value: string | undefined, fallback: number) {
+  const configured = Number(value);
+
+  return Number.isInteger(configured) && configured > 0 ? configured : fallback;
+}
+
+function buildKeyPrefix() {
+  const configured = process.env.REDIS_KEY_PREFIX?.trim();
+  const fallback = `officeflow:${process.env.NODE_ENV ?? 'development'}`;
+
+  return (configured || fallback).replace(/[^a-zA-Z0-9:._-]/g, '_');
+}
 
 @Injectable()
 export class RedisService implements OnModuleInit, OnModuleDestroy {
-  private readonly client = createClient({
-    url: process.env.REDIS_URL,
-  });
+  private readonly logger = new Logger(RedisService.name);
+  private readonly keyPrefix = buildKeyPrefix();
+  private readonly client: RedisClientType;
+  private unavailableLogged = false;
 
   constructor() {
+    this.client = createClient({
+      url: process.env.REDIS_URL?.trim() || DEFAULT_REDIS_URL,
+      disableOfflineQueue: true,
+      commandOptions: {
+        timeout: readPositiveInteger(
+          process.env.REDIS_COMMAND_TIMEOUT_MS,
+          DEFAULT_COMMAND_TIMEOUT_MS,
+        ),
+      },
+      socket: {
+        connectTimeout: readPositiveInteger(
+          process.env.REDIS_CONNECT_TIMEOUT_MS,
+          DEFAULT_CONNECT_TIMEOUT_MS,
+        ),
+        reconnectStrategy: (retries) =>
+          Math.min(200 * 2 ** Math.min(retries, 4), MAX_RECONNECT_DELAY_MS),
+      },
+    });
+
+    this.client.on('ready', () => {
+      this.unavailableLogged = false;
+      this.logger.log('Redis connection is ready');
+    });
+
+    this.client.on('reconnecting', () => {
+      this.logUnavailable('Redis connection lost; reconnecting');
+    });
+
     this.client.on('error', (error) => {
-      console.error('Redis error:', error);
+      this.logUnavailable('Redis is unavailable', error);
     });
   }
 
-  async onModuleInit() {
-    await this.client.connect();
+  onModuleInit() {
+    // Redis is an optimization and distributed coordination dependency. The API
+    // remains available while the client reconnects in the background.
+    void this.client.connect().catch((error: unknown) => {
+      this.logUnavailable('Redis initial connection failed', error);
+    });
   }
 
   async onModuleDestroy() {
-    if (this.client.isOpen) {
+    if (this.client.isReady) {
       await this.client.quit();
+    } else if (this.client.isOpen) {
+      this.client.destroy();
     }
+  }
+
+  private logUnavailable(message: string, error?: unknown) {
+    if (this.unavailableLogged) {
+      return;
+    }
+
+    this.unavailableLogged = true;
+    const detail = error instanceof Error ? `: ${error.message}` : '';
+    this.logger.warn(`${message}${detail}`);
+  }
+
+  isReady() {
+    return this.client.isReady;
+  }
+
+  key(...parts: Array<string | number>) {
+    return [this.keyPrefix, ...parts].join(':');
   }
 
   async get(key: string) {
@@ -52,8 +129,52 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
   }
 
   async getDashboardVersion() {
-    const version = await this.get('dashboard:version');
+    const key = this.key('dashboard', 'version');
+    const value = await this.get(key);
 
-    return Number(version ?? 0);
+    if (value === null) {
+      return 0;
+    }
+
+    const version = Number(value);
+
+    if (Number.isSafeInteger(version) && version >= 0) {
+      return version;
+    }
+
+    this.logger.warn('Discarding an invalid dashboard cache version');
+    await this.del(key);
+    return 0;
+  }
+
+  async incrementDashboardVersion() {
+    const key = this.key('dashboard', 'version');
+    const [version] = await this.client
+      .multi()
+      .incr(key)
+      .expire(key, DASHBOARD_VERSION_TTL_SECONDS)
+      .exec();
+
+    return version;
+  }
+
+  async getJson<T>(key: string): Promise<T | null> {
+    const value = await this.get(key);
+
+    if (value === null) {
+      return null;
+    }
+
+    try {
+      return JSON.parse(value) as T;
+    } catch {
+      this.logger.warn(`Discarding invalid JSON from Redis key ${key}`);
+      await this.del(key);
+      return null;
+    }
+  }
+
+  setJson(key: string, value: unknown, ttlSeconds: number) {
+    return this.set(key, JSON.stringify(value), ttlSeconds);
   }
 }

@@ -10,7 +10,7 @@ import {
   UnauthorizedException,
   UseGuards,
 } from '@nestjs/common';
-import { Throttle } from '@nestjs/throttler';
+import { SkipThrottle, Throttle } from '@nestjs/throttler';
 import type { Request, Response } from 'express';
 import {
   ApiBearerAuth,
@@ -47,7 +47,7 @@ export class AuthController {
 
   @Post('login')
   @UseGuards(TrustedOriginGuard)
-  @Throttle({ default: { limit: 5, ttl: 60_000 } })
+  @SkipThrottle({ default: true })
   @HttpCode(HttpStatus.OK)
   @Message('Login successfully')
   @ApiOperation({ summary: 'Login and get access token' })

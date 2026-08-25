@@ -25,7 +25,10 @@ Ticket and asset events create in-process notifications through `EventEmitter2`.
 
 ## Local setup
 
-Requirements: Node.js 22, npm, and a MySQL-compatible database.
+Requirements: Node.js 22, npm, a MySQL-compatible database, and Redis 8 for
+shared caching and distributed rate limiting. Redis outages do not take the API
+offline: dashboard reads fall back to MySQL and throttling degrades to
+per-instance memory limits.
 
 1. Copy `officeflow-nest-server/.env.example` to `officeflow-nest-server/.env` and replace every placeholder.
 2. Copy `officeflow-client/.env.example` to `officeflow-client/.env.local`.
@@ -44,6 +47,8 @@ docker compose up --build
 ```
 
 The API container deploys Prisma migrations before starting. `DOCKER_DATABASE_URL` must use the Compose service name `mysql`, not `localhost`.
+Compose exposes Redis only on `127.0.0.1:6380`; the API container connects over
+the private Compose network.
 
 ## Validation
 
@@ -53,8 +58,13 @@ Backend:
 npm run build
 npm test -- --runInBand
 npm run test:e2e -- --runInBand
+npm run test:redis
 npx prisma validate
 ```
+
+`test:redis` requires the local Redis endpoint from
+`officeflow-nest-server/.env.example`. It uses isolated random keys and removes
+them after checking cache TTL and concurrent distributed rate-limit increments.
 
 Client:
 

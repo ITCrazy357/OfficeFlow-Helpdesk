@@ -4,13 +4,21 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
+import {
+  DASHBOARD_CACHE_INVALIDATE_EVENT,
+  DashboardCacheInvalidatedEvent,
+} from '../dashboard/events/dashboard-cache-invalidated.event';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateTicketCategoryDto } from './dto/create-ticket-category.dto';
 import { UpdateTicketCategoryDto } from './dto/update-ticket-category.dto';
 
 @Injectable()
 export class TicketCategoriesService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly eventEmitter: EventEmitter2,
+  ) {}
 
   findAll() {
     return this.prisma.ticketCategory.findMany({
@@ -76,7 +84,7 @@ export class TicketCategoriesService {
   }
 
   async update(id: number, updateDto: UpdateTicketCategoryDto) {
-    await this.findOne(id);
+    const category = await this.findOne(id);
 
     if (Object.keys(updateDto).length === 0) {
       throw new BadRequestException('At least one field is required');
@@ -86,7 +94,7 @@ export class TicketCategoriesService {
       await this.ensureNameIsAvailable(updateDto.name, id);
     }
 
-    return this.prisma.ticketCategory.update({
+    const updatedCategory = await this.prisma.ticketCategory.update({
       where: { id },
       data: updateDto,
       select: {
@@ -101,6 +109,15 @@ export class TicketCategoriesService {
         },
       },
     });
+
+    if (updatedCategory.name !== category.name) {
+      await this.eventEmitter.emitAsync(
+        DASHBOARD_CACHE_INVALIDATE_EVENT,
+        new DashboardCacheInvalidatedEvent('CATEGORY_UPDATED', id),
+      );
+    }
+
+    return updatedCategory;
   }
 
   async remove(id: number) {
@@ -119,6 +136,13 @@ export class TicketCategoriesService {
         where: { id },
       }),
     ]);
+
+    if (category._count.tickets > 0) {
+      await this.eventEmitter.emitAsync(
+        DASHBOARD_CACHE_INVALIDATE_EVENT,
+        new DashboardCacheInvalidatedEvent('CATEGORY_DELETED', id),
+      );
+    }
 
     return {
       id,

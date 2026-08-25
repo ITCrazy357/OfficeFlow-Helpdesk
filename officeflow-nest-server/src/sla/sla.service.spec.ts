@@ -14,6 +14,7 @@ const mockPrismaService = {
 
 const mockEventEmitter = {
   emit: jest.fn(),
+  emitAsync: jest.fn().mockResolvedValue([]),
 };
 
 describe('SlaService', () => {
@@ -81,6 +82,13 @@ describe('SlaService', () => {
       expect.objectContaining({
         ticketId: 1,
         recipientIds: [10, 20],
+      }),
+    );
+    expect(mockEventEmitter.emitAsync).toHaveBeenCalledWith(
+      'dashboard.cache.invalidate',
+      expect.objectContaining({
+        reason: 'TICKET_OVERDUE',
+        entityId: 1,
       }),
     );
   });

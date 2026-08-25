@@ -22,10 +22,20 @@ services:
     image: redis:8-alpine
     container_name: officeflow_redis
     restart: always
+    command:
+      [
+        "redis-server",
+        "--save",
+        "",
+        "--appendonly",
+        "no",
+        "--maxmemory",
+        "128mb",
+        "--maxmemory-policy",
+        "noeviction",
+      ]
     ports:
-      - "6380:6379"
-    volumes:
-      - officeflow_redis_data:/data
+      - "127.0.0.1:6380:6379"
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
@@ -50,12 +60,15 @@ services:
       CLOUDINARY_API_KEY: ${CLOUDINARY_API_KEY:-}
       CLOUDINARY_API_SECRET: ${CLOUDINARY_API_SECRET:-}
       REDIS_URL: redis://redis:6379
+      REDIS_KEY_PREFIX: ${REDIS_KEY_PREFIX:-officeflow:docker}
+      REDIS_CONNECT_TIMEOUT_MS: ${REDIS_CONNECT_TIMEOUT_MS:-3000}
+      REDIS_COMMAND_TIMEOUT_MS: ${REDIS_COMMAND_TIMEOUT_MS:-1500}
+      DASHBOARD_CACHE_TTL_SECONDS: ${DASHBOARD_CACHE_TTL_SECONDS:-60}
     depends_on:
       mysql:
         condition: service_healthy
       redis:
-        condition: service_healthy
+        condition: service_started
 
 volumes:
   officeflow_nest_mysql_data:
-  officeflow_redis_data:

@@ -11,6 +11,25 @@ This runbook defines how OfficeFlow verifies, migrates, and rolls back the activ
    NestJS process and the production database connection.
 3. Keep the service connected to the `main` branch and the repository that owns
    `.github/workflows/backend-ci.yml`.
+4. Provision a managed Redis instance in the same region as the API and set:
+   - secret `REDIS_URL` to the provider URL, including TLS and credentials when
+     the provider requires them;
+   - `REDIS_KEY_PREFIX=officeflow:production`;
+   - `REDIS_CONNECT_TIMEOUT_MS=3000`;
+   - `REDIS_COMMAND_TIMEOUT_MS=1500`;
+   - `DASHBOARD_CACHE_TTL_SECONDS=60`.
+
+For Render's single trusted proxy hop, set `TRUST_PROXY=1` and verify that
+request logs show the real client IP. Do not enable it for an untrusted direct
+deployment, because login IP rate limiting relies on `request.ip`.
+
+Do not expose a production Redis port publicly. Redis is intentionally a
+degradable dependency: monitor `RedisService`, `DashboardService`, and
+`ResilientThrottlerStorage` warnings because an outage falls back to database
+dashboard reads and per-instance (not distributed) rate limiting. Prefer a
+`noeviction` memory policy for the shared rate-limit store and alert before it
+reaches its memory limit; application cache and limiter keys expire
+automatically.
 
 Render automatically provides `RENDER_GIT_COMMIT` at runtime. The health endpoint
 returns this SHA so GitHub can prove that it is checking the new release instead
