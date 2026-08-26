@@ -68,7 +68,7 @@ import { RedisService } from './redis/redis.service';
             name: 'login-account',
             ttl: 5 * 60_000,
             limit: 10,
-            skipIf: (context) =>   !isLoginRequest(context),
+            skipIf: (context) => !isLoginRequest(context),
             getTracker: getLoginAccountTracker,
           },
         ],
