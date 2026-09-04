@@ -80,6 +80,23 @@ export class DashboardService {
     throw new ForbiddenException('Forbidden');
   }
 
+  private logCacheError(error: unknown) {
+    if (this.cacheErrorLogged) {
+      return;
+    }
+
+    this.cacheErrorLogged = true;
+    const detail = error instanceof Error ? `: ${error.message}` : '';
+    this.logger.warn(`Dashboard cache unavailable; using database${detail}`);
+  }
+
+  private markCacheAvailable() {
+    if (this.cacheErrorLogged) {
+      this.cacheErrorLogged = false;
+      this.logger.log('Dashboard cache restored');
+    }
+  }
+
   private async getCachedReport<T>(
     report: string,
     currentUser: CurrentUser,
@@ -112,9 +129,11 @@ export class DashboardService {
     }
 
     const loadKey = cacheKey ?? `database:${report}:${scope.cacheKey}`;
+
+    ////Mục đích là chống nhiều request cùng lúc cùng đánh vào MySQL.
     const existingLoad = this.inFlightReports.get(loadKey) as
       Promise<T> | undefined;
-
+    //Đây gọi là request coalescing / single-flight.
     if (existingLoad) {
       return existingLoad;
     }
@@ -142,23 +161,6 @@ export class DashboardService {
       if (this.inFlightReports.get(loadKey) === load) {
         this.inFlightReports.delete(loadKey);
       }
-    }
-  }
-
-  private logCacheError(error: unknown) {
-    if (this.cacheErrorLogged) {
-      return;
-    }
-
-    this.cacheErrorLogged = true;
-    const detail = error instanceof Error ? `: ${error.message}` : '';
-    this.logger.warn(`Dashboard cache unavailable; using database${detail}`);
-  }
-
-  private markCacheAvailable() {
-    if (this.cacheErrorLogged) {
-      this.cacheErrorLogged = false;
-      this.logger.log('Dashboard cache restored');
     }
   }
 

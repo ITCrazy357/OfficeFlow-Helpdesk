@@ -15,12 +15,14 @@ export function isLoginRequest(context: ExecutionContext) {
   );
 }
 
+//lấy IP của client làm tracker.
 export function getIpTracker(request: ThrottledRequest) {
   return typeof request.ip === 'string' && request.ip.length > 0
     ? request.ip
     : 'unknown';
 }
 
+//lấy email account đang đăng nhập làm tracker.
 export function getLoginAccountTracker(request: ThrottledRequest) {
   const email =
     typeof request.body?.email === 'string'
@@ -30,6 +32,7 @@ export function getLoginAccountTracker(request: ThrottledRequest) {
   return createHash('sha256').update(email).digest('hex');
 }
 
+//lấy cặp IP và email account làm tracker.
 export function getLoginPairTracker(request: ThrottledRequest) {
   return `${getIpTracker(request)}:${getLoginAccountTracker(request)}`;
 }

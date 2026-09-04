@@ -26,6 +26,18 @@ export class ResilientThrottlerStorage
     );
   }
 
+  private logDegraded(error?: unknown) {
+    if (this.degraded) {
+      return;
+    }
+
+    this.degraded = true;
+    const detail = error instanceof Error ? `: ${error.message}` : '';
+    this.logger.warn(
+      `Redis rate-limit storage unavailable; using per-instance memory fallback${detail}`,
+    );
+  }
+
   async increment(
     key: string,
     ttl: number,
@@ -39,8 +51,8 @@ export class ResilientThrottlerStorage
           key,
           ttl,
           limit,
-          blockDuration,
-          throttlerName,
+          blockDuration, //Nếu vượt limit thì có thể block tracker trong một khoảng thời gian.
+          throttlerName, //Tên policy/rate-limit configuration đang áp dụng.
         );
 
         if (this.degraded) {
@@ -56,8 +68,7 @@ export class ResilientThrottlerStorage
       this.logDegraded();
     }
 
-    // Availability is preferred for this internal application. During a Redis
-    // outage, each API instance still enforces the same limits locally.
+    // Ưu tiên API vẫn hoạt động hơn là đảm bảo distributed rate limit tuyệt đối.
     return this.memoryFallback.increment(
       key,
       ttl,
@@ -69,17 +80,5 @@ export class ResilientThrottlerStorage
 
   onApplicationShutdown() {
     this.memoryFallback.onApplicationShutdown();
-  }
-
-  private logDegraded(error?: unknown) {
-    if (this.degraded) {
-      return;
-    }
-
-    this.degraded = true;
-    const detail = error instanceof Error ? `: ${error.message}` : '';
-    this.logger.warn(
-      `Redis rate-limit storage unavailable; using per-instance memory fallback${detail}`,
-    );
   }
 }

@@ -12,12 +12,14 @@ const DEFAULT_COMMAND_TIMEOUT_MS = 1_500;
 const MAX_RECONNECT_DELAY_MS = 3_000;
 const DASHBOARD_VERSION_TTL_SECONDS = 24 * 60 * 60;
 
+//Hàm này dùng để đọc số từ .env.
 function readPositiveInteger(value: string | undefined, fallback: number) {
   const configured = Number(value);
 
   return Number.isInteger(configured) && configured > 0 ? configured : fallback;
 }
 
+//tạo namespace cho Redis key
 function buildKeyPrefix() {
   const configured = process.env.REDIS_KEY_PREFIX?.trim();
   const fallback = `officeflow:${process.env.NODE_ENV ?? 'development'}`;
@@ -30,9 +32,21 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(RedisService.name);
   private readonly keyPrefix = buildKeyPrefix();
   private readonly client: RedisClientType;
-  private unavailableLogged = false;
+  private unavailableLogged = false; //chỉ log cảnh báo đầu tiên trong một chuỗi lỗi.
+
+  //Hàm private để gom logic log lỗi Redis.
+  private logUnavailable(message: string, error?: unknown) {
+    if (this.unavailableLogged) {
+      return;
+    }
+
+    this.unavailableLogged = true;
+    const detail = error instanceof Error ? `: ${error.message}` : '';
+    this.logger.warn(`${message}${detail}`);
+  }
 
   constructor() {
+    //cấu hình Redis client.
     this.client = createClient({
       url: process.env.REDIS_URL?.trim() || DEFAULT_REDIS_URL,
       disableOfflineQueue: true,
@@ -47,13 +61,14 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
           process.env.REDIS_CONNECT_TIMEOUT_MS,
           DEFAULT_CONNECT_TIMEOUT_MS,
         ),
+        //Đây là exponential backoff. Giảm tải khi redis chết mà application reconnect liên tục
         reconnectStrategy: (retries) =>
           Math.min(200 * 2 ** Math.min(retries, 4), MAX_RECONNECT_DELAY_MS),
       },
     });
 
     this.client.on('ready', () => {
-      this.unavailableLogged = false;
+      this.unavailableLogged = false; //Redis đã hồi phục, lần mất kết nối tiếp theo có thể log warning mới.
       this.logger.log('Redis connection is ready');
     });
 
@@ -67,29 +82,19 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
   }
 
   onModuleInit() {
-    // Redis is an optimization and distributed coordination dependency. The API
-    // remains available while the client reconnects in the background.
+    // Redis is an optimization and distributed coordination dependency.
+    // The API remains available while the client reconnects in the background.
     void this.client.connect().catch((error: unknown) => {
       this.logUnavailable('Redis initial connection failed', error);
     });
   }
-
+  //Khi application shutdown.
   async onModuleDestroy() {
     if (this.client.isReady) {
       await this.client.quit();
     } else if (this.client.isOpen) {
       this.client.destroy();
     }
-  }
-
-  private logUnavailable(message: string, error?: unknown) {
-    if (this.unavailableLogged) {
-      return;
-    }
-
-    this.unavailableLogged = true;
-    const detail = error instanceof Error ? `: ${error.message}` : '';
-    this.logger.warn(`${message}${detail}`);
   }
 
   isReady() {
@@ -119,11 +124,12 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
   async del(key: string) {
     await this.client.del(key);
   }
-
+  //Gia tăng
   async incr(key: string) {
     return this.client.incr(key);
   }
 
+  //Cho phép code bên ngoài lấy Redis client gốc.
   getClient() {
     return this.client;
   }
@@ -146,7 +152,7 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
     await this.del(key);
     return 0;
   }
-
+  //Gia tăng version
   async incrementDashboardVersion() {
     const key = this.key('dashboard', 'version');
     const [version] = await this.client
