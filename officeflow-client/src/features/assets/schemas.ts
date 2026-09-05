@@ -1,17 +1,13 @@
 import { z } from "zod";
 
-import type { CreateAssetInput } from "./types";
+import type { CreateAssetInput, UpdateAssetInput } from "./types";
 
 const optionalText = (maxLength: number, message: string) =>
   z.string().trim().max(maxLength, message).optional();
 
 const optionalDate = z
-  .string()
-  .optional()
-  .refine(
-    (value) => !value || !Number.isNaN(new Date(value).getTime()),
-    "Ngày không hợp lệ",
-  );
+  .union([z.literal(""), z.iso.date("Ngày không hợp lệ")])
+  .optional();
 
 export const assetFormSchema = z.object({
   assetTag: z
@@ -65,5 +61,17 @@ export function toAssetPayload(values: AssetFormValues): CreateAssetInput {
     purchaseDate: optionalValue(values.purchaseDate),
     warrantyUntil: optionalValue(values.warrantyUntil),
     notes: optionalValue(values.notes),
+  };
+}
+
+export function toAssetUpdatePayload(
+  values: AssetFormValues,
+): UpdateAssetInput {
+  return {
+    ...toAssetPayload(values),
+    brand: optionalValue(values.brand) ?? null,
+    model: optionalValue(values.model) ?? null,
+    serialNumber: optionalValue(values.serialNumber) ?? null,
+    notes: optionalValue(values.notes) ?? null,
   };
 }

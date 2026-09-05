@@ -1,7 +1,8 @@
 "use client";
 
 import type { CSSProperties } from "react";
-import { useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import {
   AlertCircle,
   BookOpenText,
@@ -65,19 +66,6 @@ const SEARCH_DEBOUNCE_MS = 400;
 
 type PublishedFilter = "ALL" | "PUBLISHED" | "DRAFT";
 type FormMode = "create" | "edit" | null;
-
-function getInitialSearchParam(name: string) {
-  if (typeof window === "undefined") {
-    return "";
-  }
-
-  return new URLSearchParams(window.location.search).get(name) ?? "";
-}
-
-function getInitialArticleId() {
-  const value = Number(getInitialSearchParam("articleId"));
-  return Number.isInteger(value) && value > 0 ? value : null;
-}
 
 function formatDateTime(value?: string | null) {
   if (!value) {
@@ -247,10 +235,40 @@ function ArticleCard({
 }
 
 export default function KnowledgePage() {
+  return (
+    <Suspense fallback={<KnowledgeSkeleton />}>
+      <KnowledgeRoute />
+    </Suspense>
+  );
+}
+
+function KnowledgeRoute() {
+  const searchParams = useSearchParams();
+  const articleId = Number(searchParams.get("articleId"));
+
+  return (
+    <KnowledgeContent
+      key={searchParams.toString()}
+      initialKeyword={searchParams.get("keyword") ?? ""}
+      initialTag={searchParams.get("tag") ?? ""}
+      initialArticleId={
+        Number.isSafeInteger(articleId) && articleId > 0 ? articleId : null
+      }
+    />
+  );
+}
+
+function KnowledgeContent({
+  initialKeyword,
+  initialTag,
+  initialArticleId,
+}: {
+  initialKeyword: string;
+  initialTag: string;
+  initialArticleId: number | null;
+}) {
   const { data: user } = useMe();
   const canManage = canManageKnowledge(user);
-  const initialKeyword = getInitialSearchParam("keyword");
-  const initialTag = getInitialSearchParam("tag");
   const [page, setPage] = useState(1);
   const [searchInput, setSearchInput] = useState(initialKeyword);
   const [keyword, setKeyword] = useState(initialKeyword);
@@ -259,7 +277,7 @@ export default function KnowledgePage() {
   const [publishedFilter, setPublishedFilter] =
     useState<PublishedFilter>("ALL");
   const [selectedArticleId, setSelectedArticleId] = useState<number | null>(
-    getInitialArticleId,
+    initialArticleId,
   );
   const [formMode, setFormMode] = useState<FormMode>(null);
   const [formError, setFormError] = useState<string | null>(null);
@@ -370,9 +388,7 @@ export default function KnowledgePage() {
     try {
       await publishArticle.mutateAsync(selectedArticleId);
     } catch (error) {
-      setFormError(
-        getApiErrorMessage(error, "Không thể xuất bản bài viết."),
-      );
+      setFormError(getApiErrorMessage(error, "Không thể xuất bản bài viết."));
     }
   }
 
@@ -405,7 +421,8 @@ export default function KnowledgePage() {
             Trung tâm trợ giúp
           </h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Tìm hướng dẫn xử lý nhanh, FAQ nội bộ và các bài viết đã được xác thực.
+            Tìm hướng dẫn xử lý nhanh, FAQ nội bộ và các bài viết đã được xác
+            thực.
           </p>
         </div>
 
@@ -621,7 +638,7 @@ export default function KnowledgePage() {
                   <KnowledgeArticleForm
                     key={
                       formMode === "edit"
-                        ? selectedArticle?.id ?? "edit"
+                        ? (selectedArticle?.id ?? "edit")
                         : "create"
                     }
                     defaultValues={
@@ -827,7 +844,8 @@ export default function KnowledgePage() {
                   </div>
                   <p className="font-semibold">Chọn một bài viết</p>
                   <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                    Nội dung chi tiết, tag và quyền thao tác sẽ hiển thị tại đây.
+                    Nội dung chi tiết, tag và quyền thao tác sẽ hiển thị tại
+                    đây.
                   </p>
                 </div>
               </CardContent>

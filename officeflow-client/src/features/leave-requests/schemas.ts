@@ -2,10 +2,7 @@ import { z } from "zod";
 import { getTodayDateInputValue } from "./constants";
 import type { CreateLeaveRequestInput } from "./types";
 
-const dateOnlySchema = z
-  .string()
-  .trim()
-  .regex(/^\d{4}-\d{2}-\d{2}$/, "Ngày không hợp lệ");
+const dateOnlySchema = z.string().trim().pipe(z.iso.date("Ngày không hợp lệ"));
 
 export const leaveRequestFormSchema = z
   .object({

@@ -32,6 +32,10 @@ type RetryableRequestConfig = InternalAxiosRequestConfig & {
 
 let refreshRequest: Promise<string> | null = null;
 
+export function isUnauthorizedError(error: unknown) {
+  return axios.isAxiosError(error) && error.response?.status === 401;
+}
+
 function isRefreshExcludedEndpoint(url?: string) {
   const path = url?.split("?")[0];
 
@@ -48,7 +52,9 @@ export function refreshAccessToken(): Promise<string> {
         return token;
       })
       .catch((error: unknown) => {
-        removeAccessToken();
+        if (isUnauthorizedError(error)) {
+          removeAccessToken();
+        }
         throw error;
       })
       .finally(() => {
@@ -100,9 +106,8 @@ api.interceptors.response.use(
       const token = await refreshAccessToken();
       originalRequest.headers.set("Authorization", `Bearer ${token}`);
       return api.request(originalRequest);
-    } catch {
-      removeAccessToken();
-      return Promise.reject(error);
+    } catch (refreshError) {
+      return Promise.reject(refreshError);
     }
   },
 );

@@ -7,13 +7,13 @@ export const knowledgeArticleFormSchema = z.object({
     .trim()
     .min(3, "Tiêu đề ít nhất 3 ký tự")
     .max(150, "Tiêu đề tối đa 150 ký tự"),
-  summary: z
+  summary: z.string().trim().max(300, "Tóm tắt tối đa 300 ký tự").optional(),
+  content: z
     .string()
     .trim()
-    .max(300, "Tóm tắt tối đa 300 ký tự")
-    .optional(),
-  content: z.string().trim().min(20, "Nội dung ít nhất 20 ký tự"),
-  tags: z.string().trim().optional(),
+    .min(20, "Nội dung ít nhất 20 ký tự")
+    .max(15_000, "Nội dung tối đa 15.000 ký tự"),
+  tags: z.string().trim().max(1000, "Tags tối đa 1.000 ký tự").optional(),
   isPublished: z.boolean(),
 });
 
@@ -33,9 +33,9 @@ export function toKnowledgeArticlePayload(
 
   return {
     title: values.title.trim(),
-    summary: summary || undefined,
+    summary: summary ?? "",
     content: values.content.trim(),
-    tags: tags || undefined,
+    tags: tags ?? "",
     isPublished: values.isPublished,
   };
 }

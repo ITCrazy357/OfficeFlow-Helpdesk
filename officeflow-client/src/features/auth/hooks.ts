@@ -21,6 +21,7 @@ export function useLogin() {
   return useMutation({
     mutationFn: loginApi,
     onSuccess: (data) => {
+      queryClient.clear();
       setAccessToken(data.accessToken);
       queryClient.setQueryData(authQueryKeys.me, data.user);
     },
@@ -34,6 +35,15 @@ export function useMe(enabled = true) {
     enabled,
     retry: false,
   });
+}
+
+export function useClearSession() {
+  const queryClient = useQueryClient();
+
+  return useCallback(() => {
+    removeAccessToken();
+    queryClient.clear();
+  }, [queryClient]);
 }
 
 export function useLogout() {

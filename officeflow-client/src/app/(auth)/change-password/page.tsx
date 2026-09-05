@@ -16,12 +16,18 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { useChangePassword, useLogout, useMe } from "@/features/auth/hooks";
+import {
+  useChangePassword,
+  useClearSession,
+  useLogout,
+  useMe,
+} from "@/features/auth/hooks";
+import { SessionError } from "@/features/auth/components/session-error";
 import {
   changePasswordSchema,
   type ChangePasswordFormValues,
 } from "@/features/auth/schemas";
-import { getApiErrorMessage } from "@/lib/axios";
+import { getApiErrorMessage, isUnauthorizedError } from "@/lib/axios";
 
 function FieldError({ message }: { message?: string }) {
   return message ? (
@@ -46,7 +52,16 @@ function ChangePasswordLoading() {
 
 export default function ChangePasswordPage() {
   const router = useRouter();
-  const { data: user, isError, isLoading } = useMe();
+  const {
+    data: user,
+    error,
+    isError,
+    isLoading,
+    isFetching,
+    refetch,
+  } = useMe();
+  const clearSession = useClearSession();
+  const sessionExpired = isUnauthorizedError(error);
   const changePassword = useChangePassword();
   const logout = useLogout();
   const [formError, setFormError] = useState<string | null>(null);
@@ -61,10 +76,11 @@ export default function ChangePasswordPage() {
   });
 
   useEffect(() => {
-    if (isError) {
-      void logout().finally(() => router.replace("/login"));
+    if (sessionExpired) {
+      clearSession();
+      router.replace("/login");
     }
-  }, [isError, logout, router]);
+  }, [sessionExpired, clearSession, router]);
 
   const onSubmit: SubmitHandler<ChangePasswordFormValues> = async (values) => {
     setFormError(null);
@@ -92,7 +108,17 @@ export default function ChangePasswordPage() {
     router.replace("/login");
   }
 
-  if (isLoading || !user) {
+  if (isError && !sessionExpired) {
+    return (
+      <SessionError
+        error={error}
+        isRetrying={isFetching}
+        onRetry={() => void refetch()}
+      />
+    );
+  }
+
+  if (isLoading || sessionExpired || !user) {
     return <ChangePasswordLoading />;
   }
 

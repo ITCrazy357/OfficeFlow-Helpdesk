@@ -17,7 +17,7 @@ import { AssetForm } from "@/features/assets/components/asset-form";
 import { AssetToast } from "@/features/assets/components/asset-toast";
 import { useAsset, useUpdateAsset } from "@/features/assets/hooks";
 import {
-  toAssetPayload,
+  toAssetUpdatePayload,
   type AssetFormValues,
 } from "@/features/assets/schemas";
 import { useMe } from "@/features/auth/hooks";
@@ -62,10 +62,20 @@ export default function EditAssetPage() {
     setFormError(null);
     setFeedback(null);
 
+    if (
+      (assetQuery.data?.purchaseDate && !values.purchaseDate) ||
+      (assetQuery.data?.warrantyUntil && !values.warrantyUntil)
+    ) {
+      setFormError(
+        "Chưa hỗ trợ xóa ngày mua hoặc ngày bảo hành đã lưu. Vui lòng giữ ngày hiện tại hoặc chọn ngày mới.",
+      );
+      return;
+    }
+
     try {
       await updateAsset.mutateAsync({
         id: assetId,
-        input: toAssetPayload(values),
+        input: toAssetUpdatePayload(values),
       });
       setFeedback({
         message: "Đã cập nhật thông tin tài sản.",

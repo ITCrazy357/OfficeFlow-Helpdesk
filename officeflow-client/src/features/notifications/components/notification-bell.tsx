@@ -1,6 +1,6 @@
 "use client";
 
-import type { CSSProperties, MouseEvent } from "react";
+import type { CSSProperties } from "react";
 import { useEffect, useRef, useState } from "react";
 import { Bell, CheckCheck, Eye, Inbox, Loader2, X } from "lucide-react";
 import Link from "next/link";
@@ -9,6 +9,7 @@ import { useRouter } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/components/ui/utils";
+import { getApiErrorMessage } from "@/lib/axios";
 import {
   formatNotificationRelativeTime,
   getNotificationMeta,
@@ -46,75 +47,83 @@ function NotificationRow({
   const meta = getNotificationMeta(notification.type);
   const Icon = meta.icon;
 
-  function handleMarkRead(event: MouseEvent<HTMLButtonElement>) {
-    event.stopPropagation();
-    onMarkRead(notification);
-  }
-
   return (
-    <button
-      type="button"
+    <div
       className={cn(
-        "motion-card w-full rounded-lg border p-3 text-left transition-colors",
+        "motion-card relative w-full rounded-lg border text-left transition-colors",
         notification.isRead
           ? "bg-card hover:bg-muted/35"
           : "border-teal-200 bg-teal-50/55 hover:bg-teal-50",
       )}
       style={{ "--motion-index": index } as CSSProperties}
-      onClick={() => onOpen(notification)}
     >
-      <div className="flex gap-3">
-        <div
-          className={cn(
-            "grid size-9 shrink-0 place-items-center rounded-lg ring-1",
-            meta.iconTone,
-          )}
-        >
-          <Icon className="size-4" />
-        </div>
-        <div className="min-w-0 flex-1">
-          <div className="flex items-start justify-between gap-2">
-            <div className="min-w-0">
-              <p className="line-clamp-1 text-sm font-semibold">
-                {notification.title}
-              </p>
-              <p className="mt-1 line-clamp-2 text-xs leading-5 text-muted-foreground">
-                {notification.message}
-              </p>
+      <button
+        type="button"
+        className="w-full rounded-lg p-3 text-left focus-visible:outline-2 focus-visible:outline-ring"
+        onClick={() => onOpen(notification)}
+        disabled={isMarking}
+      >
+        <div className="flex gap-3">
+          <div
+            className={cn(
+              "grid size-9 shrink-0 place-items-center rounded-lg ring-1",
+              meta.iconTone,
+            )}
+          >
+            <Icon className="size-4" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <div className="flex items-start justify-between gap-2">
+              <div className="min-w-0">
+                <p className="line-clamp-1 text-sm font-semibold">
+                  {notification.title}
+                </p>
+                <p className="mt-1 line-clamp-2 text-xs leading-5 text-muted-foreground">
+                  {notification.message}
+                </p>
+              </div>
+              {!notification.isRead ? (
+                <span className="mt-1 size-2 shrink-0 rounded-full bg-teal-700" />
+              ) : null}
             </div>
-            {!notification.isRead ? (
-              <span className="mt-1 size-2 shrink-0 rounded-full bg-teal-700" />
-            ) : null}
-          </div>
 
-          <div className="mt-2 flex flex-wrap items-center gap-2">
-            <Badge variant="outline" className={cn("motion-badge", meta.tone)}>
-              {meta.label}
-            </Badge>
-            <span className="text-xs text-muted-foreground">
-              {formatNotificationRelativeTime(notification.createdAt)}
-            </span>
-            {!notification.isRead ? (
-              <Button
-                type="button"
-                variant="ghost"
-                size="xs"
-                className="ml-auto h-7"
-                onClick={handleMarkRead}
-                disabled={isMarking}
+            <div
+              className={cn(
+                "mt-2 flex flex-wrap items-center gap-2",
+                !notification.isRead && "pr-20",
+              )}
+            >
+              <Badge
+                variant="outline"
+                className={cn("motion-badge", meta.tone)}
               >
-                {isMarking ? (
-                  <Loader2 className="size-3 animate-spin" />
-                ) : (
-                  <Eye className="size-3" />
-                )}
-                Đã đọc
-              </Button>
-            ) : null}
+                {meta.label}
+              </Badge>
+              <span className="text-xs text-muted-foreground">
+                {formatNotificationRelativeTime(notification.createdAt)}
+              </span>
+            </div>
           </div>
         </div>
-      </div>
-    </button>
+      </button>
+      {!notification.isRead ? (
+        <Button
+          type="button"
+          variant="ghost"
+          size="xs"
+          className="absolute bottom-2 right-2 h-7"
+          onClick={() => onMarkRead(notification)}
+          disabled={isMarking}
+        >
+          {isMarking ? (
+            <Loader2 className="size-3 animate-spin" />
+          ) : (
+            <Eye className="size-3" />
+          )}
+          Đã đọc
+        </Button>
+      ) : null}
+    </div>
   );
 }
 
@@ -125,6 +134,7 @@ export function NotificationBell() {
   const [isOpen, setIsOpen] = useState(false);
   const [showNewSignal, setShowNewSignal] = useState(false);
   const [markingId, setMarkingId] = useState<number | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
 
   const unreadCountQuery = useUnreadNotificationCount({
     refetchInterval: NOTIFICATION_POLL_INTERVAL_MS,
@@ -180,11 +190,20 @@ export function NotificationBell() {
   }, [isOpen]);
 
   async function handleOpenNotification(notification: NotificationItem) {
+    setActionError(null);
     if (!notification.isRead) {
       setMarkingId(notification.id);
 
       try {
         await markRead.mutateAsync(notification.id);
+      } catch (error) {
+        setActionError(
+          getApiErrorMessage(
+            error,
+            "Không thể đánh dấu đã đọc. Vui lòng thử lại.",
+          ),
+        );
+        return;
       } finally {
         setMarkingId(null);
       }
@@ -202,17 +221,32 @@ export function NotificationBell() {
       return;
     }
 
+    setActionError(null);
     setMarkingId(notification.id);
 
     try {
       await markRead.mutateAsync(notification.id);
+    } catch (error) {
+      setActionError(
+        getApiErrorMessage(
+          error,
+          "Không thể đánh dấu đã đọc. Vui lòng thử lại.",
+        ),
+      );
     } finally {
       setMarkingId(null);
     }
   }
 
   async function handleMarkAllRead() {
-    await markAllRead.mutateAsync();
+    setActionError(null);
+    try {
+      await markAllRead.mutateAsync();
+    } catch (error) {
+      setActionError(
+        getApiErrorMessage(error, "Không thể đánh dấu tất cả đã đọc."),
+      );
+    }
   }
 
   return (
@@ -223,7 +257,8 @@ export function NotificationBell() {
         size="icon"
         className={cn(
           "relative",
-          showNewSignal && "ring-2 ring-teal-300 ring-offset-2 ring-offset-card",
+          showNewSignal &&
+            "ring-2 ring-teal-300 ring-offset-2 ring-offset-card",
         )}
         onClick={() => {
           setIsOpen((value) => !value);
@@ -287,6 +322,14 @@ export function NotificationBell() {
           </div>
 
           <div className="mt-3 max-h-[440px] overflow-y-auto pr-1">
+            {actionError ? (
+              <p
+                role="alert"
+                className="mb-3 rounded-lg border border-destructive/20 bg-destructive/5 p-3 text-sm text-destructive"
+              >
+                {actionError}
+              </p>
+            ) : null}
             {notificationsQuery.isLoading ? (
               <div className="grid gap-3">
                 {Array.from({ length: 4 }).map((_, index) => (

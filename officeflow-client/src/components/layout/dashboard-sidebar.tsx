@@ -143,6 +143,7 @@ function SidebarNav({
               href={item.href}
               onClick={onNavigate}
               data-active={active}
+              aria-current={active ? "page" : undefined}
               className={cn(
                 "motion-nav group flex items-center gap-3 rounded-lg px-3 py-3 text-sm font-medium",
                 active
@@ -204,6 +205,8 @@ export function DashboardSidebar({
       <button
         type="button"
         aria-label="Đóng sidebar"
+        tabIndex={isOpen ? 0 : -1}
+        aria-hidden={!isOpen}
         className={cn(
           "fixed inset-0 z-40 bg-foreground/35 backdrop-blur-[2px] transition-opacity md:hidden",
           isOpen
@@ -214,6 +217,8 @@ export function DashboardSidebar({
       />
 
       <aside
+        inert={!isOpen}
+        aria-hidden={!isOpen}
         className={cn(
           "fixed inset-y-0 left-0 z-50 flex w-72 max-w-[86vw] flex-col border-r bg-sidebar shadow-2xl shadow-foreground/15 transition-transform duration-300 ease-out md:hidden",
           isOpen ? "translate-x-0" : "-translate-x-full",

@@ -13,11 +13,7 @@ export type AssetType =
   | "OTHER";
 
 export type AssetStatus =
-  | "AVAILABLE"
-  | "ASSIGNED"
-  | "MAINTENANCE"
-  | "RETIRED"
-  | "LOST";
+  "AVAILABLE" | "ASSIGNED" | "MAINTENANCE" | "RETIRED" | "LOST";
 
 export type ManualAssetStatus = Exclude<AssetStatus, "ASSIGNED">;
 
@@ -97,7 +93,14 @@ export type CreateAssetInput = {
   notes?: string;
 };
 
-export type UpdateAssetInput = Partial<CreateAssetInput>;
+export type UpdateAssetInput = Partial<
+  Omit<CreateAssetInput, "brand" | "model" | "serialNumber" | "notes">
+> & {
+  brand?: string | null;
+  model?: string | null;
+  serialNumber?: string | null;
+  notes?: string | null;
+};
 
 export type AssignAssetInput = {
   userId: number;

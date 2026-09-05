@@ -7,7 +7,11 @@ export const ticketFormSchema = z.object({
     .trim()
     .min(3, "Tiêu đề ít nhất 3 ký tự")
     .max(100, "Tiêu đề tối đa 100 ký tự"),
-  description: z.string().trim().min(10, "Mô tả ít nhất 10 ký tự"),
+  description: z
+    .string()
+    .trim()
+    .min(10, "Mô tả ít nhất 10 ký tự")
+    .max(15_000, "Mô tả tối đa 15.000 ký tự"),
   priority: z.enum(["LOW", "MEDIUM", "HIGH", "URGENT"]),
   categoryId: z
     .string()

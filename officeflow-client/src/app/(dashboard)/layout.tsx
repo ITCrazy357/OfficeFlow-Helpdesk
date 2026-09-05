@@ -6,7 +6,9 @@ import { useRouter } from "next/navigation";
 
 import { DashboardHeader } from "@/components/layout/dashboard-header";
 import { DashboardSidebar } from "@/components/layout/dashboard-sidebar";
-import { useLogout, useMe } from "@/features/auth/hooks";
+import { useClearSession, useMe } from "@/features/auth/hooks";
+import { SessionError } from "@/features/auth/components/session-error";
+import { isUnauthorizedError } from "@/lib/axios";
 
 type Props = {
   children: ReactNode;
@@ -28,22 +30,42 @@ function DashboardLoading() {
 
 export default function DashboardLayout({ children }: Props) {
   const router = useRouter();
-  const logout = useLogout();
+  const clearSession = useClearSession();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const { data: user, isError, isLoading } = useMe();
+  const {
+    data: user,
+    error,
+    isError,
+    isLoading,
+    isFetching,
+    refetch,
+  } = useMe();
+  const sessionExpired = isUnauthorizedError(error);
 
   useEffect(() => {
+    if (sessionExpired) {
+      clearSession();
+      router.replace("/login");
+      return;
+    }
+
     if (user?.mustChangePassword) {
       router.replace("/change-password");
       return;
     }
+  }, [sessionExpired, clearSession, router, user?.mustChangePassword]);
 
-    if (isError) {
-      void logout().finally(() => router.replace("/login"));
-    }
-  }, [isError, logout, router, user?.mustChangePassword]);
+  if (isError && !sessionExpired) {
+    return (
+      <SessionError
+        error={error}
+        isRetrying={isFetching}
+        onRetry={() => void refetch()}
+      />
+    );
+  }
 
-  if (isLoading || user?.mustChangePassword) {
+  if (isLoading || sessionExpired || user?.mustChangePassword) {
     return <DashboardLoading />;
   }
 

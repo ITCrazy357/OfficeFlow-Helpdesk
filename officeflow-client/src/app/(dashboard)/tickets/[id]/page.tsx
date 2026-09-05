@@ -350,7 +350,10 @@ export default function TicketDetailPage() {
       setIsEditing(false);
     } catch (error) {
       setFormError(
-        getApiErrorMessage(error, "Không thể cập nhật ticket. Vui lòng thử lại."),
+        getApiErrorMessage(
+          error,
+          "Không thể cập nhật ticket. Vui lòng thử lại.",
+        ),
       );
     }
   }
@@ -436,6 +439,11 @@ export default function TicketDetailPage() {
 
     if (content.length < 10) {
       setCommentError("Bình luận cần ít nhất 10 ký tự.");
+      return;
+    }
+
+    if (content.length > 15_000) {
+      setCommentError("Bình luận tối đa 15.000 ký tự.");
       return;
     }
 
@@ -550,8 +558,8 @@ export default function TicketDetailPage() {
 
       {searchParams.get("assetLink") === "failed" ? (
         <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-medium text-amber-900 motion-toast">
-          Ticket đã được tạo nhưng chưa thể liên kết tài sản. Bạn có thể thử
-          lại tại mục Tài sản liên quan bên dưới.
+          Ticket đã được tạo nhưng chưa thể liên kết tài sản. Bạn có thể thử lại
+          tại mục Tài sản liên quan bên dưới.
         </div>
       ) : null}
 
@@ -984,7 +992,8 @@ export default function TicketDetailPage() {
                     !staffUsersQuery.isLoading &&
                     !staffUsersQuery.isError ? (
                       <p className="text-xs text-muted-foreground">
-                        Chưa có nhân viên IT đang hoạt động trong danh sách users.
+                        Chưa có nhân viên IT đang hoạt động trong danh sách
+                        users.
                       </p>
                     ) : null}
                   </>
@@ -1152,9 +1161,7 @@ export default function TicketDetailPage() {
                 ) : (
                   <div className="rounded-lg border border-dashed p-4 text-center">
                     <History className="mx-auto size-5 text-muted-foreground" />
-                    <p className="mt-2 text-sm font-medium">
-                      Chưa có lịch sử
-                    </p>
+                    <p className="mt-2 text-sm font-medium">Chưa có lịch sử</p>
                   </div>
                 )}
               </CardContent>

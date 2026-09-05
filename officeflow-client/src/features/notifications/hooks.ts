@@ -78,7 +78,9 @@ function removeCachedNotification(queryClient: QueryClient, id: number) {
       current
         ? {
             ...current,
-            items: current.items.filter((notification) => notification.id !== id),
+            items: current.items.filter(
+              (notification) => notification.id !== id,
+            ),
             pagination: {
               ...current.pagination,
               totalItems: Math.max(current.pagination.totalItems - 1, 0),
@@ -129,7 +131,7 @@ export function useMarkNotificationAsRead() {
       }
 
       queryClient.invalidateQueries({
-        queryKey: notificationsQueryKeys.lists(),
+        queryKey: notificationsQueryKeys.all,
       });
     },
   });
@@ -144,7 +146,7 @@ export function useMarkAllNotificationsAsRead() {
       markCachedNotificationsAsRead(queryClient);
       queryClient.setQueryData(notificationsQueryKeys.unreadCount(), 0);
       queryClient.invalidateQueries({
-        queryKey: notificationsQueryKeys.lists(),
+        queryKey: notificationsQueryKeys.all,
       });
     },
   });
@@ -169,7 +171,7 @@ export function useDeleteNotification() {
       }
 
       queryClient.invalidateQueries({
-        queryKey: notificationsQueryKeys.lists(),
+        queryKey: notificationsQueryKeys.all,
       });
     },
   });
