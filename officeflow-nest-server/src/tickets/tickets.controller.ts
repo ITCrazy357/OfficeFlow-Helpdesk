@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   Delete,
+  FileTypeValidator,
   Get,
   HttpCode,
   HttpStatus,
@@ -27,6 +28,7 @@ import {
   ApiResponse,
   ApiTags,
 } from '@nestjs/swagger';
+import { Throttle } from '@nestjs/throttler';
 import { TicketPriority, TicketStatus, UserRole } from '@prisma/client';
 
 import { TicketsService, type TicketAttachmentFile } from './tickets.service';
@@ -47,6 +49,7 @@ import {
   TicketSlaFilter,
 } from './dto/get-tickets-query.dto';
 import { LinkTicketAssetDto } from './dto/link-ticket-asset.dto';
+import { ALLOWED_ATTACHMENT_FILE_TYPES } from './ticket-attachment.util';
 import { UpdateTicketStatusDto } from './dto/update-ticket-status.dto';
 import { UpdateTicketDto } from './dto/update-ticket.dto';
 
@@ -262,6 +265,12 @@ export class TicketsController {
 
   @UseGuards(JwtAuthGuard)
   @Post(':id/attachments')
+  @Throttle({
+    default: {
+      limit: 10,
+      ttl: 60_000,
+    },
+  })
   @UseInterceptors(
     FileInterceptor('file', {
       limits: { fileSize: MAX_ATTACHMENT_SIZE_IN_BYTES },
@@ -302,6 +311,10 @@ export class TicketsController {
           new MaxFileSizeValidator({
             maxSize: MAX_ATTACHMENT_SIZE_IN_BYTES,
             errorMessage: 'Attachment must not exceed 10 MB',
+          }),
+          new FileTypeValidator({
+            fileType: ALLOWED_ATTACHMENT_FILE_TYPES,
+            errorMessage: 'Only JPEG, PNG and PDF attachments are allowed',
           }),
         ],
       }),

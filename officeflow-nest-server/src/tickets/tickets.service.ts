@@ -46,6 +46,7 @@ import {
   DASHBOARD_CACHE_INVALIDATE_EVENT,
   DashboardCacheInvalidatedEvent,
 } from '../dashboard/events/dashboard-cache-invalidated.event';
+import { normalizeAttachmentFileName } from './ticket-attachment.util';
 
 export type TicketAttachmentFile = NonNullable<Request['file']>;
 
@@ -1270,6 +1271,8 @@ export class TicketsService {
 
     await this.canAccessTicket(ticketId, currentUser);
 
+    const fileName = normalizeAttachmentFileName(file.originalname);
+
     const uploadedFile = await this.cloudinaryService.uploadFile(
       file,
       'officeflow/ticket-attachments',
@@ -1281,7 +1284,7 @@ export class TicketsService {
           data: {
             ticketId,
             uploadedById: currentUser.userId,
-            fileName: file.originalname,
+            fileName,
             fileType: file.mimetype,
             fileSize: file.size,
             fileUrl: uploadedFile.secureUrl,

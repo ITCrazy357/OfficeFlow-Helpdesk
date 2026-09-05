@@ -571,6 +571,76 @@ describe('TicketsService', () => {
     );
   });
 
+  it('should normalize the attachment name before saving metadata', async () => {
+    const currentUser = {
+      userId: 1,
+      role: UserRole.ADMIN,
+    };
+    const file = {
+      originalname: '  ..\\folder/\u0000report.pdf  ',
+      mimetype: 'application/pdf',
+      size: 2048,
+    } as Express.Multer.File;
+
+    mockPrismaService.ticket.findUnique.mockResolvedValue({
+      id: 5,
+      createdById: 2,
+      createdBy: { departmentId: 1 },
+    });
+    mockCloudinaryService.uploadFile.mockResolvedValue({
+      publicId: 'officeflow/ticket-attachments/report.pdf',
+      resourceType: 'raw',
+      secureUrl: 'https://res.cloudinary.com/demo/raw/upload/v1/report.pdf',
+    });
+    mockTransaction.ticketAttachment.create.mockResolvedValue({
+      id: 20,
+      fileName: '.._folder_report.pdf',
+    });
+    mockTransaction.ticketHistory.create.mockResolvedValue({ id: 100 });
+
+    await service.uploadAttachment(5, file, currentUser);
+
+    expect(mockTransaction.ticketAttachment.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          fileName: '.._folder_report.pdf',
+        }) as object,
+      }),
+    );
+    expect(mockTransaction.ticketHistory.create).toHaveBeenCalledWith({
+      data: {
+        ticketId: 5,
+        userId: 1,
+        action: TicketHistoryAction.ATTACHMENT_ADDED,
+        newValue: '.._folder_report.pdf',
+      },
+    });
+  });
+
+  it('should reject an invalid attachment name before uploading', async () => {
+    const currentUser = {
+      userId: 1,
+      role: UserRole.ADMIN,
+    };
+    const file = {
+      originalname: '\u0000\u001f\u007f\t\n',
+      mimetype: 'application/pdf',
+      size: 2048,
+    } as Express.Multer.File;
+
+    mockPrismaService.ticket.findUnique.mockResolvedValue({
+      id: 5,
+      createdById: 2,
+      createdBy: { departmentId: 1 },
+    });
+
+    await expect(
+      service.uploadAttachment(5, file, currentUser),
+    ).rejects.toThrow('Attachment file name is invalid');
+    expect(mockCloudinaryService.uploadFile).not.toHaveBeenCalled();
+    expect(mockPrismaService.$transaction).not.toHaveBeenCalled();
+  });
+
   it('should delete an employee own attachment and write history atomically', async () => {
     const currentUser = {
       userId: 10,
