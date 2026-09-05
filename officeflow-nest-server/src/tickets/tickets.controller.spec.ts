@@ -24,6 +24,7 @@ describe('TicketsController attachment upload', () => {
     role: UserRole.ADMIN,
   };
   const mockTicketsService = {
+    getAttachmentAccessUrl: jest.fn(),
     uploadAttachment: jest.fn(),
   };
   const allowAuthenticatedRequest: CanActivate = {
@@ -63,6 +64,10 @@ describe('TicketsController attachment upload', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    mockTicketsService.getAttachmentAccessUrl.mockResolvedValue({
+      url: 'https://api.cloudinary.com/private-download',
+      expiresAt: '2027-01-15T08:05:00.000Z',
+    });
     mockTicketsService.uploadAttachment.mockResolvedValue({ id: 20 });
   });
 
@@ -134,5 +139,33 @@ describe('TicketsController attachment upload', () => {
       .expect(413);
 
     expect(mockTicketsService.uploadAttachment).not.toHaveBeenCalled();
+  });
+
+  it('creates an attachment URL with the requested disposition', async () => {
+    await request(httpServer)
+      .get('/tickets/5/attachments/20/access-url')
+      .query({ download: true })
+      .expect(200)
+      .expect('Cache-Control', 'no-store')
+      .expect({
+        url: 'https://api.cloudinary.com/private-download',
+        expiresAt: '2027-01-15T08:05:00.000Z',
+      });
+
+    expect(mockTicketsService.getAttachmentAccessUrl).toHaveBeenCalledWith(
+      5,
+      20,
+      currentUser,
+      true,
+    );
+  });
+
+  it('rejects an invalid attachment disposition option', async () => {
+    await request(httpServer)
+      .get('/tickets/5/attachments/20/access-url')
+      .query({ download: 'invalid' })
+      .expect(400);
+
+    expect(mockTicketsService.getAttachmentAccessUrl).not.toHaveBeenCalled();
   });
 });

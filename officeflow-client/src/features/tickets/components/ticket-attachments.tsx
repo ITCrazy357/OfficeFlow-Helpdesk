@@ -31,6 +31,7 @@ import type { AuthUser } from "@/features/auth/types";
 import { getApiErrorMessage } from "@/lib/axios";
 import {
   useDeleteTicketAttachment,
+  useTicketAttachmentAccessUrl,
   useTicketAttachments,
   useUploadTicketAttachment,
 } from "../hooks";
@@ -149,12 +150,18 @@ export function TicketAttachments({
 }: TicketAttachmentsProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const attachmentsQuery = useTicketAttachments(ticketId, enabled);
+  const attachmentAccess = useTicketAttachmentAccessUrl();
   const uploadAttachment = useUploadTicketAttachment();
   const deleteAttachment = useDeleteTicketAttachment();
   const [isDragging, setIsDragging] = useState(false);
   const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null);
   const [deletingId, setDeletingId] = useState<number | null>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
+  const [accessError, setAccessError] = useState<string | null>(null);
+  const [accessingAttachment, setAccessingAttachment] = useState<{
+    id: number;
+    download: boolean;
+  } | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const attachments = attachmentsQuery.data ?? [];
@@ -235,6 +242,54 @@ export function TicketAttachments({
       );
     } finally {
       setDeletingId(null);
+    }
+  }
+
+  async function handleAttachmentAccess(
+    attachment: TicketAttachment,
+    download: boolean,
+  ) {
+    setAccessError(null);
+    setAccessingAttachment({ id: attachment.id, download });
+
+    const previewWindow = download
+      ? null
+      : window.open("about:blank", "_blank");
+
+    if (previewWindow) {
+      previewWindow.opener = null;
+    }
+
+    try {
+      const access = await attachmentAccess.mutateAsync({
+        id: ticketId,
+        attachmentId: attachment.id,
+        download,
+      });
+
+      if (download) {
+        const link = document.createElement("a");
+        link.href = access.url;
+        link.download = attachment.fileName;
+        link.rel = "noopener noreferrer";
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+      } else if (previewWindow) {
+        previewWindow.location.replace(access.url);
+      } else {
+        window.location.assign(access.url);
+      }
+    } catch (error) {
+      previewWindow?.close();
+      setAccessError(
+        getApiErrorMessage(
+          error,
+          "Không thể mở tệp đính kèm. Vui lòng thử lại.",
+        ),
+      );
+    } finally {
+      setAccessingAttachment(null);
     }
   }
 
@@ -322,6 +377,13 @@ export function TicketAttachments({
           </div>
         ) : null}
 
+        {accessError ? (
+          <div className="flex items-start gap-2 rounded-lg border border-destructive/20 bg-destructive/5 px-3 py-2 text-sm font-medium text-destructive motion-toast">
+            <AlertCircle className="mt-0.5 size-4 shrink-0" />
+            <span>{accessError}</span>
+          </div>
+        ) : null}
+
         {attachmentsQuery.isLoading ? (
           <div className="grid gap-3">
             {Array.from({ length: 3 }).map((_, index) => (
@@ -354,6 +416,12 @@ export function TicketAttachments({
               const allowDelete = canDeleteAttachment(currentUser, attachment);
               const isConfirmingDelete = confirmDeleteId === attachment.id;
               const isDeleting = deletingId === attachment.id;
+              const isOpening =
+                accessingAttachment?.id === attachment.id &&
+                !accessingAttachment.download;
+              const isDownloading =
+                accessingAttachment?.id === attachment.id &&
+                accessingAttachment.download;
 
               return (
                 <div
@@ -389,21 +457,37 @@ export function TicketAttachments({
                     </div>
 
                     <div className="flex flex-wrap gap-2 sm:justify-end">
-                      <Button asChild type="button" variant="outline" size="sm">
-                        <a
-                          href={attachment.fileUrl}
-                          target="_blank"
-                          rel="noreferrer"
-                        >
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() =>
+                          void handleAttachmentAccess(attachment, false)
+                        }
+                        disabled={attachmentAccess.isPending}
+                      >
+                        {isOpening ? (
+                          <Loader2 className="size-4 animate-spin" />
+                        ) : (
                           <ExternalLink className="size-4" />
-                          Mở
-                        </a>
+                        )}
+                        Mở
                       </Button>
-                      <Button asChild type="button" variant="outline" size="sm">
-                        <a href={attachment.fileUrl} download>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() =>
+                          void handleAttachmentAccess(attachment, true)
+                        }
+                        disabled={attachmentAccess.isPending}
+                      >
+                        {isDownloading ? (
+                          <Loader2 className="size-4 animate-spin" />
+                        ) : (
                           <Download className="size-4" />
-                          Tải
-                        </a>
+                        )}
+                        Tải
                       </Button>
                       {allowDelete ? (
                         <Button

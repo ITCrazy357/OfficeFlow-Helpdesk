@@ -129,6 +129,7 @@ export class CloudinaryService {
     format: string,
     resourceType: CloudinaryResourceType,
     deliveryType: CloudinaryDeliveryType = 'authenticated',
+    asAttachment = true,
   ): CloudinaryPrivateDownloadResult {
     const expiresAt = Math.floor(Date.now() / 1000) + 5 * 60;
 
@@ -136,7 +137,7 @@ export class CloudinaryService {
       resource_type: resourceType,
       type: deliveryType,
       expires_at: expiresAt,
-      attachment: true,
+      attachment: asAttachment,
     });
 
     return {

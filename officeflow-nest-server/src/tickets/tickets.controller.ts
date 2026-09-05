@@ -1,13 +1,16 @@
 import {
   Body,
   Controller,
+  DefaultValuePipe,
   Delete,
   FileTypeValidator,
   Get,
+  Header,
   HttpCode,
   HttpStatus,
   MaxFileSizeValidator,
   Param,
+  ParseBoolPipe,
   ParseFilePipe,
   ParseIntPipe,
   Patch,
@@ -343,6 +346,49 @@ export class TicketsController {
     @CurrentUser() currentUser: CurrentUserPayload,
   ) {
     return this.ticketsService.getAttachments(id, currentUser);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Get(':id/attachments/:attachmentId/access-url')
+  @Throttle({
+    default: {
+      limit: 30,
+      ttl: 60_000,
+    },
+  })
+  @HttpCode(HttpStatus.OK)
+  @Header('Cache-Control', 'no-store')
+  @Message('Get ticket attachment access URL successfully')
+  @ApiOperation({ summary: 'Create a temporary attachment access URL' })
+  @ApiParam({ name: 'id', example: 1 })
+  @ApiParam({ name: 'attachmentId', example: 10 })
+  @ApiQuery({
+    name: 'download',
+    required: false,
+    type: Boolean,
+    description: 'Download the attachment instead of opening it inline',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Temporary attachment access URL created successfully',
+  })
+  @ApiResponse({ status: 400, description: 'Invalid download option' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Forbidden' })
+  @ApiResponse({ status: 404, description: 'Ticket or attachment not found' })
+  getAttachmentAccessUrl(
+    @Param('id', ParseIntPipe) id: number,
+    @Param('attachmentId', ParseIntPipe) attachmentId: number,
+    @CurrentUser() currentUser: CurrentUserPayload,
+    @Query('download', new DefaultValuePipe(false), ParseBoolPipe)
+    download: boolean,
+  ) {
+    return this.ticketsService.getAttachmentAccessUrl(
+      id,
+      attachmentId,
+      currentUser,
+      download,
+    );
   }
 
   @UseGuards(JwtAuthGuard)

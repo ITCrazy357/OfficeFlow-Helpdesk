@@ -10,6 +10,7 @@ import type {
   LinkTicketAssetInput,
   Ticket,
   TicketAttachment,
+  TicketAttachmentAccessUrl,
   TicketComment,
   TicketHistory,
   UpdateTicketInput,
@@ -110,6 +111,21 @@ export async function getTicketHistoryApi(id: number) {
 export async function getTicketAttachmentsApi(id: number) {
   const res = await api.get<ApiResponse<TicketAttachment[]>>(
     `/tickets/${id}/attachments`,
+  );
+
+  return res.data.data;
+}
+
+export async function getTicketAttachmentAccessUrlApi(
+  id: number,
+  attachmentId: number,
+  download: boolean,
+) {
+  const res = await api.get<ApiResponse<TicketAttachmentAccessUrl>>(
+    `/tickets/${id}/attachments/${attachmentId}/access-url`,
+    {
+      params: { download },
+    },
   );
 
   return res.data.data;

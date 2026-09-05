@@ -132,6 +132,11 @@ export type TicketAttachment = {
   uploadedBy: TicketUser;
 };
 
+export type TicketAttachmentAccessUrl = {
+  url: string;
+  expiresAt: string | null;
+};
+
 export type DeleteTicketResponse = {
   id?: number;
   message?: string;

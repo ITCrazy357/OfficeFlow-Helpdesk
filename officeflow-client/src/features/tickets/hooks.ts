@@ -6,6 +6,7 @@ import {
   createTicketApi,
   deleteTicketAttachmentApi,
   deleteTicketApi,
+  getTicketAttachmentAccessUrlApi,
   getTicketAttachmentsApi,
   getTicketCommentsApi,
   getTicketHistoryApi,
@@ -81,6 +82,20 @@ export function useTicketAttachments(id: number, enabled = true) {
     queryFn: () => getTicketAttachmentsApi(id),
     enabled,
     retry: false,
+  });
+}
+
+export function useTicketAttachmentAccessUrl() {
+  return useMutation({
+    mutationFn: ({
+      id,
+      attachmentId,
+      download,
+    }: {
+      id: number;
+      attachmentId: number;
+      download: boolean;
+    }) => getTicketAttachmentAccessUrlApi(id, attachmentId, download),
   });
 }
 

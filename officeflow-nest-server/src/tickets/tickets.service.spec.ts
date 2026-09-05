@@ -52,6 +52,7 @@ const mockPrismaService = {
 };
 
 const mockCloudinaryService = {
+  createPrivateDownloadUrl: jest.fn(),
   uploadFile: jest.fn(),
   deleteFile: jest.fn(),
 };
@@ -474,6 +475,101 @@ describe('TicketsService', () => {
       { createdAt: 'desc' },
       { id: 'desc' },
     ]);
+  });
+
+  it('should create a signed URL for an authenticated attachment', async () => {
+    const currentUser = {
+      userId: 1,
+      role: UserRole.ADMIN,
+    };
+    const accessResult = {
+      url: 'https://api.cloudinary.com/private-download',
+      expiresAt: new Date('2027-01-15T08:05:00.000Z'),
+    };
+
+    mockPrismaService.ticket.findUnique.mockResolvedValue({
+      id: 5,
+      createdById: 2,
+      createdBy: { departmentId: 1 },
+    });
+    mockPrismaService.ticketAttachment.findUnique.mockResolvedValue({
+      fileUrl: 'https://res.cloudinary.com/demo/raw/authenticated/report.pdf',
+      publicId: 'officeflow/ticket-attachments/report',
+      resourceType: 'raw',
+      deliveryType: 'authenticated',
+      format: 'pdf',
+    });
+    mockCloudinaryService.createPrivateDownloadUrl.mockReturnValue(
+      accessResult,
+    );
+
+    await expect(
+      service.getAttachmentAccessUrl(5, 20, currentUser, false),
+    ).resolves.toEqual(accessResult);
+    expect(mockCloudinaryService.createPrivateDownloadUrl).toHaveBeenCalledWith(
+      'officeflow/ticket-attachments/report',
+      'pdf',
+      'raw',
+      'authenticated',
+      false,
+    );
+  });
+
+  it('should return the existing URL for a legacy public attachment', async () => {
+    const currentUser = {
+      userId: 1,
+      role: UserRole.ADMIN,
+    };
+
+    mockPrismaService.ticket.findUnique.mockResolvedValue({
+      id: 5,
+      createdById: 2,
+      createdBy: { departmentId: 1 },
+    });
+    mockPrismaService.ticketAttachment.findUnique.mockResolvedValue({
+      fileUrl: 'https://res.cloudinary.com/demo/image/upload/legacy.png',
+      publicId: 'officeflow/ticket-attachments/legacy',
+      resourceType: 'image',
+      deliveryType: 'upload',
+      format: null,
+    });
+
+    await expect(
+      service.getAttachmentAccessUrl(5, 20, currentUser, true),
+    ).resolves.toEqual({
+      url: 'https://res.cloudinary.com/demo/image/upload/legacy.png',
+      expiresAt: null,
+    });
+    expect(
+      mockCloudinaryService.createPrivateDownloadUrl,
+    ).not.toHaveBeenCalled();
+  });
+
+  it('should reject incomplete metadata for a protected attachment', async () => {
+    const currentUser = {
+      userId: 1,
+      role: UserRole.ADMIN,
+    };
+
+    mockPrismaService.ticket.findUnique.mockResolvedValue({
+      id: 5,
+      createdById: 2,
+      createdBy: { departmentId: 1 },
+    });
+    mockPrismaService.ticketAttachment.findUnique.mockResolvedValue({
+      fileUrl: 'https://res.cloudinary.com/demo/raw/authenticated/report.pdf',
+      publicId: 'officeflow/ticket-attachments/report',
+      resourceType: 'raw',
+      deliveryType: 'authenticated',
+      format: null,
+    });
+
+    await expect(
+      service.getAttachmentAccessUrl(5, 20, currentUser, true),
+    ).rejects.toThrow('Attachment delivery metadata is incomplete');
+    expect(
+      mockCloudinaryService.createPrivateDownloadUrl,
+    ).not.toHaveBeenCalled();
   });
 
   it('should save the detected Cloudinary resource type when uploading', async () => {

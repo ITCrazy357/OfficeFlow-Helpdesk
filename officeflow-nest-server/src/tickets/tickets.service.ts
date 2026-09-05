@@ -3,6 +3,7 @@ import {
   ConflictException,
   ForbiddenException,
   Injectable,
+  InternalServerErrorException,
   Logger,
   NotFoundException,
 } from '@nestjs/common';
@@ -130,7 +131,13 @@ function resolveCloudinaryDeliveryType(
     return deliveryType;
   }
 
-  return 'upload';
+  if (deliveryType === null) {
+    return 'upload';
+  }
+
+  throw new InternalServerErrorException(
+    'Attachment delivery metadata is invalid',
+  );
 }
 
 @Injectable()
@@ -1381,6 +1388,59 @@ export class TicketsService {
       orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
     });
     return attachments;
+  }
+
+  async getAttachmentAccessUrl(
+    ticketId: number,
+    attachmentId: number,
+    currentUser: CurrentUserPayload,
+    asAttachment: boolean,
+  ) {
+    await this.canAccessTicket(ticketId, currentUser);
+
+    const attachment = await this.prisma.ticketAttachment.findUnique({
+      where: {
+        id: attachmentId,
+        ticketId,
+      },
+      select: {
+        fileUrl: true,
+        publicId: true,
+        resourceType: true,
+        deliveryType: true,
+        format: true,
+      },
+    });
+
+    if (!attachment) {
+      throw new NotFoundException('Attachment not found');
+    }
+
+    const deliveryType = resolveCloudinaryDeliveryType(attachment.deliveryType);
+
+    if (deliveryType === 'upload') {
+      return {
+        url: attachment.fileUrl,
+        expiresAt: null,
+      };
+    }
+
+    if (!attachment.publicId || !attachment.format) {
+      throw new InternalServerErrorException(
+        'Attachment delivery metadata is incomplete',
+      );
+    }
+
+    return this.cloudinaryService.createPrivateDownloadUrl(
+      attachment.publicId,
+      attachment.format,
+      resolveCloudinaryResourceType(
+        attachment.resourceType,
+        attachment.fileUrl,
+      ),
+      deliveryType,
+      asAttachment,
+    );
   }
 
   async deleteAttachment(

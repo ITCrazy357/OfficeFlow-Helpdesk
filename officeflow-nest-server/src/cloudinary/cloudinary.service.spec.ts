@@ -131,6 +131,7 @@ describe('CloudinaryService', () => {
         'pdf',
         'raw',
         'authenticated',
+        true,
       ),
     ).toEqual({
       url: 'https://api.cloudinary.com/private-download',
