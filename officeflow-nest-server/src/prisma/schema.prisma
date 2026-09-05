@@ -337,6 +337,9 @@ model TicketAttachment {
   publicId     String?
   resourceType String?
 
+  format       String? @db.VarChar(32)
+  deliveryType String  @default("upload") @db.VarChar(32)
+
   ticketId Int
   ticket   Ticket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
 

@@ -4,10 +4,19 @@ import { Readable } from 'stream';
 
 export type CloudinaryResourceType = 'image' | 'raw' | 'video';
 
+export type CloudinaryDeliveryType = 'upload' | 'private' | 'authenticated';
+
 export type CloudinaryUploadResult = {
   publicId: string;
   resourceType: CloudinaryResourceType;
+  deliveryType: CloudinaryDeliveryType;
+  format: string;
   secureUrl: string;
+};
+
+export type CloudinaryPrivateDownloadResult = {
+  url: string;
+  expiresAt: Date;
 };
 
 type CloudinaryDestroyResponse = {
@@ -16,6 +25,10 @@ type CloudinaryDestroyResponse = {
 
 function isResourceType(value: string): value is CloudinaryResourceType {
   return value === 'image' || value === 'raw' || value === 'video';
+}
+
+function isDeliveryType(value: string): value is CloudinaryDeliveryType {
+  return value === 'upload' || value === 'private' || value === 'authenticated';
 }
 
 function isDestroyResponse(value: unknown): value is CloudinaryDestroyResponse {
@@ -46,6 +59,10 @@ export class CloudinaryService {
         {
           folder,
           resource_type: 'auto',
+          type: 'authenticated',
+          use_filename: false,
+          unique_filename: true,
+          overwrite: false,
         },
         (error, result) => {
           if (error || !result) {
@@ -54,7 +71,7 @@ export class CloudinaryService {
             );
           }
 
-          return resolve(result);
+          resolve(result);
         },
       );
 
@@ -67,9 +84,17 @@ export class CloudinaryService {
       );
     }
 
+    if (!isDeliveryType(result.type) || !result.format) {
+      throw new InternalServerErrorException(
+        'Cloudinary returned invalid delivery metadata',
+      );
+    }
+
     return {
       publicId: result.public_id,
       resourceType: result.resource_type,
+      deliveryType: result.type,
+      format: result.format,
       secureUrl: result.secure_url,
     };
   }
@@ -77,12 +102,14 @@ export class CloudinaryService {
   async deleteFile(
     publicId: string,
     resourceType: CloudinaryResourceType,
+    deliveryType: CloudinaryDeliveryType = 'upload',
   ): Promise<void> {
     let response: unknown;
 
     try {
       response = await cloudinary.uploader.destroy(publicId, {
         resource_type: resourceType,
+        type: deliveryType,
         invalidate: true,
       });
     } catch {
@@ -95,5 +122,26 @@ export class CloudinaryService {
     ) {
       throw new InternalServerErrorException('Delete file failed');
     }
+  }
+
+  createPrivateDownloadUrl(
+    publicId: string,
+    format: string,
+    resourceType: CloudinaryResourceType,
+    deliveryType: CloudinaryDeliveryType = 'authenticated',
+  ): CloudinaryPrivateDownloadResult {
+    const expiresAt = Math.floor(Date.now() / 1000) + 5 * 60;
+
+    const url = cloudinary.utils.private_download_url(publicId, format, {
+      resource_type: resourceType,
+      type: deliveryType,
+      expires_at: expiresAt,
+      attachment: true,
+    });
+
+    return {
+      url,
+      expiresAt: new Date(expiresAt * 1000),
+    };
   }
 }

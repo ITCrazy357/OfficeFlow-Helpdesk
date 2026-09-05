@@ -16,6 +16,7 @@ import { PrismaService } from '../prisma/prisma.service';
 
 const mockTransaction = {
   ticket: {
+    delete: jest.fn(),
     findUnique: jest.fn(),
     updateMany: jest.fn(),
   },
@@ -508,6 +509,8 @@ describe('TicketsService', () => {
     mockCloudinaryService.uploadFile.mockResolvedValue({
       publicId: 'officeflow/ticket-attachments/recording',
       resourceType: 'video',
+      deliveryType: 'authenticated',
+      format: 'mp4',
       secureUrl:
         'https://res.cloudinary.com/demo/video/upload/v1/recording.mp4',
     });
@@ -525,6 +528,8 @@ describe('TicketsService', () => {
     expect(createAttachmentArgs.data).toMatchObject({
       publicId: 'officeflow/ticket-attachments/recording',
       resourceType: 'video',
+      deliveryType: 'authenticated',
+      format: 'mp4',
     });
     expect(mockTransaction.ticketHistory.create).toHaveBeenCalledWith({
       data: {
@@ -533,6 +538,42 @@ describe('TicketsService', () => {
         action: TicketHistoryAction.ATTACHMENT_ADDED,
         newValue: 'recording.mp4',
       },
+    });
+  });
+
+  it('should use the delivery type when deleting ticket attachments', async () => {
+    const currentUser = {
+      userId: 1,
+      role: UserRole.ADMIN,
+    };
+
+    mockPrismaService.ticket.findUnique.mockResolvedValue({
+      id: 5,
+      title: 'Printer is unavailable',
+      createdById: 2,
+      status: TicketStatus.OPEN,
+      attachments: [
+        {
+          fileUrl:
+            'https://res.cloudinary.com/demo/raw/authenticated/report.pdf',
+          publicId: 'officeflow/ticket-attachments/report',
+          resourceType: 'raw',
+          deliveryType: 'authenticated',
+        },
+      ],
+    });
+    mockCloudinaryService.deleteFile.mockResolvedValue(undefined);
+    mockTransaction.ticket.delete.mockResolvedValue({ id: 5 });
+    mockAuditLogsService.create.mockResolvedValue({ id: 100 });
+
+    await expect(service.remove(5, currentUser)).resolves.toEqual({ id: 5 });
+    expect(mockCloudinaryService.deleteFile).toHaveBeenCalledWith(
+      'officeflow/ticket-attachments/report',
+      'raw',
+      'authenticated',
+    );
+    expect(mockTransaction.ticket.delete).toHaveBeenCalledWith({
+      where: { id: 5 },
     });
   });
 
@@ -555,6 +596,8 @@ describe('TicketsService', () => {
     mockCloudinaryService.uploadFile.mockResolvedValue({
       publicId: 'officeflow/ticket-attachments/report.pdf',
       resourceType: 'raw',
+      deliveryType: 'authenticated',
+      format: 'pdf',
       secureUrl: 'https://res.cloudinary.com/demo/raw/upload/v1/report.pdf',
     });
     mockPrismaService.$transaction.mockRejectedValueOnce(
@@ -568,6 +611,7 @@ describe('TicketsService', () => {
     expect(mockCloudinaryService.deleteFile).toHaveBeenCalledWith(
       'officeflow/ticket-attachments/report.pdf',
       'raw',
+      'authenticated',
     );
   });
 
@@ -590,6 +634,8 @@ describe('TicketsService', () => {
     mockCloudinaryService.uploadFile.mockResolvedValue({
       publicId: 'officeflow/ticket-attachments/report.pdf',
       resourceType: 'raw',
+      deliveryType: 'authenticated',
+      format: 'pdf',
       secureUrl: 'https://res.cloudinary.com/demo/raw/upload/v1/report.pdf',
     });
     mockTransaction.ticketAttachment.create.mockResolvedValue({
@@ -648,12 +694,18 @@ describe('TicketsService', () => {
     };
     const attachment: Pick<
       TicketAttachment,
-      'fileName' | 'fileUrl' | 'publicId' | 'resourceType' | 'uploadedById'
+      | 'fileName'
+      | 'fileUrl'
+      | 'publicId'
+      | 'resourceType'
+      | 'deliveryType'
+      | 'uploadedById'
     > = {
       fileName: 'recording.mp4',
       fileUrl: 'https://res.cloudinary.com/demo/video/upload/v1/recording.mp4',
       publicId: 'officeflow/ticket-attachments/recording',
       resourceType: 'video',
+      deliveryType: 'authenticated',
       uploadedById: 10,
     };
 
@@ -674,6 +726,7 @@ describe('TicketsService', () => {
     expect(mockCloudinaryService.deleteFile).toHaveBeenCalledWith(
       'officeflow/ticket-attachments/recording',
       'video',
+      'authenticated',
     );
     expect(mockTransaction.ticketAttachment.deleteMany).toHaveBeenCalledWith({
       where: { id: 20, ticketId: 5 },
@@ -704,6 +757,7 @@ describe('TicketsService', () => {
       fileUrl: 'https://res.cloudinary.com/demo/raw/upload/v1/report.pdf',
       publicId: 'officeflow/ticket-attachments/report.pdf',
       resourceType: 'raw',
+      deliveryType: 'authenticated',
       uploadedById: 2,
     });
     mockCloudinaryService.deleteFile.mockRejectedValue(
@@ -733,6 +787,7 @@ describe('TicketsService', () => {
       fileUrl: 'https://res.cloudinary.com/demo/raw/upload/v1/report.pdf',
       publicId: 'officeflow/ticket-attachments/report.pdf',
       resourceType: 'raw',
+      deliveryType: 'authenticated',
       uploadedById: 30,
     });
 

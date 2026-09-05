@@ -21,6 +21,7 @@ import type {} from 'multer';
 import { AuditLogsService } from '../audit-logs/audit-logs.service';
 import {
   CloudinaryService,
+  type CloudinaryDeliveryType,
   type CloudinaryResourceType,
 } from '../cloudinary/cloudinary.service';
 import type { CurrentUserPayload } from '../common/decorators/current-user.decorator';
@@ -116,6 +117,20 @@ function resolveCloudinaryResourceType(
   }
 
   return 'image';
+}
+
+function resolveCloudinaryDeliveryType(
+  deliveryType: string | null,
+): CloudinaryDeliveryType {
+  if (
+    deliveryType === 'upload' ||
+    deliveryType === 'private' ||
+    deliveryType === 'authenticated'
+  ) {
+    return deliveryType;
+  }
+
+  return 'upload';
 }
 
 @Injectable()
@@ -985,6 +1000,7 @@ export class TicketsService {
             fileUrl: true,
             publicId: true,
             resourceType: true,
+            deliveryType: true,
           },
         },
       },
@@ -1016,6 +1032,7 @@ export class TicketsService {
             attachment.resourceType,
             attachment.fileUrl,
           ),
+          resolveCloudinaryDeliveryType(attachment.deliveryType),
         );
       }),
     );
@@ -1290,6 +1307,8 @@ export class TicketsService {
             fileUrl: uploadedFile.secureUrl,
             publicId: uploadedFile.publicId,
             resourceType: uploadedFile.resourceType,
+            deliveryType: uploadedFile.deliveryType,
+            format: uploadedFile.format,
           },
           select: {
             id: true,
@@ -1325,6 +1344,7 @@ export class TicketsService {
         await this.cloudinaryService.deleteFile(
           uploadedFile.publicId,
           uploadedFile.resourceType,
+          uploadedFile.deliveryType,
         );
       } catch (cleanupError) {
         this.logger.error(
@@ -1380,6 +1400,7 @@ export class TicketsService {
         fileUrl: true,
         publicId: true,
         resourceType: true,
+        deliveryType: true,
         uploadedById: true,
       },
     });
@@ -1406,6 +1427,7 @@ export class TicketsService {
           attachment.resourceType,
           attachment.fileUrl,
         ),
+        resolveCloudinaryDeliveryType(attachment.deliveryType),
       );
     }
 
