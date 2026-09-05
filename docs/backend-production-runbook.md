@@ -135,6 +135,17 @@ tested backup-restore procedure instead of improvising SQL on production.
 
 ## Failure interpretation
 
+- **MariaDB 45012 / socket timeout after 1000ms:** the API now defaults to
+  `connectTimeout=10000` and `acquireTimeout=20000` in the runtime adapter URL.
+  No environment change is needed when those options are absent. Explicit
+  `connectTimeout` / `acquireTimeout` URL parameters take precedence and use
+  milliseconds; retain the existing database credentials and TLS options.
+  Startup requires `SELECT 1` to succeed and closes the pool on failure, so a
+  database outage prevents the new process from reporting ready. After deploying,
+  verify `/api/db-health` and login. This timeout change requires no schema
+  migration. If connection creation still times out, investigate connectivity
+  from Render to the database; longer timeouts cannot repair a blocked route.
+
 - **Verify Backend failed:** no deployment was triggered; fix the code or
   migration and push again.
 - **Render hook failed:** confirm the hook secret has not expired or been

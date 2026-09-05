@@ -1,16 +1,7 @@
 import { Injectable, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
 import { PrismaClient } from '@prisma/client';
 import { PrismaMariaDb } from '@prisma/adapter-mariadb';
-
-function getDatabaseUrl() {
-  const databaseUrl = process.env.DATABASE_URL;
-
-  if (!databaseUrl) {
-    throw new Error('DATABASE_URL is not set');
-  }
-
-  return databaseUrl;
-}
+import { getDatabaseUrl } from './database.config';
 
 @Injectable()
 //Được đánh dấu là Injectable để có thể được sử dụng trong các lớp khác trong NestJS.
@@ -26,7 +17,15 @@ export class PrismaService
   }
 
   async onModuleInit() {
-    await this.$connect();
+    try {
+      await this.$connect();
+      // The adapter may swallow its initial capability-query error. Require an
+      // actual query to succeed before Nest reports the application as ready.
+      await this.$queryRaw`SELECT 1`;
+    } catch (error) {
+      await this.$disconnect().catch(() => undefined);
+      throw error;
+    }
   }
 
   async onModuleDestroy() {
