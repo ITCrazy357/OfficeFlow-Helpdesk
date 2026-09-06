@@ -31,6 +31,7 @@ import type { AuthUser } from "@/features/auth/types";
 import { getApiErrorMessage } from "@/lib/axios";
 import {
   useDeleteTicketAttachment,
+  useDownloadTicketAttachment,
   useTicketAttachmentAccessUrl,
   useTicketAttachments,
   useUploadTicketAttachment,
@@ -151,6 +152,7 @@ export function TicketAttachments({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const attachmentsQuery = useTicketAttachments(ticketId, enabled);
   const attachmentAccess = useTicketAttachmentAccessUrl();
+  const attachmentDownload = useDownloadTicketAttachment();
   const uploadAttachment = useUploadTicketAttachment();
   const deleteAttachment = useDeleteTicketAttachment();
   const [isDragging, setIsDragging] = useState(false);
@@ -261,24 +263,32 @@ export function TicketAttachments({
     }
 
     try {
-      const access = await attachmentAccess.mutateAsync({
-        id: ticketId,
-        attachmentId: attachment.id,
-        download,
-      });
-
       if (download) {
+        const file = await attachmentDownload.mutateAsync({
+          id: ticketId,
+          attachmentId: attachment.id,
+        });
+        const objectUrl = URL.createObjectURL(file);
         const link = document.createElement("a");
-        link.href = access.url;
+        link.href = objectUrl;
         link.download = attachment.fileName;
         link.rel = "noopener noreferrer";
         document.body.appendChild(link);
         link.click();
         link.remove();
-      } else if (previewWindow) {
-        previewWindow.location.replace(access.url);
+        window.setTimeout(() => URL.revokeObjectURL(objectUrl), 0);
       } else {
-        window.location.assign(access.url);
+        const access = await attachmentAccess.mutateAsync({
+          id: ticketId,
+          attachmentId: attachment.id,
+          download: false,
+        });
+
+        if (previewWindow) {
+          previewWindow.location.replace(access.url);
+        } else {
+          window.location.assign(access.url);
+        }
       }
     } catch (error) {
       previewWindow?.close();

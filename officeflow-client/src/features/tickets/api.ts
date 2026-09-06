@@ -131,6 +131,18 @@ export async function getTicketAttachmentAccessUrlApi(
   return res.data.data;
 }
 
+export async function downloadTicketAttachmentApi(
+  id: number,
+  attachmentId: number,
+) {
+  const res = await api.get<Blob>(
+    `/tickets/${id}/attachments/${attachmentId}/download`,
+    { responseType: "blob" },
+  );
+
+  return res.data;
+}
+
 export async function uploadTicketAttachmentApi(id: number, file: File) {
   const formData = new FormData();
   formData.append("file", file);

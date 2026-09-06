@@ -24,6 +24,7 @@ describe('TicketsController attachment upload', () => {
     role: UserRole.ADMIN,
   };
   const mockTicketsService = {
+    downloadAttachment: jest.fn(),
     getAttachmentAccessUrl: jest.fn(),
     uploadAttachment: jest.fn(),
   };
@@ -67,6 +68,11 @@ describe('TicketsController attachment upload', () => {
     mockTicketsService.getAttachmentAccessUrl.mockResolvedValue({
       url: 'https://api.cloudinary.com/private-download',
       expiresAt: '2027-01-15T08:05:00.000Z',
+    });
+    mockTicketsService.downloadAttachment.mockResolvedValue({
+      file: Buffer.from('%PDF-1.7'),
+      fileName: 'Báo cáo quý 1.pdf',
+      contentType: 'application/pdf',
     });
     mockTicketsService.uploadAttachment.mockResolvedValue({ id: 20 });
   });
@@ -167,5 +173,23 @@ describe('TicketsController attachment upload', () => {
       .expect(400);
 
     expect(mockTicketsService.getAttachmentAccessUrl).not.toHaveBeenCalled();
+  });
+
+  it('downloads an attachment with its original Unicode filename', async () => {
+    await request(httpServer)
+      .get('/tickets/5/attachments/20/download')
+      .expect(200)
+      .expect('Cache-Control', 'no-store')
+      .expect('Content-Type', 'application/pdf')
+      .expect(
+        'Content-Disposition',
+        'attachment; filename="Bao cao quy 1.pdf"; filename*=UTF-8\'\'B%C3%A1o%20c%C3%A1o%20qu%C3%BD%201.pdf',
+      );
+
+    expect(mockTicketsService.downloadAttachment).toHaveBeenCalledWith(
+      5,
+      20,
+      currentUser,
+    );
   });
 });

@@ -48,9 +48,22 @@ import {
   DASHBOARD_CACHE_INVALIDATE_EVENT,
   DashboardCacheInvalidatedEvent,
 } from '../dashboard/events/dashboard-cache-invalidated.event';
-import { normalizeAttachmentFileName } from './ticket-attachment.util';
+import {
+  ALLOWED_ATTACHMENT_FILE_TYPES,
+  normalizeAttachmentFileName,
+} from './ticket-attachment.util';
 
 export type TicketAttachmentFile = NonNullable<Request['file']>;
+
+type AttachmentDeliveryMetadata = {
+  fileName: string;
+  fileUrl: string;
+  fileType: string | null;
+  publicId: string | null;
+  resourceType: string | null;
+  deliveryType: string;
+  format: string | null;
+};
 
 const SLA_DUE_SOON_HOURS = 24;
 const MAX_TICKET_HISTORY_VALUE_LENGTH = 191;
@@ -138,6 +151,12 @@ function resolveCloudinaryDeliveryType(
   throw new InternalServerErrorException(
     'Attachment delivery metadata is invalid',
   );
+}
+
+function resolveAttachmentContentType(fileType: string | null): string {
+  return fileType && ALLOWED_ATTACHMENT_FILE_TYPES.test(fileType)
+    ? fileType
+    : 'application/octet-stream';
 }
 
 @Injectable()
@@ -1390,12 +1409,11 @@ export class TicketsService {
     return attachments;
   }
 
-  async getAttachmentAccessUrl(
+  private async getAttachmentDeliveryMetadata(
     ticketId: number,
     attachmentId: number,
     currentUser: CurrentUserPayload,
-    asAttachment: boolean,
-  ) {
+  ): Promise<AttachmentDeliveryMetadata> {
     await this.canAccessTicket(ticketId, currentUser);
 
     const attachment = await this.prisma.ticketAttachment.findUnique({
@@ -1404,7 +1422,9 @@ export class TicketsService {
         ticketId,
       },
       select: {
+        fileName: true,
         fileUrl: true,
+        fileType: true,
         publicId: true,
         resourceType: true,
         deliveryType: true,
@@ -1416,6 +1436,13 @@ export class TicketsService {
       throw new NotFoundException('Attachment not found');
     }
 
+    return attachment;
+  }
+
+  private createAttachmentAccessUrl(
+    attachment: AttachmentDeliveryMetadata,
+    asAttachment: boolean,
+  ) {
     const deliveryType = resolveCloudinaryDeliveryType(attachment.deliveryType);
 
     if (deliveryType === 'upload') {
@@ -1441,6 +1468,41 @@ export class TicketsService {
       deliveryType,
       asAttachment,
     );
+  }
+
+  async getAttachmentAccessUrl(
+    ticketId: number,
+    attachmentId: number,
+    currentUser: CurrentUserPayload,
+    asAttachment: boolean,
+  ) {
+    const attachment = await this.getAttachmentDeliveryMetadata(
+      ticketId,
+      attachmentId,
+      currentUser,
+    );
+
+    return this.createAttachmentAccessUrl(attachment, asAttachment);
+  }
+
+  async downloadAttachment(
+    ticketId: number,
+    attachmentId: number,
+    currentUser: CurrentUserPayload,
+  ) {
+    const attachment = await this.getAttachmentDeliveryMetadata(
+      ticketId,
+      attachmentId,
+      currentUser,
+    );
+    const access = this.createAttachmentAccessUrl(attachment, true);
+    const file = await this.cloudinaryService.downloadFile(access.url);
+
+    return {
+      file,
+      fileName: attachment.fileName,
+      contentType: resolveAttachmentContentType(attachment.fileType),
+    };
   }
 
   async deleteAttachment(

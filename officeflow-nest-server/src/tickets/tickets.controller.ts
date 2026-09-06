@@ -16,6 +16,7 @@ import {
   Patch,
   Post,
   Query,
+  Res,
   UploadedFile,
   UseGuards,
   UseInterceptors,
@@ -27,12 +28,14 @@ import {
   ApiConsumes,
   ApiOperation,
   ApiParam,
+  ApiProduces,
   ApiQuery,
   ApiResponse,
   ApiTags,
 } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import { TicketPriority, TicketStatus, UserRole } from '@prisma/client';
+import type { Response } from 'express';
 
 import { TicketsService, type TicketAttachmentFile } from './tickets.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
@@ -52,7 +55,10 @@ import {
   TicketSlaFilter,
 } from './dto/get-tickets-query.dto';
 import { LinkTicketAssetDto } from './dto/link-ticket-asset.dto';
-import { ALLOWED_ATTACHMENT_FILE_TYPES } from './ticket-attachment.util';
+import {
+  ALLOWED_ATTACHMENT_FILE_TYPES,
+  createAttachmentContentDisposition,
+} from './ticket-attachment.util';
 import { UpdateTicketStatusDto } from './dto/update-ticket-status.dto';
 import { UpdateTicketDto } from './dto/update-ticket.dto';
 
@@ -389,6 +395,47 @@ export class TicketsController {
       currentUser,
       download,
     );
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Get(':id/attachments/:attachmentId/download')
+  @Throttle({
+    default: {
+      limit: 30,
+      ttl: 60_000,
+    },
+  })
+  @ApiOperation({ summary: 'Download a ticket attachment' })
+  @ApiParam({ name: 'id', example: 1 })
+  @ApiParam({ name: 'attachmentId', example: 10 })
+  @ApiProduces('application/octet-stream')
+  @ApiResponse({ status: 200, description: 'Attachment file' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Forbidden' })
+  @ApiResponse({ status: 404, description: 'Ticket or attachment not found' })
+  async downloadAttachment(
+    @Param('id', ParseIntPipe) id: number,
+    @Param('attachmentId', ParseIntPipe) attachmentId: number,
+    @CurrentUser() currentUser: CurrentUserPayload,
+    @Res() response: Response,
+  ): Promise<void> {
+    const attachment = await this.ticketsService.downloadAttachment(
+      id,
+      attachmentId,
+      currentUser,
+    );
+
+    response
+      .status(HttpStatus.OK)
+      .set({
+        'Cache-Control': 'no-store',
+        'Content-Disposition': createAttachmentContentDisposition(
+          attachment.fileName,
+        ),
+        'Content-Type': attachment.contentType,
+        'X-Content-Type-Options': 'nosniff',
+      })
+      .send(attachment.file);
   }
 
   @UseGuards(JwtAuthGuard)

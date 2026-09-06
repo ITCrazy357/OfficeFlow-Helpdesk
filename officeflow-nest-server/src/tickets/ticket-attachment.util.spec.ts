@@ -2,6 +2,7 @@ import { BadRequestException, FileTypeValidator } from '@nestjs/common';
 
 import {
   ALLOWED_ATTACHMENT_FILE_TYPES,
+  createAttachmentContentDisposition,
   normalizeAttachmentFileName,
 } from './ticket-attachment.util';
 
@@ -83,6 +84,20 @@ describe('ticket attachment utilities', () => {
 
     it('limits the stored name to 191 characters', () => {
       expect(normalizeAttachmentFileName('a'.repeat(200))).toHaveLength(191);
+    });
+  });
+
+  describe('createAttachmentContentDisposition', () => {
+    it('preserves a Unicode filename through the RFC 5987 parameter', () => {
+      expect(createAttachmentContentDisposition('Báo cáo quý 1.pdf')).toBe(
+        'attachment; filename="Bao cao quy 1.pdf"; filename*=UTF-8\'\'B%C3%A1o%20c%C3%A1o%20qu%C3%BD%201.pdf',
+      );
+    });
+
+    it('does not allow quotes or slashes to escape the fallback filename', () => {
+      expect(createAttachmentContentDisposition('report "final"\\.pdf')).toBe(
+        'attachment; filename="report _final__.pdf"; filename*=UTF-8\'\'report%20%22final%22%5C.pdf',
+      );
     });
   });
 });

@@ -26,3 +26,21 @@ export function normalizeAttachmentFileName(value: string): string {
 
   return normalized.slice(0, MAX_ATTACHMENT_FILE_NAME_LENGTH);
 }
+
+function encodeRfc5987Value(value: string): string {
+  return encodeURIComponent(value).replace(
+    /[!'()*]/g,
+    (character) => `%${character.charCodeAt(0).toString(16).toUpperCase()}`,
+  );
+}
+
+export function createAttachmentContentDisposition(fileName: string): string {
+  const asciiFallback = fileName
+    .normalize('NFKD')
+    .replace(/\p{Mark}/gu, '')
+    .replace(/[^\x20-\x7e]/g, '_')
+    .replace(/["\\]/g, '_')
+    .trim();
+
+  return `attachment; filename="${asciiFallback || 'attachment'}"; filename*=UTF-8''${encodeRfc5987Value(fileName)}`;
+}

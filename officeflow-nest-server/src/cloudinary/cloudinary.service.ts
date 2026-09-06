@@ -19,6 +19,9 @@ export type CloudinaryPrivateDownloadResult = {
   expiresAt: Date;
 };
 
+const MAX_CLOUDINARY_DOWNLOAD_SIZE_IN_BYTES = 10 * 1024 * 1024;
+const CLOUDINARY_DOWNLOAD_TIMEOUT_IN_MS = 60_000;
+
 type CloudinaryDestroyResponse = {
   result: string;
 };
@@ -38,6 +41,24 @@ function isDestroyResponse(value: unknown): value is CloudinaryDestroyResponse {
     'result' in value &&
     typeof value.result === 'string'
   );
+}
+
+function isTrustedCloudinaryUrl(value: string): boolean {
+  try {
+    const { hostname, protocol } = new URL(value);
+    const normalizedHostname = hostname.toLowerCase();
+
+    return (
+      protocol === 'https:' &&
+      (normalizedHostname === 'api.cloudinary.com' ||
+        normalizedHostname === 'api-eu.cloudinary.com' ||
+        normalizedHostname === 'api-ap.cloudinary.com' ||
+        normalizedHostname === 'res.cloudinary.com' ||
+        normalizedHostname.endsWith('-res.cloudinary.com'))
+    );
+  } catch {
+    return false;
+  }
 }
 
 @Injectable()
@@ -144,5 +165,49 @@ export class CloudinaryService {
       url,
       expiresAt: new Date(expiresAt * 1000),
     };
+  }
+
+  async downloadFile(url: string): Promise<Buffer> {
+    if (!isTrustedCloudinaryUrl(url)) {
+      throw new InternalServerErrorException('Download file failed');
+    }
+
+    let response: Response;
+
+    try {
+      response = await fetch(url, {
+        redirect: 'follow',
+        signal: AbortSignal.timeout(CLOUDINARY_DOWNLOAD_TIMEOUT_IN_MS),
+      });
+    } catch {
+      throw new InternalServerErrorException('Download file failed');
+    }
+
+    if (!response.ok) {
+      throw new InternalServerErrorException('Download file failed');
+    }
+
+    const declaredSize = Number(response.headers.get('content-length'));
+
+    if (
+      Number.isFinite(declaredSize) &&
+      declaredSize > MAX_CLOUDINARY_DOWNLOAD_SIZE_IN_BYTES
+    ) {
+      throw new InternalServerErrorException('Download file failed');
+    }
+
+    let file: Buffer;
+
+    try {
+      file = Buffer.from(await response.arrayBuffer());
+    } catch {
+      throw new InternalServerErrorException('Download file failed');
+    }
+
+    if (file.byteLength > MAX_CLOUDINARY_DOWNLOAD_SIZE_IN_BYTES) {
+      throw new InternalServerErrorException('Download file failed');
+    }
+
+    return file;
   }
 }

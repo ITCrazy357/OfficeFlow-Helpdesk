@@ -6,6 +6,7 @@ import {
   createTicketApi,
   deleteTicketAttachmentApi,
   deleteTicketApi,
+  downloadTicketAttachmentApi,
   getTicketAttachmentAccessUrlApi,
   getTicketAttachmentsApi,
   getTicketCommentsApi,
@@ -96,6 +97,13 @@ export function useTicketAttachmentAccessUrl() {
       attachmentId: number;
       download: boolean;
     }) => getTicketAttachmentAccessUrlApi(id, attachmentId, download),
+  });
+}
+
+export function useDownloadTicketAttachment() {
+  return useMutation({
+    mutationFn: ({ id, attachmentId }: { id: number; attachmentId: number }) =>
+      downloadTicketAttachmentApi(id, attachmentId),
   });
 }
 

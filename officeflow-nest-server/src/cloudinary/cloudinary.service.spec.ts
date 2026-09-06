@@ -38,6 +38,10 @@ describe('CloudinaryService', () => {
     service = new CloudinaryService();
   });
 
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
   function mockSuccessfulUpload(response: UploadApiResponse): void {
     jest
       .mocked(cloudinary.uploader.upload_stream)
@@ -147,5 +151,45 @@ describe('CloudinaryService', () => {
         attachment: true,
       },
     );
+  });
+
+  it('downloads a file only from a trusted Cloudinary URL', async () => {
+    const file = Uint8Array.from([1, 2, 3]);
+    const fetchSpy = jest.spyOn(global, 'fetch').mockResolvedValue(
+      new Response(file, {
+        status: 200,
+        headers: { 'content-length': String(file.byteLength) },
+      }),
+    );
+
+    await expect(
+      service.downloadFile('https://api.cloudinary.com/private-download'),
+    ).resolves.toEqual(Buffer.from(file));
+    expect(fetchSpy).toHaveBeenCalledWith(
+      'https://api.cloudinary.com/private-download',
+      expect.objectContaining({ redirect: 'follow' }),
+    );
+  });
+
+  it('rejects a download URL outside Cloudinary', async () => {
+    const fetchSpy = jest.spyOn(global, 'fetch');
+
+    await expect(
+      service.downloadFile('https://example.com/file.pdf'),
+    ).rejects.toThrow(InternalServerErrorException);
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it('rejects a Cloudinary response larger than the upload limit', async () => {
+    jest.spyOn(global, 'fetch').mockResolvedValue(
+      new Response(null, {
+        status: 200,
+        headers: { 'content-length': String(10 * 1024 * 1024 + 1) },
+      }),
+    );
+
+    await expect(
+      service.downloadFile('https://res.cloudinary.com/demo/file.pdf'),
+    ).rejects.toThrow(InternalServerErrorException);
   });
 });

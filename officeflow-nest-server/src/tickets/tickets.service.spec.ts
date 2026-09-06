@@ -53,6 +53,7 @@ const mockPrismaService = {
 
 const mockCloudinaryService = {
   createPrivateDownloadUrl: jest.fn(),
+  downloadFile: jest.fn(),
   uploadFile: jest.fn(),
   deleteFile: jest.fn(),
 };
@@ -543,6 +544,52 @@ describe('TicketsService', () => {
     expect(
       mockCloudinaryService.createPrivateDownloadUrl,
     ).not.toHaveBeenCalled();
+  });
+
+  it('should download an authorized attachment with its original metadata', async () => {
+    const currentUser = {
+      userId: 1,
+      role: UserRole.ADMIN,
+    };
+    const file = Buffer.from('%PDF-1.7');
+
+    mockPrismaService.ticket.findUnique.mockResolvedValue({
+      id: 5,
+      createdById: 2,
+      createdBy: { departmentId: 1 },
+    });
+    mockPrismaService.ticketAttachment.findUnique.mockResolvedValue({
+      fileName: 'Báo cáo quý 1.pdf',
+      fileUrl: 'https://res.cloudinary.com/demo/raw/authenticated/report.pdf',
+      fileType: 'application/pdf',
+      publicId: 'officeflow/ticket-attachments/report',
+      resourceType: 'raw',
+      deliveryType: 'authenticated',
+      format: 'pdf',
+    });
+    mockCloudinaryService.createPrivateDownloadUrl.mockReturnValue({
+      url: 'https://api.cloudinary.com/private-download',
+      expiresAt: new Date('2027-01-15T08:05:00.000Z'),
+    });
+    mockCloudinaryService.downloadFile.mockResolvedValue(file);
+
+    await expect(
+      service.downloadAttachment(5, 20, currentUser),
+    ).resolves.toEqual({
+      file,
+      fileName: 'Báo cáo quý 1.pdf',
+      contentType: 'application/pdf',
+    });
+    expect(mockCloudinaryService.createPrivateDownloadUrl).toHaveBeenCalledWith(
+      'officeflow/ticket-attachments/report',
+      'pdf',
+      'raw',
+      'authenticated',
+      true,
+    );
+    expect(mockCloudinaryService.downloadFile).toHaveBeenCalledWith(
+      'https://api.cloudinary.com/private-download',
+    );
   });
 
   it('should reject incomplete metadata for a protected attachment', async () => {
