@@ -5,11 +5,11 @@ import {
   NotFoundException,
   UnprocessableEntityException,
 } from '@nestjs/common';
-import { EventEmitter2 } from '@nestjs/event-emitter';
 import { Test, TestingModule } from '@nestjs/testing';
 import { LeaveStatus, Prisma, UserRole } from '@prisma/client';
 
 import { AuditLogsService } from '../audit-logs/audit-logs.service';
+import { OutboxService } from '../outbox/outbox.service';
 import { PrismaService } from '../prisma/prisma.service';
 
 import { LeaveRequestService } from './leave-requests.service';
@@ -35,8 +35,8 @@ const mockPrismaService = {
   $transaction: jest.fn(),
 };
 
-const mockEventEmitter = {
-  emit: jest.fn(),
+const mockOutboxService = {
+  enqueue: jest.fn().mockResolvedValue({ id: 'outbox-event-id' }),
 };
 
 type AuditParams = {
@@ -107,12 +107,12 @@ describe('LeaveRequestService', () => {
           useValue: mockPrismaService,
         },
         {
-          provide: EventEmitter2,
-          useValue: mockEventEmitter,
-        },
-        {
           provide: AuditLogsService,
           useValue: mockAuditLogsService,
+        },
+        {
+          provide: OutboxService,
+          useValue: mockOutboxService,
         },
       ],
     }).compile();
@@ -124,7 +124,7 @@ describe('LeaveRequestService', () => {
     jest.useRealTimers();
   });
 
-  it('creates a request, returns it, and emits after the transaction succeeds', async () => {
+  it('creates a request and its outbox event in the same transaction', async () => {
     const created = {
       id: 30,
       startDate: new Date('2026-09-10T00:00:00.000Z'),
@@ -162,9 +162,12 @@ describe('LeaveRequestService', () => {
         }) as Record<string, unknown>,
       }),
     );
-    expect(mockEventEmitter.emit).toHaveBeenCalledWith(
-      'leave.requested',
-      expect.objectContaining({ leaveRequestId: created.id }),
+    expect(mockOutboxService.enqueue).toHaveBeenCalledWith(
+      mockTransaction,
+      expect.objectContaining({
+        type: 'leave.requested',
+        payload: { leaveRequestId: created.id },
+      }),
     );
     expect(mockAuditLogsService.create).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -205,7 +208,7 @@ describe('LeaveRequestService', () => {
     );
 
     expect(mockTransaction.leaveRequest.create).not.toHaveBeenCalled();
-    expect(mockEventEmitter.emit).not.toHaveBeenCalled();
+    expect(mockOutboxService.enqueue).not.toHaveBeenCalled();
   });
 
   it('rejects a manager whose role cannot approve leave', async () => {
@@ -229,7 +232,7 @@ describe('LeaveRequestService', () => {
     );
 
     expect(mockTransaction.leaveRequest.create).not.toHaveBeenCalled();
-    expect(mockEventEmitter.emit).not.toHaveBeenCalled();
+    expect(mockOutboxService.enqueue).not.toHaveBeenCalled();
   });
 
   it('retries one serializable transaction write conflict', async () => {
@@ -260,7 +263,7 @@ describe('LeaveRequestService', () => {
     );
 
     expect(mockPrismaService.$transaction).toHaveBeenCalledTimes(2);
-    expect(mockEventEmitter.emit).toHaveBeenCalledTimes(1);
+    expect(mockOutboxService.enqueue).toHaveBeenCalledTimes(1);
   });
 
   it('returns only requests created by the current user, including for ADMIN', async () => {
@@ -385,7 +388,7 @@ describe('LeaveRequestService', () => {
     expect(mockPrismaService.leaveRequest.findMany).not.toHaveBeenCalled();
   });
 
-  it('approves an assigned pending request, audits it, then emits an event', async () => {
+  it('approves an assigned pending request and enqueues its event atomically', async () => {
     const approver = { userId: 20, role: UserRole.MANAGER };
     const approved = {
       id: 42,
@@ -424,9 +427,12 @@ describe('LeaveRequestService', () => {
       }),
       mockTransaction,
     );
-    expect(mockEventEmitter.emit).toHaveBeenCalledWith(
-      'leave.approved',
-      expect.objectContaining({ leaveRequestId: approved.id }),
+    expect(mockOutboxService.enqueue).toHaveBeenCalledWith(
+      mockTransaction,
+      expect.objectContaining({
+        type: 'leave.approved',
+        payload: { leaveRequestId: approved.id },
+      }),
     );
   });
 
@@ -461,9 +467,12 @@ describe('LeaveRequestService', () => {
     const auditParams = mockAuditLogsService.create.mock.calls[0]?.[0];
     expect(auditParams.oldValues).not.toHaveProperty('reviewNote');
     expect(auditParams.newValues).not.toHaveProperty('reviewNote');
-    expect(mockEventEmitter.emit).toHaveBeenCalledWith(
-      'leave.rejected',
-      expect.objectContaining({ leaveRequestId: rejected.id }),
+    expect(mockOutboxService.enqueue).toHaveBeenCalledWith(
+      mockTransaction,
+      expect.objectContaining({
+        type: 'leave.rejected',
+        payload: { leaveRequestId: rejected.id },
+      }),
     );
   });
 
@@ -492,7 +501,7 @@ describe('LeaveRequestService', () => {
       NotFoundException,
     );
 
-    expect(mockEventEmitter.emit).not.toHaveBeenCalled();
+    expect(mockOutboxService.enqueue).not.toHaveBeenCalled();
   });
 
   it('returns conflict when another reviewer processes the request first', async () => {
@@ -509,7 +518,7 @@ describe('LeaveRequestService', () => {
     );
 
     expect(mockAuditLogsService.create).not.toHaveBeenCalled();
-    expect(mockEventEmitter.emit).not.toHaveBeenCalled();
+    expect(mockOutboxService.enqueue).not.toHaveBeenCalled();
   });
 
   it('allows only the requester to cancel a pending request', async () => {
@@ -533,9 +542,12 @@ describe('LeaveRequestService', () => {
         },
       }),
     );
-    expect(mockEventEmitter.emit).toHaveBeenCalledWith(
-      'leave.cancelled',
-      expect.objectContaining({ leaveRequestId: cancelled.id }),
+    expect(mockOutboxService.enqueue).toHaveBeenCalledWith(
+      mockTransaction,
+      expect.objectContaining({
+        type: 'leave.cancelled',
+        payload: { leaveRequestId: cancelled.id },
+      }),
     );
   });
 
@@ -550,6 +562,6 @@ describe('LeaveRequestService', () => {
     );
 
     expect(mockTransaction.leaveRequest.updateMany).not.toHaveBeenCalled();
-    expect(mockEventEmitter.emit).not.toHaveBeenCalled();
+    expect(mockOutboxService.enqueue).not.toHaveBeenCalled();
   });
 });

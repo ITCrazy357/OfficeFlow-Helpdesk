@@ -22,8 +22,7 @@ export class TicketEmailListener {
   ) {}
 
   @OnEvent('ticket.created', {
-    async: true,
-    suppressErrors: true,
+    suppressErrors: false,
   })
   async handleTicketCreated(event: TicketCreatedEvent) {
     if (!this.mailService.isEnabled()) {
@@ -79,12 +78,12 @@ export class TicketEmailListener {
       });
     } catch (error: unknown) {
       this.logError('ticket-created', error);
+      throw error;
     }
   }
 
   @OnEvent('ticket.assigned', {
-    async: true,
-    suppressErrors: true,
+    suppressErrors: false,
   })
   async handleTicketAssigned(event: TicketAssignedEvent) {
     if (!this.mailService.isEnabled()) {
@@ -127,12 +126,12 @@ export class TicketEmailListener {
       });
     } catch (error: unknown) {
       this.logError('ticket-assigned', error);
+      throw error;
     }
   }
 
   @OnEvent('ticket.resolved', {
-    async: true,
-    suppressErrors: true,
+    suppressErrors: false,
   })
   async handleTicketResolved(event: TicketResolvedEvent) {
     if (!this.mailService.isEnabled()) {
@@ -189,12 +188,12 @@ export class TicketEmailListener {
       });
     } catch (error: unknown) {
       this.logError('ticket-resolved', error);
+      throw error;
     }
   }
 
   @OnEvent('ticket.overdue', {
-    async: true,
-    suppressErrors: true,
+    suppressErrors: false,
   })
   async handleTicketOverdue(event: TicketOverdueEvent) {
     if (!this.mailService.isEnabled()) {
@@ -222,6 +221,8 @@ export class TicketEmailListener {
         },
       });
 
+      const failedRecipientIds: number[] = [];
+
       for (const recipient of recipients) {
         const email = ticketOverdueEmailTemplate({
           recipientName: recipient.name || 'User',
@@ -239,10 +240,18 @@ export class TicketEmailListener {
           });
         } catch (error: unknown) {
           this.logError(`ticket-overdue recipient ${recipient.id}`, error);
+          failedRecipientIds.push(recipient.id);
         }
+      }
+
+      if (failedRecipientIds.length > 0) {
+        throw new Error(
+          `Ticket-overdue email failed for recipients ${failedRecipientIds.join(',')}`,
+        );
       }
     } catch (error: unknown) {
       this.logError('ticket-overdue', error);
+      throw error;
     }
   }
 

@@ -6,6 +6,7 @@ import * as bcrypt from 'bcrypt';
 import { createHash } from 'node:crypto';
 
 import { AuditLogsService } from '../audit-logs/audit-logs.service';
+import { OutboxService } from '../outbox/outbox.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { PasswordRecoveryService } from './password-recovery.service';
 
@@ -61,6 +62,10 @@ const mockEventEmitter = {
   emit: jest.fn<boolean, [string, unknown]>(),
 };
 
+const mockOutboxService = {
+  enqueue: jest.fn().mockResolvedValue({ id: 'outbox-event-id' }),
+};
+
 const activeUser = {
   id: 7,
   isActive: true,
@@ -114,6 +119,10 @@ describe('PasswordRecoveryService', () => {
         {
           provide: EventEmitter2,
           useValue: mockEventEmitter,
+        },
+        {
+          provide: OutboxService,
+          useValue: mockOutboxService,
         },
       ],
     }).compile();
@@ -279,14 +288,52 @@ describe('PasswordRecoveryService', () => {
         where: { userId: storedResetToken.userId, revokedAt: null },
       }),
     );
-    expect(mockEventEmitter.emit).toHaveBeenCalledWith(
-      'password-recovery.completed',
-      expect.objectContaining({ userId: storedResetToken.userId }),
+    expect(mockOutboxService.enqueue).toHaveBeenCalledWith(
+      mockTransactionClient,
+      expect.objectContaining({
+        type: 'password-recovery.completed',
+        payload: { userId: storedResetToken.userId },
+      }),
     );
     const auditCalls = JSON.stringify(mockAuditLogsService.create.mock.calls);
     expect(auditCalls).not.toContain(rawToken);
     expect(auditCalls).not.toContain('new-secure-password-456');
     expect(auditCalls).not.toContain('new-password-hash');
+  });
+
+  it('enqueues separate resets when the same token row is reused', async () => {
+    const createEvent = jest.fn().mockResolvedValue({ id: 'event' });
+    const outbox = new OutboxService();
+    mockOutboxService.enqueue.mockImplementation(
+      (_client: unknown, params: Parameters<OutboxService['enqueue']>[1]) =>
+        outbox.enqueue(
+          { outboxEvent: { create: createEvent } } as unknown as Pick<
+            Prisma.TransactionClient,
+            'outboxEvent'
+          >,
+          params,
+        ),
+    );
+    for (const token of [rawToken, 'b'.repeat(43)]) {
+      mockPasswordResetTokenModel.findUnique.mockResolvedValue({
+        ...storedResetToken,
+        tokenHash: createHash('sha256').update(token).digest('hex'),
+      });
+      await expect(
+        service.resetPassword({
+          token,
+          newPassword: 'new-secure-password-456',
+        }),
+      ).resolves.toEqual({ passwordReset: true });
+    }
+    const args = createEvent.mock.calls.map(
+      ([arg]) => arg as Prisma.OutboxEventCreateArgs,
+    );
+    expect(args).toHaveLength(2);
+    expect(args[0].data.deduplicationKey).not.toBe(
+      args[1].data.deduplicationKey,
+    );
+    expect(JSON.stringify(args)).not.toContain(rawToken);
   });
 
   it.each([

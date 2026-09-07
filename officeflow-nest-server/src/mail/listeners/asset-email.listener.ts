@@ -18,8 +18,7 @@ export class AssetEmailListener {
   ) {}
 
   @OnEvent('asset.assigned', {
-    async: true,
-    suppressErrors: true,
+    suppressErrors: false,
   })
   async handleAssetAssigned(event: AssetAssignedEvent) {
     if (!this.mailService.isEnabled()) {
@@ -62,12 +61,12 @@ export class AssetEmailListener {
       });
     } catch (error: unknown) {
       this.logError('asset-assigned', error);
+      throw error;
     }
   }
 
   @OnEvent('asset.returned', {
-    async: true,
-    suppressErrors: true,
+    suppressErrors: false,
   })
   async handleAssetReturned(event: AssetReturnedEvent) {
     if (!this.mailService.isEnabled()) {
@@ -110,6 +109,7 @@ export class AssetEmailListener {
       });
     } catch (error: unknown) {
       this.logError('asset-returned', error);
+      throw error;
     }
   }
 

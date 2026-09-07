@@ -19,7 +19,7 @@ export class LeaveEmailListener {
     private readonly mailService: MailService,
   ) {}
 
-  @OnEvent('leave.requested', { async: true, suppressErrors: true })
+  @OnEvent('leave.requested', { suppressErrors: false })
   async handleRequested(event: LeaveRequestedEvent) {
     if (!this.mailService.isEnabled()) return;
 
@@ -63,10 +63,11 @@ export class LeaveEmailListener {
       });
     } catch (error: unknown) {
       this.logError('leave-requested', error);
+      throw error;
     }
   }
 
-  @OnEvent('leave.approved', { async: true, suppressErrors: true })
+  @OnEvent('leave.approved', { suppressErrors: false })
   async handleApproved(event: LeaveApprovedEvent) {
     await this.handleDecision(
       event.leaveRequestId,
@@ -75,7 +76,7 @@ export class LeaveEmailListener {
     );
   }
 
-  @OnEvent('leave.rejected', { async: true, suppressErrors: true })
+  @OnEvent('leave.rejected', { suppressErrors: false })
   async handleRejected(event: LeaveRejectedEvent) {
     await this.handleDecision(
       event.leaveRequestId,
@@ -84,7 +85,7 @@ export class LeaveEmailListener {
     );
   }
 
-  @OnEvent('leave.cancelled', { async: true, suppressErrors: true })
+  @OnEvent('leave.cancelled', { suppressErrors: false })
   async handleCancelled(event: LeaveCancelledEvent) {
     if (!this.mailService.isEnabled()) return;
 
@@ -128,6 +129,7 @@ export class LeaveEmailListener {
       });
     } catch (error: unknown) {
       this.logError('leave-cancelled', error);
+      throw error;
     }
   }
 
@@ -177,6 +179,7 @@ export class LeaveEmailListener {
       });
     } catch (error: unknown) {
       this.logError(`leave-${decision}`, error);
+      throw error;
     }
   }
 

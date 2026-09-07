@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
 import { NotificationType } from '@prisma/client';
 
+import type { OutboxDispatchedEvent } from '../outbox/outbox.constants';
 import { NotificationsService } from './notifications.service';
 import { AssetAssignedEvent } from './events/asset-assigned.event';
 import { AssetReturnedEvent } from './events/asset-returned.event';
@@ -14,19 +15,24 @@ import { TicketStatusChangedEvent } from './events/ticket-status-changed.event';
 export class NotificationsListener {
   constructor(private readonly notificationsService: NotificationsService) {}
 
-  @OnEvent('ticket.assigned')
-  async handleTicketAssignedEvent(event: TicketAssignedEvent) {
+  @OnEvent('ticket.assigned', { suppressErrors: false })
+  async handleTicketAssignedEvent(
+    event: TicketAssignedEvent & OutboxDispatchedEvent,
+  ) {
     await this.notificationsService.create({
       userId: event.assignedToId,
       type: NotificationType.TICKET_ASSIGNED,
       title: 'New ticket assigned',
       message: `${event.assignedByName} assigned ticket "${event.ticketTitle}" to you`,
       targetUrl: `/tickets/${event.ticketId}`,
+      sourceEventId: event.outboxEventId,
     });
   }
 
-  @OnEvent('ticket.commented')
-  async handleTicketCommentedEvent(event: TicketCommentedEvent) {
+  @OnEvent('ticket.commented', { suppressErrors: false })
+  async handleTicketCommentedEvent(
+    event: TicketCommentedEvent & OutboxDispatchedEvent,
+  ) {
     const recipientIds = event.recipientIds.filter(
       (id) => id !== event.commentAuthorId,
     );
@@ -37,11 +43,14 @@ export class NotificationsListener {
       title: 'New ticket comment',
       message: `${event.commentAuthorName} commented on ticket "${event.ticketTitle}"`,
       targetUrl: `/tickets/${event.ticketId}`,
+      sourceEventId: event.outboxEventId,
     });
   }
 
-  @OnEvent('ticket.status_changed')
-  async handleTicketStatusChangedEvent(event: TicketStatusChangedEvent) {
+  @OnEvent('ticket.status_changed', { suppressErrors: false })
+  async handleTicketStatusChangedEvent(
+    event: TicketStatusChangedEvent & OutboxDispatchedEvent,
+  ) {
     const recipientIds = event.recipientIds.filter(
       (id) => id !== event.changedById,
     );
@@ -52,22 +61,28 @@ export class NotificationsListener {
       title: 'Ticket status changed',
       message: `${event.changedByName} changed ticket "${event.ticketTitle}" status from "${event.oldStatus}" to "${event.newStatus}"`,
       targetUrl: `/tickets/${event.ticketId}`,
+      sourceEventId: event.outboxEventId,
     });
   }
 
-  @OnEvent('ticket.overdue')
-  async handleTicketOverdueEvent(event: TicketOverdueEvent) {
+  @OnEvent('ticket.overdue', { suppressErrors: false })
+  async handleTicketOverdueEvent(
+    event: TicketOverdueEvent & OutboxDispatchedEvent,
+  ) {
     await this.notificationsService.createdMany({
       userIds: event.recipientIds,
       type: NotificationType.TICKET_OVERDUE,
       title: 'Ticket overdue',
       message: `Ticket "${event.ticketTitle}" has passed its SLA deadline`,
       targetUrl: `/tickets/${event.ticketId}`,
+      sourceEventId: event.outboxEventId,
     });
   }
 
-  @OnEvent('asset.assigned')
-  async handleAssetAssignedEvent(event: AssetAssignedEvent) {
+  @OnEvent('asset.assigned', { suppressErrors: false })
+  async handleAssetAssignedEvent(
+    event: AssetAssignedEvent & OutboxDispatchedEvent,
+  ) {
     await this.notificationsService.create({
       userId: event.assignedToId,
       type: NotificationType.ASSET_ASSIGNED,
@@ -76,11 +91,14 @@ export class NotificationsListener {
         `${event.assignedByName} assigned ` +
         `${event.assetName} (${event.assetTag}) to you.`,
       targetUrl: `/assets/${event.assetId}`,
+      sourceEventId: event.outboxEventId,
     });
   }
 
-  @OnEvent('asset.returned')
-  async handleAssetReturnedEvent(event: AssetReturnedEvent) {
+  @OnEvent('asset.returned', { suppressErrors: false })
+  async handleAssetReturnedEvent(
+    event: AssetReturnedEvent & OutboxDispatchedEvent,
+  ) {
     await this.notificationsService.create({
       userId: event.previousAssignedToId,
       type: NotificationType.ASSET_RETURNED,
@@ -89,6 +107,7 @@ export class NotificationsListener {
         `${event.returnedByName} recorded the return of ` +
         `${event.assetName} (${event.assetTag}).`,
       targetUrl: '/assets',
+      sourceEventId: event.outboxEventId,
     });
   }
 }

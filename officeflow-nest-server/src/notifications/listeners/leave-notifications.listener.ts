@@ -7,6 +7,7 @@ import { LeaveCancelledEvent } from '../../leave-requests/events/leave-cancelled
 import { LeaveRejectedEvent } from '../../leave-requests/events/leave-rejected.event';
 import { LeaveRequestedEvent } from '../../leave-requests/events/leave-requested.event';
 import { PrismaService } from '../../prisma/prisma.service';
+import type { OutboxDispatchedEvent } from '../../outbox/outbox.constants';
 import { NotificationsService } from '../notifications.service';
 
 @Injectable()
@@ -18,8 +19,8 @@ export class LeaveNotificationsListener {
     private readonly notificationsService: NotificationsService,
   ) {}
 
-  @OnEvent('leave.requested', { async: true, suppressErrors: true })
-  async handleRequested(event: LeaveRequestedEvent) {
+  @OnEvent('leave.requested', { suppressErrors: false })
+  async handleRequested(event: LeaveRequestedEvent & OutboxDispatchedEvent) {
     try {
       const leaveRequest = await this.prisma.leaveRequest.findUnique({
         where: { id: event.leaveRequestId },
@@ -50,36 +51,40 @@ export class LeaveNotificationsListener {
           `${leaveRequest.requester.name} requested leave from ` +
           `${formatDateOnly(leaveRequest.startDate)} to ${formatDateOnly(leaveRequest.endDate)}.`,
         targetUrl: `/leave-requests/${leaveRequest.id}`,
+        sourceEventId: event.outboxEventId,
       });
     } catch (error: unknown) {
       this.logError('leave-requested', error);
+      throw error;
     }
   }
 
-  @OnEvent('leave.approved', { async: true, suppressErrors: true })
-  async handleApproved(event: LeaveApprovedEvent) {
+  @OnEvent('leave.approved', { suppressErrors: false })
+  async handleApproved(event: LeaveApprovedEvent & OutboxDispatchedEvent) {
     await this.createDecisionNotification(
       event.leaveRequestId,
       NotificationType.LEAVE_APPROVED,
       LeaveStatus.APPROVED,
       'Leave request approved',
       'Your leave request was approved.',
+      event.outboxEventId,
     );
   }
 
-  @OnEvent('leave.rejected', { async: true, suppressErrors: true })
-  async handleRejected(event: LeaveRejectedEvent) {
+  @OnEvent('leave.rejected', { suppressErrors: false })
+  async handleRejected(event: LeaveRejectedEvent & OutboxDispatchedEvent) {
     await this.createDecisionNotification(
       event.leaveRequestId,
       NotificationType.LEAVE_REJECTED,
       LeaveStatus.REJECTED,
       'Leave request rejected',
       'Your leave request was rejected. Open it to review the decision.',
+      event.outboxEventId,
     );
   }
 
-  @OnEvent('leave.cancelled', { async: true, suppressErrors: true })
-  async handleCancelled(event: LeaveCancelledEvent) {
+  @OnEvent('leave.cancelled', { suppressErrors: false })
+  async handleCancelled(event: LeaveCancelledEvent & OutboxDispatchedEvent) {
     try {
       const leaveRequest = await this.prisma.leaveRequest.findUnique({
         where: { id: event.leaveRequestId },
@@ -106,9 +111,11 @@ export class LeaveNotificationsListener {
         title: 'Leave request cancelled',
         message: `${leaveRequest.requester.name} cancelled a pending leave request.`,
         targetUrl: `/leave-requests/${leaveRequest.id}`,
+        sourceEventId: event.outboxEventId,
       });
     } catch (error: unknown) {
       this.logError('leave-cancelled', error);
+      throw error;
     }
   }
 
@@ -118,6 +125,7 @@ export class LeaveNotificationsListener {
     expectedStatus: typeof LeaveStatus.APPROVED | typeof LeaveStatus.REJECTED,
     title: string,
     message: string,
+    sourceEventId?: string,
   ) {
     try {
       const leaveRequest = await this.prisma.leaveRequest.findUnique({
@@ -142,9 +150,11 @@ export class LeaveNotificationsListener {
         title,
         message,
         targetUrl: `/leave-requests/${leaveRequest.id}`,
+        sourceEventId,
       });
     } catch (error: unknown) {
       this.logError('leave-decision', error);
+      throw error;
     }
   }
 

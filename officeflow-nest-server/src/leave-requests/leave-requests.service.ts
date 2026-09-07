@@ -7,7 +7,6 @@ import {
   UnauthorizedException,
   UnprocessableEntityException,
 } from '@nestjs/common';
-import { EventEmitter2 } from '@nestjs/event-emitter';
 import {
   AuditLogAction,
   AuditLogEntity,
@@ -18,6 +17,8 @@ import {
 
 import { AuditLogsService } from '../audit-logs/audit-logs.service';
 import type { CurrentUserPayload } from '../common/decorators/current-user.decorator';
+import { OUTBOX_EVENT_TYPES } from '../outbox/outbox.constants';
+import { OutboxService } from '../outbox/outbox.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { parseDateOnly, startOfUtcDate } from '../utils/formatDate';
 
@@ -27,10 +28,6 @@ import {
   LeaveRequestPaginationQueryDto,
 } from './dto/get-leave-request.dto';
 import { RejectLeaveRequestDto } from './dto/reject-leave-request.dto';
-import { LeaveApprovedEvent } from './events/leave-approved.event';
-import { LeaveCancelledEvent } from './events/leave-cancelled.event';
-import { LeaveRejectedEvent } from './events/leave-rejected.event';
-import { LeaveRequestedEvent } from './events/leave-requested.event';
 
 const leaveRequestDetailSelect = {
   id: true,
@@ -72,8 +69,8 @@ export class LeaveRequestService {
 
   constructor(
     private readonly prisma: PrismaService,
-    private readonly eventEmitter: EventEmitter2,
     private readonly auditLogsService: AuditLogsService,
+    private readonly outboxService: OutboxService,
   ) {}
 
   private async createInSerializableTransaction(
@@ -193,6 +190,14 @@ export class LeaveRequestService {
               tx,
             );
 
+            await this.outboxService.enqueue(tx, {
+              type: OUTBOX_EVENT_TYPES.LEAVE_REQUESTED,
+              payload: {
+                leaveRequestId: leaveRequest.id,
+              },
+              deduplicationKey: `leave-requested:${leaveRequest.id}`,
+            });
+
             return leaveRequest;
           },
           {
@@ -234,19 +239,12 @@ export class LeaveRequestService {
       throw new BadRequestException('Start date can not be in the past');
     }
 
-    const leaveRequest = await this.createInSerializableTransaction(
+    return this.createInSerializableTransaction(
       currentUser,
       startDate,
       endDate,
       dto.reason,
     );
-
-    this.eventEmitter.emit(
-      'leave.requested',
-      new LeaveRequestedEvent(leaveRequest.id),
-    );
-
-    return leaveRequest;
   }
 
   async findMine(currentUser: CurrentUserPayload, query: GetLeaveRequestDto) {
@@ -435,6 +433,17 @@ export class LeaveRequestService {
         tx,
       );
 
+      await this.outboxService.enqueue(tx, {
+        type:
+          newStatus === LeaveStatus.APPROVED
+            ? OUTBOX_EVENT_TYPES.LEAVE_APPROVED
+            : OUTBOX_EVENT_TYPES.LEAVE_REJECTED,
+        payload: {
+          leaveRequestId,
+        },
+        deduplicationKey: `leave-${newStatus.toLowerCase()}:${leaveRequestId}`,
+      });
+
       return tx.leaveRequest.findUniqueOrThrow({
         where: { id: leaveRequestId },
         select: leaveRequestDetailSelect,
@@ -443,18 +452,7 @@ export class LeaveRequestService {
   }
 
   async approve(leaveRequestId: number, actor: CurrentUserPayload) {
-    const leaveRequest = await this.review(
-      leaveRequestId,
-      actor,
-      LeaveStatus.APPROVED,
-    );
-
-    this.eventEmitter.emit(
-      'leave.approved',
-      new LeaveApprovedEvent(leaveRequest.id),
-    );
-
-    return leaveRequest;
+    return this.review(leaveRequestId, actor, LeaveStatus.APPROVED);
   }
 
   async reject(
@@ -462,19 +460,12 @@ export class LeaveRequestService {
     dto: RejectLeaveRequestDto,
     actor: CurrentUserPayload,
   ) {
-    const leaveRequest = await this.review(
+    return this.review(
       leaveRequestId,
       actor,
       LeaveStatus.REJECTED,
       dto.reviewNote,
     );
-
-    this.eventEmitter.emit(
-      'leave.rejected',
-      new LeaveRejectedEvent(leaveRequest.id),
-    );
-
-    return leaveRequest;
   }
 
   async cancel(leaveRequestId: number, actor: CurrentUserPayload) {
@@ -534,16 +525,19 @@ export class LeaveRequestService {
         tx,
       );
 
+      await this.outboxService.enqueue(tx, {
+        type: OUTBOX_EVENT_TYPES.LEAVE_CANCELLED,
+        payload: {
+          leaveRequestId,
+        },
+        deduplicationKey: `leave-cancelled:${leaveRequestId}`,
+      });
+
       return tx.leaveRequest.findUniqueOrThrow({
         where: { id: leaveRequestId },
         select: leaveRequestDetailSelect,
       });
     });
-
-    this.eventEmitter.emit(
-      'leave.cancelled',
-      new LeaveCancelledEvent(leaveRequest.id),
-    );
 
     return leaveRequest;
   }

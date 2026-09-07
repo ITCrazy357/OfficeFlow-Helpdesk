@@ -26,11 +26,8 @@ import {
   type CloudinaryResourceType,
 } from '../cloudinary/cloudinary.service';
 import type { CurrentUserPayload } from '../common/decorators/current-user.decorator';
-import { TicketAssignedEvent } from '../notifications/events/ticket-assigned.event';
-import { TicketCommentedEvent } from '../notifications/events/ticket-commented.event';
-import { TicketCreatedEvent } from '../notifications/events/ticket-created.event';
-import { TicketResolvedEvent } from '../notifications/events/ticket-resolved.event';
-import { TicketStatusChangedEvent } from '../notifications/events/ticket-status-changed.event';
+import { OUTBOX_EVENT_TYPES } from '../outbox/outbox.constants';
+import { OutboxService } from '../outbox/outbox.service';
 import { PrismaService } from '../prisma/prisma.service';
 
 import { AssignTicketDto } from './dto/assign-ticket.dto';
@@ -168,6 +165,7 @@ export class TicketsService {
     private readonly cloudinaryService: CloudinaryService,
     private readonly eventEmitter: EventEmitter2,
     private readonly auditLogsService: AuditLogsService,
+    private readonly outboxService: OutboxService,
   ) {}
 
   private async ensureCategoryExists(categoryId?: number) {
@@ -429,10 +427,15 @@ export class TicketsService {
         transaction,
       );
 
+      await this.outboxService.enqueue(transaction, {
+        type: OUTBOX_EVENT_TYPES.TICKET_CREATED,
+        payload: { ticketId: ticket.id },
+        deduplicationKey: `ticket-created:${ticket.id}`,
+      });
+
       return ticket;
     });
 
-    this.eventEmitter.emit('ticket.created', new TicketCreatedEvent(ticket.id));
     await this.eventEmitter.emitAsync(
       DASHBOARD_CACHE_INVALIDATE_EVENT,
       new DashboardCacheInvalidatedEvent('TICKET_CREATED', ticket.id),
@@ -725,6 +728,12 @@ export class TicketsService {
       throw new ForbiddenException('Forbidden');
     }
 
+    const actor = await this.prisma.user.findUnique({
+      where: { id: currentUser.userId },
+      select: { name: true },
+    });
+    const actorName = actor?.name || 'Someone';
+
     const result = await this.prisma.$transaction(async (transaction) => {
       const currentTicket = await transaction.ticket.findUnique({
         where: {
@@ -803,6 +812,37 @@ export class TicketsService {
         transaction,
       );
 
+      const recipientIds = [
+        currentTicket.createdBy.id,
+        currentTicket.assignedTo?.id,
+      ].filter((userId): userId is number => Boolean(userId));
+
+      await this.outboxService.enqueue(transaction, {
+        type: OUTBOX_EVENT_TYPES.TICKET_STATUS_CHANGED,
+        payload: {
+          ticketId: id,
+          ticketTitle: currentTicket.title,
+          changedById: currentUser.userId,
+          changedByName: actorName,
+          oldStatus: currentTicket.status,
+          newStatus: updatedTicket.status,
+          recipientIds,
+        },
+      });
+
+      if (updatedTicket.status === TicketStatus.RESOLVED) {
+        await this.outboxService.enqueue(transaction, {
+          type: OUTBOX_EVENT_TYPES.TICKET_RESOLVED,
+          payload: {
+            ticketId: id,
+            ticketTitle: currentTicket.title,
+            resolverId: currentUser.userId,
+            resolverName: actorName,
+            recipientIds,
+          },
+        });
+      }
+
       return {
         statusChanged: true,
         previousTicket: currentTicket,
@@ -811,48 +851,10 @@ export class TicketsService {
     });
 
     if (result.statusChanged) {
-      const recipientIds = [
-        result.previousTicket.createdBy.id,
-        result.previousTicket.assignedTo?.id,
-      ].filter((userId): userId is number => Boolean(userId));
-
-      const actor = await this.prisma.user.findUnique({
-        where: { id: currentUser.userId },
-        select: {
-          name: true,
-        },
-      });
-
-      this.eventEmitter.emit(
-        'ticket.status_changed',
-        new TicketStatusChangedEvent(
-          id,
-          result.previousTicket.title,
-          currentUser.userId,
-          actor?.name || 'Someone',
-          result.previousTicket.status,
-          result.updatedTicket.status,
-          recipientIds,
-        ),
-      );
-
       await this.eventEmitter.emitAsync(
         DASHBOARD_CACHE_INVALIDATE_EVENT,
         new DashboardCacheInvalidatedEvent('TICKET_STATUS_CHANGED', id),
       );
-
-      if (result.updatedTicket.status === TicketStatus.RESOLVED) {
-        this.eventEmitter.emit(
-          'ticket.resolved',
-          new TicketResolvedEvent(
-            id,
-            result.previousTicket.title,
-            currentUser.userId,
-            actor?.name || 'Someone',
-            recipientIds,
-          ),
-        );
-      }
     }
 
     return result.updatedTicket;
@@ -910,6 +912,15 @@ export class TicketsService {
 
     if (assigned.isLocked) {
       throw new BadRequestException('Cannot assign ticket to a locked user');
+    }
+
+    const actor = await this.prisma.user.findUnique({
+      where: { id: currentUser.userId },
+      select: { name: true },
+    });
+
+    if (!actor) {
+      throw new NotFoundException('Actor not found');
     }
 
     const updatedTicket = await this.prisma.$transaction(
@@ -985,30 +996,21 @@ export class TicketsService {
           transaction,
         );
 
+        if (ticket.assignedToId !== assignTicketDto.assignedToId) {
+          await this.outboxService.enqueue(transaction, {
+            type: OUTBOX_EVENT_TYPES.TICKET_ASSIGNED,
+            payload: {
+              ticketId: id,
+              ticketTitle: ticket.title,
+              assignedToId: assignTicketDto.assignedToId,
+              assignedByName: actor.name || 'Someone',
+            },
+          });
+        }
+
         return result;
       },
     );
-
-    const actor = await this.prisma.user.findUnique({
-      where: { id: currentUser.userId },
-      select: {
-        name: true,
-      },
-    });
-
-    if (!actor) throw new NotFoundException('Actor not found');
-
-    if (ticket.assignedToId !== assignTicketDto.assignedToId) {
-      this.eventEmitter.emit(
-        'ticket.assigned',
-        new TicketAssignedEvent(
-          id,
-          ticket.title,
-          assignTicketDto.assignedToId,
-          actor.name || 'Someone',
-        ),
-      );
-    }
 
     return updatedTicket;
   }
@@ -1023,6 +1025,7 @@ export class TicketsService {
         status: true,
         attachments: {
           select: {
+            id: true,
             fileUrl: true,
             publicId: true,
             resourceType: true,
@@ -1046,23 +1049,6 @@ export class TicketsService {
       throw new ForbiddenException('Forbidden');
     }
 
-    await Promise.all(
-      ticket.attachments.map((attachment) => {
-        if (!attachment.publicId) {
-          return Promise.resolve();
-        }
-
-        return this.cloudinaryService.deleteFile(
-          attachment.publicId,
-          resolveCloudinaryResourceType(
-            attachment.resourceType,
-            attachment.fileUrl,
-          ),
-          resolveCloudinaryDeliveryType(attachment.deliveryType),
-        );
-      }),
-    );
-
     await this.prisma.$transaction(async (transaction) => {
       await transaction.ticket.delete({
         where: { id },
@@ -1085,6 +1071,27 @@ export class TicketsService {
         },
         transaction,
       );
+
+      for (const attachment of ticket.attachments) {
+        if (!attachment.publicId) {
+          continue;
+        }
+
+        await this.outboxService.enqueue(transaction, {
+          type: OUTBOX_EVENT_TYPES.CLOUDINARY_ASSET_DELETE,
+          payload: {
+            publicId: attachment.publicId,
+            resourceType: resolveCloudinaryResourceType(
+              attachment.resourceType,
+              attachment.fileUrl,
+            ),
+            deliveryType: resolveCloudinaryDeliveryType(
+              attachment.deliveryType,
+            ),
+          },
+          deduplicationKey: `cloudinary-delete:ticket:${ticket.id}:attachment:${attachment.id}`,
+        });
+      }
     });
 
     await this.eventEmitter.emitAsync(
@@ -1214,35 +1221,32 @@ export class TicketsService {
         transaction,
       );
 
-      return createdComment;
-    });
-
-    const ticket = await this.prisma.ticket.findUnique({
-      where: { id: ticketId },
-      select: {
-        id: true,
-        title: true,
-        createdById: true,
-        assignedToId: true,
-      },
-    });
-
-    if (ticket) {
+      const ticket = await transaction.ticket.findUniqueOrThrow({
+        where: { id: ticketId },
+        select: {
+          id: true,
+          title: true,
+          createdById: true,
+          assignedToId: true,
+        },
+      });
       const recipientIds = [ticket.createdById, ticket.assignedToId].filter(
         (id): id is number => Boolean(id),
       );
 
-      this.eventEmitter.emit(
-        'ticket.commented',
-        new TicketCommentedEvent(
-          ticket.id,
-          ticket.title,
-          currentUser.userId,
-          comment.author.name,
+      await this.outboxService.enqueue(transaction, {
+        type: OUTBOX_EVENT_TYPES.TICKET_COMMENTED,
+        payload: {
+          ticketId: ticket.id,
+          ticketTitle: ticket.title,
+          commentAuthorId: currentUser.userId,
+          commentAuthorName: createdComment.author.name,
           recipientIds,
-        ),
-      );
-    }
+        },
+      });
+
+      return createdComment;
+    });
 
     return comment;
   }
@@ -1542,17 +1546,6 @@ export class TicketsService {
       throw new ForbiddenException('Forbidden');
     }
 
-    if (attachment.publicId) {
-      await this.cloudinaryService.deleteFile(
-        attachment.publicId,
-        resolveCloudinaryResourceType(
-          attachment.resourceType,
-          attachment.fileUrl,
-        ),
-        resolveCloudinaryDeliveryType(attachment.deliveryType),
-      );
-    }
-
     await this.prisma.$transaction(async (transaction) => {
       const deleted = await transaction.ticketAttachment.deleteMany({
         where: {
@@ -1573,6 +1566,23 @@ export class TicketsService {
           newValue: attachment.fileName,
         },
       });
+
+      if (attachment.publicId) {
+        await this.outboxService.enqueue(transaction, {
+          type: OUTBOX_EVENT_TYPES.CLOUDINARY_ASSET_DELETE,
+          payload: {
+            publicId: attachment.publicId,
+            resourceType: resolveCloudinaryResourceType(
+              attachment.resourceType,
+              attachment.fileUrl,
+            ),
+            deliveryType: resolveCloudinaryDeliveryType(
+              attachment.deliveryType,
+            ),
+          },
+          deduplicationKey: `cloudinary-delete:ticket:${ticketId}:attachment:${attachmentId}`,
+        });
+      }
     });
 
     return { id: attachmentId };

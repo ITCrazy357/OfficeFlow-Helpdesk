@@ -12,12 +12,14 @@ import { TicketsService } from './tickets.service';
 import { TicketSlaFilter } from './dto/get-tickets-query.dto';
 import { AuditLogsService } from '../audit-logs/audit-logs.service';
 import { CloudinaryService } from '../cloudinary/cloudinary.service';
+import { OutboxService } from '../outbox/outbox.service';
 import { PrismaService } from '../prisma/prisma.service';
 
 const mockTransaction = {
   ticket: {
     delete: jest.fn(),
     findUnique: jest.fn(),
+    findUniqueOrThrow: jest.fn(),
     updateMany: jest.fn(),
   },
   ticketComment: {
@@ -67,6 +69,10 @@ const mockAuditLogsService = {
   create: jest.fn(),
 };
 
+const mockOutboxService = {
+  enqueue: jest.fn().mockResolvedValue({ id: 'outbox-event-id' }),
+};
+
 describe('TicketsService', () => {
   let service: TicketsService;
 
@@ -96,6 +102,10 @@ describe('TicketsService', () => {
         {
           provide: AuditLogsService,
           useValue: mockAuditLogsService,
+        },
+        {
+          provide: OutboxService,
+          useValue: mockOutboxService,
         },
       ],
     }).compile();
@@ -399,18 +409,17 @@ describe('TicketsService', () => {
         role: UserRole.ADMIN,
       },
     };
-    mockPrismaService.ticket.findUnique
-      .mockResolvedValueOnce({
-        id: 5,
-        createdById: 2,
-        createdBy: { departmentId: 1 },
-      })
-      .mockResolvedValueOnce({
-        id: 5,
-        title: 'VPN issue',
-        createdById: 2,
-        assignedToId: null,
-      });
+    mockPrismaService.ticket.findUnique.mockResolvedValueOnce({
+      id: 5,
+      createdById: 2,
+      createdBy: { departmentId: 1 },
+    });
+    mockTransaction.ticket.findUniqueOrThrow.mockResolvedValue({
+      id: 5,
+      title: 'VPN issue',
+      createdById: 2,
+      assignedToId: null,
+    });
     mockTransaction.ticketComment.create.mockResolvedValue(comment);
     mockTransaction.ticketHistory.create.mockResolvedValue({ id: 100 });
 
@@ -697,6 +706,7 @@ describe('TicketsService', () => {
       status: TicketStatus.OPEN,
       attachments: [
         {
+          id: 11,
           fileUrl:
             'https://res.cloudinary.com/demo/raw/authenticated/report.pdf',
           publicId: 'officeflow/ticket-attachments/report',
@@ -710,10 +720,17 @@ describe('TicketsService', () => {
     mockAuditLogsService.create.mockResolvedValue({ id: 100 });
 
     await expect(service.remove(5, currentUser)).resolves.toEqual({ id: 5 });
-    expect(mockCloudinaryService.deleteFile).toHaveBeenCalledWith(
-      'officeflow/ticket-attachments/report',
-      'raw',
-      'authenticated',
+    expect(mockCloudinaryService.deleteFile).not.toHaveBeenCalled();
+    expect(mockOutboxService.enqueue).toHaveBeenCalledWith(
+      mockTransaction,
+      expect.objectContaining({
+        type: 'cloudinary.asset.delete',
+        payload: {
+          publicId: 'officeflow/ticket-attachments/report',
+          resourceType: 'raw',
+          deliveryType: 'authenticated',
+        },
+      }),
     );
     expect(mockTransaction.ticket.delete).toHaveBeenCalledWith({
       where: { id: 5 },
@@ -866,10 +883,17 @@ describe('TicketsService', () => {
       { id: 20 },
     );
 
-    expect(mockCloudinaryService.deleteFile).toHaveBeenCalledWith(
-      'officeflow/ticket-attachments/recording',
-      'video',
-      'authenticated',
+    expect(mockCloudinaryService.deleteFile).not.toHaveBeenCalled();
+    expect(mockOutboxService.enqueue).toHaveBeenCalledWith(
+      mockTransaction,
+      expect.objectContaining({
+        type: 'cloudinary.asset.delete',
+        payload: {
+          publicId: 'officeflow/ticket-attachments/recording',
+          resourceType: 'video',
+          deliveryType: 'authenticated',
+        },
+      }),
     );
     expect(mockTransaction.ticketAttachment.deleteMany).toHaveBeenCalledWith({
       where: { id: 20, ticketId: 5 },
@@ -884,7 +908,7 @@ describe('TicketsService', () => {
     });
   });
 
-  it('should not delete the database record when Cloudinary deletion fails', async () => {
+  it('should commit attachment deletion without calling Cloudinary inline', async () => {
     const currentUser = {
       userId: 1,
       role: UserRole.ADMIN,
@@ -906,11 +930,46 @@ describe('TicketsService', () => {
     mockCloudinaryService.deleteFile.mockRejectedValue(
       new Error('Cloudinary unavailable'),
     );
+    mockTransaction.ticketAttachment.deleteMany.mockResolvedValue({ count: 1 });
+    mockTransaction.ticketHistory.create.mockResolvedValue({ id: 100 });
 
-    await expect(service.deleteAttachment(5, 20, currentUser)).rejects.toThrow(
-      'Cloudinary unavailable',
+    await expect(service.deleteAttachment(5, 20, currentUser)).resolves.toEqual(
+      { id: 20 },
     );
-    expect(mockPrismaService.$transaction).not.toHaveBeenCalled();
+    expect(mockCloudinaryService.deleteFile).not.toHaveBeenCalled();
+    expect(mockOutboxService.enqueue).toHaveBeenCalledWith(
+      mockTransaction,
+      expect.objectContaining({
+        type: 'cloudinary.asset.delete',
+      }),
+    );
+  });
+
+  it('propagates an outbox write failure through the delete transaction without touching Cloudinary', async () => {
+    mockPrismaService.ticket.findUnique.mockResolvedValue({
+      id: 5,
+      createdById: 2,
+      createdBy: { departmentId: 1 },
+    });
+    mockPrismaService.ticketAttachment.findUnique.mockResolvedValue({
+      fileName: 'report.pdf',
+      publicId: 'report.pdf',
+      resourceType: 'raw',
+      deliveryType: 'authenticated',
+      uploadedById: 2,
+    });
+    mockTransaction.ticketAttachment.deleteMany.mockResolvedValue({ count: 1 });
+    mockOutboxService.enqueue.mockRejectedValueOnce(
+      new Error('Outbox write failed'),
+    );
+    await expect(
+      service.deleteAttachment(5, 20, { userId: 1, role: UserRole.ADMIN }),
+    ).rejects.toThrow('Outbox write failed');
+    expect(mockOutboxService.enqueue).toHaveBeenCalledWith(
+      mockTransaction,
+      expect.any(Object),
+    );
+    expect(mockCloudinaryService.deleteFile).not.toHaveBeenCalled();
   });
 
   it('should forbid a manager from deleting an attachment', async () => {

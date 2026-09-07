@@ -9,6 +9,7 @@ import { AuditLogAction, AuditLogEntity, UserRole } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 
 import { AuditLogsService } from '../audit-logs/audit-logs.service';
+import { OutboxService } from '../outbox/outbox.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { UsersService } from './users.service';
 
@@ -66,6 +67,10 @@ const mockEventEmitter = {
   emitAsync: jest.fn().mockResolvedValue([]),
 };
 
+const mockOutboxService = {
+  enqueue: jest.fn().mockResolvedValue({ id: 'outbox-event-id' }),
+};
+
 const currentUser = {
   userId: 1,
   role: UserRole.ADMIN,
@@ -119,6 +124,10 @@ describe('UsersService', () => {
           provide: EventEmitter2,
           useValue: mockEventEmitter,
         },
+        {
+          provide: OutboxService,
+          useValue: mockOutboxService,
+        },
       ],
     }).compile();
 
@@ -160,10 +169,11 @@ describe('UsersService', () => {
       }),
       mockTransactionClient,
     );
-    expect(mockEventEmitter.emit).toHaveBeenCalledWith(
-      'user.created',
+    expect(mockOutboxService.enqueue).toHaveBeenCalledWith(
+      mockTransactionClient,
       expect.objectContaining({
-        userId: storedUser.id,
+        type: 'user.created',
+        payload: { userId: storedUser.id },
       }),
     );
   });

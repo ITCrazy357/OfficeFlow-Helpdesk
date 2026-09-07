@@ -5,8 +5,9 @@ import * as bcrypt from 'bcrypt';
 import { createHash, randomBytes } from 'node:crypto';
 
 import { AuditLogsService } from '../audit-logs/audit-logs.service';
-import { PasswordRecoveryCompletedEvent } from '../notifications/events/password-recovery-completed.event';
 import { PasswordResetRequestedEvent } from '../notifications/events/password-reset-requested.event';
+import { OUTBOX_EVENT_TYPES } from '../outbox/outbox.constants';
+import { OutboxService } from '../outbox/outbox.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { ResetForgottenPasswordDto } from './dto/reset-forgotten-password.dto';
@@ -36,6 +37,7 @@ export class PasswordRecoveryService {
     private readonly prisma: PrismaService,
     private readonly auditLogsService: AuditLogsService,
     private readonly eventEmitter: EventEmitter2,
+    private readonly outboxService: OutboxService,
   ) {}
 
   private async waitForGenericResponseFloor(startedAt: number) {
@@ -292,15 +294,19 @@ export class PasswordRecoveryService {
         transaction,
       );
 
+      await this.outboxService.enqueue(transaction, {
+        type: OUTBOX_EVENT_TYPES.PASSWORD_RECOVERY_COMPLETED,
+        payload: {
+          userId: resetToken.userId,
+        },
+        // Token rows are reused by upsert. Let enqueue generate a fresh key
+        // for each successful reset; updateMany already enforces one-time use.
+      });
+
       return {
         passwordReset: true as const,
       };
     });
-
-    this.eventEmitter.emit(
-      'password-recovery.completed',
-      new PasswordRecoveryCompletedEvent(resetToken.userId),
-    );
 
     return result;
   }

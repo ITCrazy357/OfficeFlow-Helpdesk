@@ -19,7 +19,8 @@ import {
   DASHBOARD_CACHE_INVALIDATE_EVENT,
   DashboardCacheInvalidatedEvent,
 } from '../dashboard/events/dashboard-cache-invalidated.event';
-import { UserCreatedEvent } from '../notifications/events/user-created.event';
+import { OUTBOX_EVENT_TYPES } from '../outbox/outbox.constants';
+import { OutboxService } from '../outbox/outbox.service';
 import { PrismaService } from '../prisma/prisma.service';
 
 import { CreateUserDto } from './dto/create-user.dto';
@@ -53,6 +54,7 @@ export class UsersService {
     private readonly prisma: PrismaService,
     private readonly auditLogsService: AuditLogsService,
     private readonly eventEmitter: EventEmitter2,
+    private readonly outboxService: OutboxService,
   ) {}
 
   async create(createUserDto: CreateUserDto, currentUser: CurrentUserPayload) {
@@ -118,10 +120,14 @@ export class UsersService {
         transaction,
       );
 
+      await this.outboxService.enqueue(transaction, {
+        type: OUTBOX_EVENT_TYPES.USER_CREATED,
+        payload: { userId: user.id },
+        deduplicationKey: `user-created:${user.id}`,
+      });
+
       return user;
     });
-
-    this.eventEmitter.emit('user.created', new UserCreatedEvent(user.id));
 
     return user;
   }

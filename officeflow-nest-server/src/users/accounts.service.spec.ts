@@ -4,12 +4,12 @@ import {
   ForbiddenException,
   NotFoundException,
 } from '@nestjs/common';
-import { EventEmitter2 } from '@nestjs/event-emitter';
 import { Test, TestingModule } from '@nestjs/testing';
 import { UserRole } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 
 import { AuditLogsService } from '../audit-logs/audit-logs.service';
+import { OutboxService } from '../outbox/outbox.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { AccountService } from './accounts.service';
 
@@ -58,8 +58,8 @@ const mockAuditLogsService = {
   create: jest.fn<Promise<unknown>, [unknown, unknown]>(),
 };
 
-const mockEventEmitter = {
-  emit: jest.fn(),
+const mockOutboxService = {
+  enqueue: jest.fn().mockResolvedValue({ id: 'outbox-event-id' }),
 };
 
 const baseUser = {
@@ -109,8 +109,8 @@ describe('AccountService', () => {
           useValue: mockAuditLogsService,
         },
         {
-          provide: EventEmitter2,
-          useValue: mockEventEmitter,
+          provide: OutboxService,
+          useValue: mockOutboxService,
         },
       ],
     }).compile();
@@ -333,9 +333,12 @@ describe('AccountService', () => {
     expect(mockPasswordResetTokenModel.deleteMany).toHaveBeenCalledWith({
       where: { userId: target.id },
     });
-    expect(mockEventEmitter.emit).toHaveBeenCalledWith(
-      'user.password-reset',
-      expect.objectContaining({ userId: target.id }),
+    expect(mockOutboxService.enqueue).toHaveBeenCalledWith(
+      mockTransactionClient,
+      expect.objectContaining({
+        type: 'user.password-reset',
+        payload: { userId: target.id },
+      }),
     );
     expect(
       JSON.stringify(mockAuditLogsService.create.mock.calls),

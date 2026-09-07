@@ -14,6 +14,7 @@ import { KnowledgeModule } from './knowledge/knowledge.module';
 import { LeaveRequestsModule } from './leave-requests/leave-requests.module';
 import { MailModule } from './mail/mail.module';
 import { NotificationsModule } from './notifications/notifications.module';
+import { OutboxModule } from './outbox/outbox.module';
 import { PasswordRecoveryModule } from './password-recovery/password-recovery.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { SlaModule } from './sla/sla.module';
@@ -79,6 +80,7 @@ import { RedisService } from './redis/redis.service';
       }),
     }),
     PrismaModule,
+    OutboxModule,
     AuthModule,
     UsersModule,
     DepartmentsModule,

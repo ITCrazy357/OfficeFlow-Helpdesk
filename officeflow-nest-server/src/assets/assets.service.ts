@@ -5,7 +5,6 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { EventEmitter2 } from '@nestjs/event-emitter';
 import {
   AuditLogAction,
   AuditLogEntity,
@@ -16,8 +15,8 @@ import {
 
 import { AuditLogsService } from '../audit-logs/audit-logs.service';
 import type { CurrentUserPayload } from '../common/decorators/current-user.decorator';
-import { AssetAssignedEvent } from '../notifications/events/asset-assigned.event';
-import { AssetReturnedEvent } from '../notifications/events/asset-returned.event';
+import { OUTBOX_EVENT_TYPES } from '../outbox/outbox.constants';
+import { OutboxService } from '../outbox/outbox.service';
 import { PrismaService } from '../prisma/prisma.service';
 
 import { AssignAssetDto } from './dto/assign-asset.dto';
@@ -31,8 +30,8 @@ import { UpdateAssetDto } from './dto/update-asset.dto';
 export class AssetsService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly eventEmitter: EventEmitter2,
     private readonly auditLogsService: AuditLogsService,
+    private readonly outboxService: OutboxService,
   ) {}
 
   private canManageAssets(currentUser: CurrentUserPayload) {
@@ -554,22 +553,22 @@ export class AssetsService {
         tx,
       );
 
+      await this.outboxService.enqueue(tx, {
+        type: OUTBOX_EVENT_TYPES.ASSET_ASSIGNED,
+        payload: {
+          assetId: asset.id,
+          assetTag: asset.assetTag,
+          assetName: asset.name,
+          assignedToId: targetUser.id,
+          assignedByName: actor?.name || 'IT staff',
+        },
+      });
+
       return {
         asset: updatedAsset,
         assignment,
       };
     });
-
-    this.eventEmitter.emit(
-      'asset.assigned',
-      new AssetAssignedEvent(
-        result.asset.id,
-        result.asset.assetTag,
-        result.asset.name,
-        targetUser.id,
-        actor?.name || 'IT staff',
-      ),
-    );
 
     return result;
   }
@@ -683,19 +682,19 @@ export class AssetsService {
         tx,
       );
 
+      await this.outboxService.enqueue(tx, {
+        type: OUTBOX_EVENT_TYPES.ASSET_RETURNED,
+        payload: {
+          assetId: asset.id,
+          assetTag: asset.assetTag,
+          assetName: asset.name,
+          previousAssignedToId,
+          returnedByName: actor?.name || 'IT staff',
+        },
+      });
+
       return updatedAsset;
     });
-
-    this.eventEmitter.emit(
-      'asset.returned',
-      new AssetReturnedEvent(
-        asset.id,
-        asset.assetTag,
-        asset.name,
-        previousAssignedToId,
-        actor?.name || 'IT staff',
-      ),
-    );
 
     return result;
   }

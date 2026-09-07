@@ -5,7 +5,6 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { EventEmitter2 } from '@nestjs/event-emitter';
 import {
   AuditLogAction,
   AuditLogEntity,
@@ -16,7 +15,8 @@ import * as bcrypt from 'bcrypt';
 
 import { AuditLogsService } from '../audit-logs/audit-logs.service';
 import { type CurrentUserPayload } from '../common/decorators/current-user.decorator';
-import { UserPasswordResetEvent } from '../notifications/events/user-password-reset.event';
+import { OUTBOX_EVENT_TYPES } from '../outbox/outbox.constants';
+import { OutboxService } from '../outbox/outbox.service';
 import { PrismaService } from '../prisma/prisma.service';
 
 import { ChangeMyPasswordDto } from './dto/change-my-password.dto';
@@ -59,7 +59,7 @@ export class AccountService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly auditLogsService: AuditLogsService,
-    private readonly eventEmitter: EventEmitter2,
+    private readonly outboxService: OutboxService,
   ) {}
 
   private assertCanManageAccount(
@@ -388,13 +388,13 @@ export class AccountService {
         transaction,
       );
 
+      await this.outboxService.enqueue(transaction, {
+        type: OUTBOX_EVENT_TYPES.USER_PASSWORD_RESET,
+        payload: { userId: updatedUser.id },
+      });
+
       return updatedUser;
     });
-
-    this.eventEmitter.emit(
-      'user.password-reset',
-      new UserPasswordResetEvent(updatedUser.id),
-    );
 
     return updatedUser;
   }

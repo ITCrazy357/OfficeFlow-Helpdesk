@@ -18,7 +18,24 @@ export class NotificationsService {
     title: string;
     message: string;
     targetUrl: string;
+    sourceEventId?: string;
   }) {
+    if (params.sourceEventId) {
+      return this.prisma.notification.createMany({
+        data: [
+          {
+            userId: params.userId,
+            type: params.type,
+            title: params.title,
+            message: params.message,
+            targetUrl: params.targetUrl,
+            sourceEventId: params.sourceEventId,
+          },
+        ],
+        skipDuplicates: true,
+      });
+    }
+
     return this.prisma.notification.create({
       data: {
         userId: params.userId,
@@ -45,6 +62,7 @@ export class NotificationsService {
     title: string;
     message: string;
     targetUrl: string;
+    sourceEventId?: string;
   }) {
     const uniqueUserIds = [...new Set(params.userIds)];
 
@@ -59,7 +77,9 @@ export class NotificationsService {
         title: params.title,
         message: params.message,
         targetUrl: params.targetUrl,
+        sourceEventId: params.sourceEventId,
       })),
+      skipDuplicates: Boolean(params.sourceEventId),
     });
   }
 

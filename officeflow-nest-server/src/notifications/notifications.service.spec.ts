@@ -6,6 +6,8 @@ import { NotificationsService } from './notifications.service';
 
 const mockPrismaService = {
   notification: {
+    create: jest.fn(),
+    createMany: jest.fn(),
     findUnique: jest.fn(),
     update: jest.fn(),
   },
@@ -16,6 +18,7 @@ describe('NotificationsService', () => {
 
   beforeEach(async () => {
     jest.clearAllMocks();
+    mockPrismaService.notification.createMany.mockResolvedValue({ count: 1 });
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -28,6 +31,30 @@ describe('NotificationsService', () => {
     }).compile();
 
     service = module.get(NotificationsService);
+  });
+
+  it('uses the outbox event id to make notification creation idempotent', async () => {
+    await expect(
+      service.create({
+        userId: 7,
+        type: NotificationType.TICKET_ASSIGNED,
+        title: 'Ticket assigned',
+        message: 'A ticket was assigned to you',
+        targetUrl: '/tickets/42',
+        sourceEventId: 'f93fc842-2cf2-4f4b-8791-824457674900',
+      }),
+    ).resolves.toEqual({ count: 1 });
+
+    expect(mockPrismaService.notification.createMany).toHaveBeenCalledWith({
+      data: [
+        expect.objectContaining({
+          userId: 7,
+          sourceEventId: 'f93fc842-2cf2-4f4b-8791-824457674900',
+        }),
+      ],
+      skipDuplicates: true,
+    });
+    expect(mockPrismaService.notification.create).not.toHaveBeenCalled();
   });
 
   it('should return the updated notification after marking it as read', async () => {

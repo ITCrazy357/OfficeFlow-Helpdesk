@@ -22,8 +22,7 @@ export class UserEmailListener {
   ) {}
 
   @OnEvent('user.created', {
-    async: true,
-    suppressErrors: true,
+    suppressErrors: false,
   })
   async handleUserCreated(event: UserCreatedEvent) {
     if (!this.mailService.isEnabled()) {
@@ -54,12 +53,12 @@ export class UserEmailListener {
       });
     } catch (error: unknown) {
       this.logError('user-created', error);
+      throw error;
     }
   }
 
   @OnEvent('user.password-reset', {
-    async: true,
-    suppressErrors: true,
+    suppressErrors: false,
   })
   async handleUserPasswordReset(event: UserPasswordResetEvent) {
     if (!this.mailService.isEnabled()) {
@@ -90,6 +89,7 @@ export class UserEmailListener {
       });
     } catch (error: unknown) {
       this.logError('user-password-reset', error);
+      throw error;
     }
   }
 
@@ -144,8 +144,7 @@ export class UserEmailListener {
   }
 
   @OnEvent('password-recovery.completed', {
-    async: true,
-    suppressErrors: true,
+    suppressErrors: false,
   })
   async handlePasswordRecoveryCompleted(event: PasswordRecoveryCompletedEvent) {
     if (!this.mailService.isEnabled()) {
@@ -176,6 +175,7 @@ export class UserEmailListener {
       });
     } catch (error: unknown) {
       this.logError('password-recovery-completed', error);
+      throw error;
     }
   }
 

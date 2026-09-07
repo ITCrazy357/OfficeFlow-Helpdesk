@@ -9,7 +9,8 @@ import {
   DASHBOARD_CACHE_INVALIDATE_EVENT,
   DashboardCacheInvalidatedEvent,
 } from '../dashboard/events/dashboard-cache-invalidated.event';
-import { TicketOverdueEvent } from '../notifications/events/ticket-overdue.event';
+import { OUTBOX_EVENT_TYPES } from '../outbox/outbox.constants';
+import { OutboxService } from '../outbox/outbox.service';
 
 @Injectable()
 export class SlaService {
@@ -18,6 +19,7 @@ export class SlaService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly eventEmitter: EventEmitter2,
+    private readonly outboxService: OutboxService,
   ) {}
 
   @Cron(CronExpression.EVERY_30_MINUTES)
@@ -55,41 +57,55 @@ export class SlaService {
     let lastMarkedTicketId: number | null = null;
 
     for (const ticket of overdueTickets) {
-      const updated = await this.prisma.ticket.updateMany({
-        where: {
-          id: ticket.id,
-          dueAt: {
-            lt: now,
+      const claimed = await this.prisma.$transaction(async (tx) => {
+        const updated = await tx.ticket.updateMany({
+          where: {
+            id: ticket.id,
+            dueAt: {
+              lt: now,
+            },
+            isOverdue: false,
+            status: {
+              notIn: [
+                TicketStatus.RESOLVED,
+                TicketStatus.CLOSED,
+                TicketStatus.CANCELLED,
+              ],
+            },
           },
-          isOverdue: false,
-          status: {
-            notIn: [
-              TicketStatus.RESOLVED,
-              TicketStatus.CLOSED,
-              TicketStatus.CANCELLED,
-            ],
+          data: {
+            isOverdue: true,
           },
-        },
-        data: {
-          isOverdue: true,
-        },
+        });
+
+        if (updated.count !== 1) {
+          return false;
+        }
+
+        const recipientIds = [ticket.createdById, ticket.assignedToId].filter(
+          (id): id is number => Boolean(id),
+        );
+
+        await this.outboxService.enqueue(tx, {
+          type: OUTBOX_EVENT_TYPES.TICKET_OVERDUE,
+          payload: {
+            ticketId: ticket.id,
+            ticketTitle: ticket.title,
+            recipientIds,
+          },
+          deduplicationKey: `ticket-overdue:${ticket.id}`,
+        });
+
+        return true;
       });
 
       // Another worker may have claimed the same ticket after the initial read.
-      if (updated.count !== 1) {
+      if (!claimed) {
         continue;
       }
 
       markedCount++;
       lastMarkedTicketId = ticket.id;
-      const recipientIds = [ticket.createdById, ticket.assignedToId].filter(
-        (id): id is number => Boolean(id),
-      );
-
-      this.eventEmitter.emit(
-        'ticket.overdue',
-        new TicketOverdueEvent(ticket.id, ticket.title, recipientIds),
-      );
     }
 
     if (lastMarkedTicketId !== null) {
