@@ -286,37 +286,45 @@ describe('TicketsService', () => {
     expect(mockPrismaService.$transaction).not.toHaveBeenCalled();
   });
 
-  it('should preserve resolveAt and side effects when status does not change', async () => {
-    const unchangedTicket = {
-      id: 5,
-      title: 'VPN issue',
-      description: 'Cannot connect to VPN',
-      status: TicketStatus.RESOLVED,
-      priority: 'MEDIUM',
-      dueAt: new Date(),
-      resolveAt: new Date('2026-08-01T10:00:00.000Z'),
-      isOverdue: false,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-      createdBy: { id: 2, name: 'Employee', email: 'employee@example.com' },
-      assignedTo: null,
-      category: null,
-    };
-    mockTransaction.ticket.findUnique.mockResolvedValue(unchangedTicket);
+  it.each(Object.values(TicketStatus))(
+    'should preserve %s without side effects when status does not change',
+    async (status) => {
+      const unchangedTicket = {
+        id: 5,
+        title: 'VPN issue',
+        description: 'Cannot connect to VPN',
+        status,
+        priority: 'MEDIUM',
+        dueAt: new Date(),
+        resolveAt:
+          status === TicketStatus.RESOLVED || status === TicketStatus.CLOSED
+            ? new Date('2026-08-01T10:00:00.000Z')
+            : null,
+        isOverdue: false,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        createdBy: { id: 2, name: 'Employee', email: 'employee@example.com' },
+        assignedTo: null,
+        category: null,
+      };
+      mockTransaction.ticket.findUnique.mockResolvedValue(unchangedTicket);
 
-    await expect(
-      service.updateStatus(
-        unchangedTicket.id,
-        { status: TicketStatus.RESOLVED },
-        { userId: 1, role: UserRole.ADMIN },
-      ),
-    ).resolves.toEqual(unchangedTicket);
+      await expect(
+        service.updateStatus(
+          unchangedTicket.id,
+          { status },
+          { userId: 1, role: UserRole.ADMIN },
+        ),
+      ).resolves.toEqual(unchangedTicket);
 
-    expect(mockTransaction.ticket.updateMany).not.toHaveBeenCalled();
-    expect(mockTransaction.ticketHistory.create).not.toHaveBeenCalled();
-    expect(mockAuditLogsService.create).not.toHaveBeenCalled();
-    expect(mockEventEmitter.emit).not.toHaveBeenCalled();
-  });
+      expect(mockTransaction.ticket.updateMany).not.toHaveBeenCalled();
+      expect(mockTransaction.ticketHistory.create).not.toHaveBeenCalled();
+      expect(mockAuditLogsService.create).not.toHaveBeenCalled();
+      expect(mockEventEmitter.emit).not.toHaveBeenCalled();
+      expect(mockEventEmitter.emitAsync).not.toHaveBeenCalled();
+      expect(mockOutboxService.enqueue).not.toHaveBeenCalled();
+    },
+  );
 
   it('should reject a stale concurrent status update without side effects', async () => {
     mockTransaction.ticket.findUnique.mockResolvedValue({
@@ -339,15 +347,186 @@ describe('TicketsService', () => {
     await expect(
       service.updateStatus(
         5,
-        { status: TicketStatus.CLOSED },
+        { status: TicketStatus.IN_PROGRESS },
         { userId: 1, role: UserRole.ADMIN },
       ),
     ).rejects.toThrow('Ticket status changed concurrently');
 
+    expect(mockTransaction.ticket.updateMany).toHaveBeenCalledWith({
+      where: { id: 5, status: TicketStatus.OPEN },
+      data: { status: TicketStatus.IN_PROGRESS, resolveAt: null },
+    });
     expect(mockTransaction.ticketHistory.create).not.toHaveBeenCalled();
     expect(mockAuditLogsService.create).not.toHaveBeenCalled();
     expect(mockEventEmitter.emit).not.toHaveBeenCalled();
+    expect(mockOutboxService.enqueue).not.toHaveBeenCalled();
+    expect(mockEventEmitter.emitAsync).not.toHaveBeenCalled();
   });
+
+  it.each([
+    [TicketStatus.CLOSED, TicketStatus.OPEN],
+    [TicketStatus.OPEN, TicketStatus.CLOSED],
+    [TicketStatus.CANCELLED, TicketStatus.IN_PROGRESS],
+  ])(
+    'should reject forbidden %s -> %s before writing any side effects',
+    async (currentStatus, nextStatus) => {
+      mockTransaction.ticket.findUnique.mockResolvedValue({
+        id: 5,
+        title: 'VPN issue',
+        description: 'Cannot connect to VPN',
+        status: currentStatus,
+        priority: 'MEDIUM',
+        dueAt: new Date(),
+        resolveAt: null,
+        isOverdue: false,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        createdBy: { id: 2, name: 'Employee', email: 'employee@example.com' },
+        assignedTo: null,
+        category: null,
+      });
+      await expect(
+        service.updateStatus(
+          5,
+          { status: nextStatus },
+          { userId: 1, role: UserRole.ADMIN },
+        ),
+      ).rejects.toThrow(
+        `Cannot change ticket status from ${currentStatus} to ${nextStatus}`,
+      );
+
+      expect(mockTransaction.ticket.updateMany).not.toHaveBeenCalled();
+      expect(mockTransaction.ticketHistory.create).not.toHaveBeenCalled();
+      expect(mockAuditLogsService.create).not.toHaveBeenCalled();
+      expect(mockEventEmitter.emit).not.toHaveBeenCalled();
+      expect(mockOutboxService.enqueue).not.toHaveBeenCalled();
+      expect(mockEventEmitter.emitAsync).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each([
+    {
+      from: TicketStatus.IN_PROGRESS,
+      to: TicketStatus.RESOLVED,
+      previousResolveAt: null,
+      expectedResolveAt: new Date('2026-09-08T12:00:00.000Z'),
+    },
+    {
+      from: TicketStatus.RESOLVED,
+      to: TicketStatus.CLOSED,
+      previousResolveAt: new Date('2026-09-08T10:00:00.000Z'),
+      expectedResolveAt: new Date('2026-09-08T10:00:00.000Z'),
+    },
+    {
+      from: TicketStatus.RESOLVED,
+      to: TicketStatus.IN_PROGRESS,
+      previousResolveAt: new Date('2026-09-08T10:00:00.000Z'),
+      expectedResolveAt: null,
+    },
+  ])(
+    'should update $from -> $to with the correct resolveAt and transactional events',
+    async ({ from, to, previousResolveAt, expectedResolveAt }) => {
+      jest.useFakeTimers();
+      jest.setSystemTime(new Date('2026-09-08T12:00:00.000Z'));
+      try {
+        const currentTicket = {
+          id: 5,
+          title: 'VPN issue',
+          status: from,
+          resolveAt: previousResolveAt,
+          dueAt: new Date('2026-09-08T09:00:00.000Z'),
+          isOverdue: true,
+          createdBy: { id: 2 },
+          assignedTo: { id: 3 },
+        };
+        const updatedTicket = {
+          ...currentTicket,
+          status: to,
+          resolveAt: expectedResolveAt,
+        };
+        mockPrismaService.user.findUnique.mockResolvedValue({ name: 'Admin' });
+        mockTransaction.ticket.findUnique
+          .mockResolvedValueOnce(currentTicket)
+          .mockResolvedValueOnce(updatedTicket);
+        mockTransaction.ticket.updateMany.mockResolvedValue({ count: 1 });
+
+        await expect(
+          service.updateStatus(
+            5,
+            { status: to },
+            { userId: 1, role: UserRole.ADMIN },
+          ),
+        ).resolves.toEqual(updatedTicket);
+
+        // Exact data also proves that changing status does not overwrite SLA fields.
+        expect(mockTransaction.ticket.updateMany).toHaveBeenCalledWith({
+          where: { id: 5, status: from },
+          data: { status: to, resolveAt: expectedResolveAt },
+        });
+        expect(mockTransaction.ticketHistory.create).toHaveBeenCalledTimes(1);
+        expect(mockTransaction.ticketHistory.create).toHaveBeenCalledWith({
+          data: {
+            ticketId: 5,
+            userId: 1,
+            action: TicketHistoryAction.STATUS_CHANGED,
+            oldValue: from,
+            newValue: to,
+          },
+        });
+        expect(mockAuditLogsService.create).toHaveBeenCalledTimes(1);
+        expect(mockAuditLogsService.create).toHaveBeenCalledWith(
+          expect.objectContaining({
+            oldValues: { status: from },
+            newValues: { status: to },
+          }),
+          mockTransaction,
+        );
+        expect(mockOutboxService.enqueue).toHaveBeenCalledWith(
+          mockTransaction,
+          {
+            type: 'ticket.status_changed',
+            payload: {
+              ticketId: 5,
+              ticketTitle: 'VPN issue',
+              changedById: 1,
+              changedByName: 'Admin',
+              oldStatus: from,
+              newStatus: to,
+              recipientIds: [2, 3],
+            },
+          },
+        );
+        expect(mockOutboxService.enqueue).toHaveBeenCalledTimes(
+          to === TicketStatus.RESOLVED ? 2 : 1,
+        );
+        if (to === TicketStatus.RESOLVED) {
+          expect(mockOutboxService.enqueue).toHaveBeenCalledWith(
+            mockTransaction,
+            {
+              type: 'ticket.resolved',
+              payload: {
+                ticketId: 5,
+                ticketTitle: 'VPN issue',
+                resolverId: 1,
+                resolverName: 'Admin',
+                recipientIds: [2, 3],
+              },
+            },
+          );
+        }
+        expect(mockEventEmitter.emitAsync).toHaveBeenCalledTimes(1);
+        expect(mockEventEmitter.emitAsync).toHaveBeenCalledWith(
+          'dashboard.cache.invalidate',
+          expect.objectContaining({
+            reason: 'TICKET_STATUS_CHANGED',
+            entityId: 5,
+          }),
+        );
+      } finally {
+        jest.useRealTimers();
+      }
+    },
+  );
 
   it('should reject assigning a ticket to an inactive IT user', async () => {
     mockPrismaService.ticket.findUnique.mockResolvedValue({

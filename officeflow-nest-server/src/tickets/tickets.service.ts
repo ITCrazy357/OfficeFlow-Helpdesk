@@ -50,6 +50,8 @@ import {
   normalizeAttachmentFileName,
 } from './ticket-attachment.util';
 
+import { assertTicketStatusTransition } from './ticket-status.policy';
+
 export type TicketAttachmentFile = NonNullable<Request['file']>;
 
 type AttachmentDeliveryMetadata = {
@@ -717,10 +719,6 @@ export class TicketsService {
   ) {
     const nextStatus = updateStatusDto.status;
 
-    const shouldSetResolveAt =
-      nextStatus === TicketStatus.RESOLVED ||
-      nextStatus === TicketStatus.CLOSED;
-
     if (
       currentUser.role !== UserRole.ADMIN &&
       currentUser.role !== UserRole.IT_STAFF
@@ -754,6 +752,15 @@ export class TicketsService {
         };
       }
 
+      assertTicketStatusTransition(currentTicket.status, nextStatus);
+
+      const resolveAt =
+        nextStatus === TicketStatus.RESOLVED
+          ? new Date()
+          : nextStatus === TicketStatus.CLOSED
+            ? currentTicket.resolveAt
+            : null;
+
       const claimed = await transaction.ticket.updateMany({
         where: {
           id,
@@ -761,7 +768,7 @@ export class TicketsService {
         },
         data: {
           status: nextStatus,
-          resolveAt: shouldSetResolveAt ? new Date() : null,
+          resolveAt,
         },
       });
 
