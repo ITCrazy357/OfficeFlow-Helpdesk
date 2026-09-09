@@ -27,6 +27,7 @@ type UserFormProps = {
   isSubmitting?: boolean;
   isLoadingDepartments?: boolean;
   error?: string | null;
+  roleDisabledReason?: string;
   onCancel: () => void;
   onSubmit: (values: UserFormValues) => Promise<void> | void;
 };
@@ -44,6 +45,7 @@ export function UserForm({
   isSubmitting = false,
   isLoadingDepartments = false,
   error,
+  roleDisabledReason,
   onCancel,
   onSubmit,
 }: UserFormProps) {
@@ -112,7 +114,7 @@ export function UserForm({
               <Select
                 value={field.value}
                 onValueChange={field.onChange}
-                disabled={isSubmitting}
+                disabled={isSubmitting || Boolean(roleDisabledReason)}
               >
                 <SelectTrigger
                   className="w-full"
@@ -131,6 +133,11 @@ export function UserForm({
             )}
           />
           <FieldError message={form.formState.errors.role?.message} />
+          {roleDisabledReason ? (
+            <p className="text-xs text-muted-foreground">
+              {roleDisabledReason}
+            </p>
+          ) : null}
         </div>
 
         <div className="grid gap-2">

@@ -52,6 +52,9 @@ import {
 
 import { assertTicketStatusTransition } from './ticket-status.policy';
 
+import { runSerializableTransaction } from '../common/database/serializable-transaction.util';
+import { assertTicketAssignee } from '../users/user-lifecycle.policy';
+
 export type TicketAttachmentFile = NonNullable<Request['file']>;
 
 type AttachmentDeliveryMetadata = {
@@ -732,130 +735,140 @@ export class TicketsService {
     });
     const actorName = actor?.name || 'Someone';
 
-    const result = await this.prisma.$transaction(async (transaction) => {
-      const currentTicket = await transaction.ticket.findUnique({
-        where: {
-          id,
-        },
-        select: ticketStatusSelect,
-      });
+    const result = await runSerializableTransaction(
+      this.prisma,
+      async (transaction) => {
+        const currentTicket = await transaction.ticket.findUnique({
+          where: {
+            id,
+          },
+          select: ticketStatusSelect,
+        });
 
-      if (!currentTicket) {
-        throw new NotFoundException('Ticket not found');
-      }
+        if (!currentTicket) {
+          throw new NotFoundException('Ticket not found');
+        }
 
-      if (currentTicket.status === nextStatus) {
-        return {
-          statusChanged: false,
-          previousTicket: currentTicket,
-          updatedTicket: currentTicket,
-        };
-      }
+        if (currentTicket.status === nextStatus) {
+          return {
+            statusChanged: false,
+            previousTicket: currentTicket,
+            updatedTicket: currentTicket,
+          };
+        }
 
-      assertTicketStatusTransition(currentTicket.status, nextStatus);
+        assertTicketStatusTransition(currentTicket.status, nextStatus);
 
-      const resolveAt =
-        nextStatus === TicketStatus.RESOLVED
-          ? new Date()
-          : nextStatus === TicketStatus.CLOSED
-            ? currentTicket.resolveAt
-            : null;
+        if (
+          nextStatus === TicketStatus.IN_PROGRESS &&
+          currentTicket.assignedTo
+        ) {
+          await assertTicketAssignee(transaction, currentTicket.assignedTo.id);
+        }
 
-      const claimed = await transaction.ticket.updateMany({
-        where: {
-          id,
-          status: currentTicket.status,
-        },
-        data: {
-          status: nextStatus,
-          resolveAt,
-        },
-      });
+        const resolveAt =
+          nextStatus === TicketStatus.RESOLVED
+            ? new Date()
+            : nextStatus === TicketStatus.CLOSED
+              ? currentTicket.resolveAt
+              : null;
 
-      if (claimed.count !== 1) {
-        throw new ConflictException(
-          'Ticket status changed concurrently. Please retry',
-        );
-      }
-
-      const updatedTicket = await transaction.ticket.findUnique({
-        where: {
-          id,
-        },
-        select: ticketStatusSelect,
-      });
-
-      if (!updatedTicket) {
-        throw new NotFoundException('Ticket not found');
-      }
-
-      await this.createHistory(
-        {
-          ticketId: id,
-          userId: currentUser.userId,
-          action: TicketHistoryAction.STATUS_CHANGED,
-          oldValue: currentTicket.status,
-          newValue: updatedTicket.status,
-        },
-        transaction,
-      );
-
-      await this.auditLogsService.create(
-        {
-          actorId: currentUser.userId,
-          entity: AuditLogEntity.TICKET,
-          entityId: currentTicket.id,
-          action: AuditLogAction.STATUS_CHANGED,
-          description: `Changed status of ticket ${currentTicket.title}.`,
-          oldValues: {
+        const claimed = await transaction.ticket.updateMany({
+          where: {
+            id,
             status: currentTicket.status,
           },
-          newValues: {
-            status: updatedTicket.status,
+          data: {
+            status: nextStatus,
+            resolveAt,
           },
-          ipAddress: currentUser.ipAddress,
-          userAgent: currentUser.userAgent,
-        },
-        transaction,
-      );
+        });
 
-      const recipientIds = [
-        currentTicket.createdBy.id,
-        currentTicket.assignedTo?.id,
-      ].filter((userId): userId is number => Boolean(userId));
+        if (claimed.count !== 1) {
+          throw new ConflictException(
+            'Ticket status changed concurrently. Please retry',
+          );
+        }
 
-      await this.outboxService.enqueue(transaction, {
-        type: OUTBOX_EVENT_TYPES.TICKET_STATUS_CHANGED,
-        payload: {
-          ticketId: id,
-          ticketTitle: currentTicket.title,
-          changedById: currentUser.userId,
-          changedByName: actorName,
-          oldStatus: currentTicket.status,
-          newStatus: updatedTicket.status,
-          recipientIds,
-        },
-      });
+        const updatedTicket = await transaction.ticket.findUnique({
+          where: {
+            id,
+          },
+          select: ticketStatusSelect,
+        });
 
-      if (updatedTicket.status === TicketStatus.RESOLVED) {
+        if (!updatedTicket) {
+          throw new NotFoundException('Ticket not found');
+        }
+
+        await this.createHistory(
+          {
+            ticketId: id,
+            userId: currentUser.userId,
+            action: TicketHistoryAction.STATUS_CHANGED,
+            oldValue: currentTicket.status,
+            newValue: updatedTicket.status,
+          },
+          transaction,
+        );
+
+        await this.auditLogsService.create(
+          {
+            actorId: currentUser.userId,
+            entity: AuditLogEntity.TICKET,
+            entityId: currentTicket.id,
+            action: AuditLogAction.STATUS_CHANGED,
+            description: `Changed status of ticket ${currentTicket.title}.`,
+            oldValues: {
+              status: currentTicket.status,
+            },
+            newValues: {
+              status: updatedTicket.status,
+            },
+            ipAddress: currentUser.ipAddress,
+            userAgent: currentUser.userAgent,
+          },
+          transaction,
+        );
+
+        const recipientIds = [
+          currentTicket.createdBy.id,
+          currentTicket.assignedTo?.id,
+        ].filter((userId): userId is number => Boolean(userId));
+
         await this.outboxService.enqueue(transaction, {
-          type: OUTBOX_EVENT_TYPES.TICKET_RESOLVED,
+          type: OUTBOX_EVENT_TYPES.TICKET_STATUS_CHANGED,
           payload: {
             ticketId: id,
             ticketTitle: currentTicket.title,
-            resolverId: currentUser.userId,
-            resolverName: actorName,
+            changedById: currentUser.userId,
+            changedByName: actorName,
+            oldStatus: currentTicket.status,
+            newStatus: updatedTicket.status,
             recipientIds,
           },
         });
-      }
 
-      return {
-        statusChanged: true,
-        previousTicket: currentTicket,
-        updatedTicket,
-      };
-    });
+        if (updatedTicket.status === TicketStatus.RESOLVED) {
+          await this.outboxService.enqueue(transaction, {
+            type: OUTBOX_EVENT_TYPES.TICKET_RESOLVED,
+            payload: {
+              ticketId: id,
+              ticketTitle: currentTicket.title,
+              resolverId: currentUser.userId,
+              resolverName: actorName,
+              recipientIds,
+            },
+          });
+        }
+
+        return {
+          statusChanged: true,
+          previousTicket: currentTicket,
+          updatedTicket,
+        };
+      },
+    );
 
     if (result.statusChanged) {
       await this.eventEmitter.emitAsync(
@@ -879,59 +892,35 @@ export class TicketsService {
       throw new ForbiddenException('Forbidden');
     }
 
-    const ticket = await this.prisma.ticket.findUnique({
-      where: { id },
-      select: {
-        id: true,
-        title: true,
-        assignedToId: true,
-      },
-    });
-
-    if (!ticket) {
-      throw new NotFoundException('Ticket not found');
-    }
-
-    const assigned = await this.prisma.user.findUnique({
-      where: { id: assignTicketDto.assignedToId },
-      select: {
-        id: true,
-        role: true,
-        isActive: true,
-        isLocked: true,
-      },
-    });
-
-    if (!assigned) {
-      throw new NotFoundException('Assignee not found');
-    }
-
-    if (
-      assigned.role !== UserRole.IT_STAFF &&
-      assigned.role !== UserRole.ADMIN
-    ) {
-      throw new BadRequestException('Assignee must be IT staff or admin');
-    }
-
-    if (!assigned.isActive) {
-      throw new BadRequestException('Cannot assign ticket to an inactive user');
-    }
-
-    if (assigned.isLocked) {
-      throw new BadRequestException('Cannot assign ticket to a locked user');
-    }
-
-    const actor = await this.prisma.user.findUnique({
-      where: { id: currentUser.userId },
-      select: { name: true },
-    });
-
-    if (!actor) {
-      throw new NotFoundException('Actor not found');
-    }
-
-    const updatedTicket = await this.prisma.$transaction(
+    const updatedTicket = await runSerializableTransaction(
+      this.prisma,
       async (transaction) => {
+        const ticket = await transaction.ticket.findUnique({
+          where: { id },
+          select: {
+            id: true,
+            title: true,
+            assignedToId: true,
+          },
+        });
+
+        if (!ticket) {
+          throw new NotFoundException('Ticket not found');
+        }
+
+        await assertTicketAssignee(transaction, assignTicketDto.assignedToId);
+
+        const actor = await transaction.user.findUnique({
+          where: { id: currentUser.userId },
+          select: {
+            name: true,
+          },
+        });
+
+        if (!actor) {
+          throw new NotFoundException('Actor not found');
+        }
+
         const result = await transaction.ticket.update({
           where: { id },
           data: {

@@ -82,6 +82,10 @@ import type {
 import { useTicketAssignees } from "@/features/users/hooks";
 import type { UserListItem } from "@/features/users/types";
 import { getApiErrorMessage } from "@/lib/axios";
+import {
+  canTransitionTicket,
+  isTerminalTicket,
+} from "@/features/tickets/status-policy";
 
 function formatDateTime(value?: string | null) {
   if (!value) {
@@ -362,6 +366,20 @@ export default function TicketDetailPage() {
     const status = value as TicketStatus;
 
     if (status === ticket.status) {
+      return;
+    }
+
+    if (!canTransitionTicket(ticket.status, status) || updateStatus.isPending)
+      return;
+    if (
+      status === "IN_PROGRESS" &&
+      ticket.assignedTo &&
+      staffUsersQuery.isSuccess &&
+      !selectedStaff
+    ) {
+      setStatusError(
+        "Người phụ trách không còn đủ điều kiện. Hãy giao lại ticket trước khi bắt đầu hoặc mở lại.",
+      );
       return;
     }
 
@@ -856,27 +874,57 @@ export default function TicketDetailPage() {
                 <Select
                   value={ticket.status}
                   onValueChange={handleStatusChange}
-                  disabled={updateStatus.isPending}
+                  disabled={
+                    updateStatus.isPending || isTerminalTicket(ticket.status)
+                  }
                 >
                   <SelectTrigger className="w-full">
                     <SelectValue placeholder="Chọn trạng thái" />
                   </SelectTrigger>
                   <SelectContent>
-                    {ticketStatusOptions.map((status) => (
-                      <SelectItem key={status.value} value={status.value}>
-                        <span className="flex items-center gap-2">
-                          {status.label}
-                          {status.value === "RESOLVED" ? (
-                            <MailCheck
-                              className="size-3.5 text-emerald-700"
-                              aria-label="Có email thông báo"
-                            />
-                          ) : null}
-                        </span>
-                      </SelectItem>
-                    ))}
+                    {ticketStatusOptions
+                      .filter((status) =>
+                        canTransitionTicket(ticket.status, status.value),
+                      )
+                      .map((status) => (
+                        <SelectItem
+                          key={status.value}
+                          value={status.value}
+                          disabled={
+                            status.value !== ticket.status &&
+                            status.value === "IN_PROGRESS" &&
+                            Boolean(ticket.assignedTo) &&
+                            staffUsersQuery.isSuccess &&
+                            !selectedStaff
+                          }
+                        >
+                          <span className="flex items-center gap-2">
+                            {status.label}
+                            {status.value === "RESOLVED" ? (
+                              <MailCheck
+                                className="size-3.5 text-emerald-700"
+                                aria-label="Có email thông báo"
+                              />
+                            ) : null}
+                          </span>
+                        </SelectItem>
+                      ))}
                   </SelectContent>
                 </Select>
+                {isTerminalTicket(ticket.status) ? (
+                  <p className="text-sm text-muted-foreground">
+                    Ticket đã đóng hoặc hủy, không thể đổi trạng thái tiếp.
+                  </p>
+                ) : null}
+                {ticket.assignedTo &&
+                staffUsersQuery.isSuccess &&
+                !selectedStaff &&
+                !isTerminalTicket(ticket.status) ? (
+                  <p className="text-sm text-amber-800">
+                    Người phụ trách hiện không đủ điều kiện. Hãy giao lại ticket
+                    trước khi chuyển sang Đang xử lý.
+                  </p>
+                ) : null}
                 <div className="flex items-start gap-2 rounded-lg border border-emerald-200/80 bg-emerald-50/70 p-3 text-xs leading-5 text-emerald-900">
                   <MailCheck className="mt-0.5 size-3.5 shrink-0" />
                   <p>

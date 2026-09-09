@@ -8,12 +8,14 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 import {
   AuditLogAction,
   AuditLogEntity,
+  LeaveStatus,
   type Prisma,
   UserRole,
 } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 
 import { AuditLogsService } from '../audit-logs/audit-logs.service';
+import { runSerializableTransaction } from '../common/database/serializable-transaction.util';
 import type { CurrentUserPayload } from '../common/decorators/current-user.decorator';
 import {
   DASHBOARD_CACHE_INVALIDATE_EVENT,
@@ -26,6 +28,17 @@ import { PrismaService } from '../prisma/prisma.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { ChangeUserStatusDto } from './dto/change-user-status.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
+import { HandoffUserDto } from './dto/handoff-user.dto';
+
+import {
+  assertActiveAdmin,
+  assertAnotherUsableAdmin,
+} from './user-lifecycle.policy';
+
+import {
+  assertNoPendingHandoff,
+  assertRoleHandoff,
+} from './user-handoff.policy';
 
 const userSelect = {
   id: true,
@@ -141,8 +154,11 @@ export class UsersService {
     });
   }
 
-  private async getUserOrThrow(id: number) {
-    const user = await this.prisma.user.findUnique({
+  private async getUserOrThrow(
+    id: number,
+    transaction: Prisma.TransactionClient,
+  ) {
+    const user = await transaction.user.findUnique({
       where: {
         id,
       },
@@ -156,12 +172,15 @@ export class UsersService {
     return user;
   }
 
-  private async ensureDepartmentExists(departmentId: number | null) {
+  private async ensureDepartmentExists(
+    departmentId: number | null,
+    transaction: Prisma.TransactionClient,
+  ) {
     if (departmentId === null) {
       return;
     }
 
-    const department = await this.prisma.department.findUnique({
+    const department = await transaction.department.findUnique({
       where: {
         id: departmentId,
       },
@@ -180,109 +199,137 @@ export class UsersService {
     updateUserDto: UpdateUserDto,
     currentUser: CurrentUserPayload,
   ) {
-    const user = await this.getUserOrThrow(id);
+    const { updatedUser, departmentChanged } = await runSerializableTransaction(
+      this.prisma,
+      async (transaction) => {
+        await assertActiveAdmin(transaction, currentUser.userId);
+        const user = await this.getUserOrThrow(id, transaction);
 
-    if (
-      id === currentUser.userId &&
-      updateUserDto.role &&
-      updateUserDto.role !== UserRole.ADMIN
-    ) {
-      throw new BadRequestException('Cannot remove your own ADMIN role');
-    }
+        if (
+          id === currentUser.userId &&
+          updateUserDto.role &&
+          updateUserDto.role !== UserRole.ADMIN
+        ) {
+          throw new BadRequestException('Cannot remove your own ADMIN role');
+        }
 
-    const data: Prisma.UserUncheckedUpdateInput = {};
+        const data: Prisma.UserUncheckedUpdateInput = {};
 
-    if (updateUserDto.name !== undefined) {
-      data.name = updateUserDto.name.trim();
-    }
+        if (updateUserDto.name !== undefined) {
+          data.name = updateUserDto.name.trim();
+        }
 
-    if (updateUserDto.email !== undefined) {
-      data.email = updateUserDto.email.trim().toLowerCase();
-    }
+        if (updateUserDto.email !== undefined) {
+          data.email = updateUserDto.email.trim().toLowerCase();
+        }
 
-    if (updateUserDto.role !== undefined) {
-      data.role = updateUserDto.role;
-    }
+        if (updateUserDto.role !== undefined) {
+          data.role = updateUserDto.role;
+        }
 
-    if (updateUserDto.departmentId !== undefined) {
-      data.departmentId = updateUserDto.departmentId;
-    }
+        if (updateUserDto.departmentId !== undefined) {
+          data.departmentId = updateUserDto.departmentId;
+        }
 
-    if (Object.keys(data).length === 0) {
-      throw new BadRequestException('No user information to update');
-    }
+        if (Object.keys(data).length === 0) {
+          throw new BadRequestException('No user information to update');
+        }
 
-    if (data.email && data.email !== user.email) {
-      const existedUser = await this.prisma.user.findFirst({
-        where: {
-          email: data.email as string,
-          id: {
-            not: id,
-          },
-        },
-        select: {
-          id: true,
-        },
-      });
+        if (data.email && data.email !== user.email) {
+          const existedUser = await transaction.user.findFirst({
+            where: {
+              email: data.email as string,
+              id: {
+                not: id,
+              },
+            },
+            select: {
+              id: true,
+            },
+          });
 
-      if (existedUser) {
-        throw new ConflictException('Email already exists');
-      }
-    }
+          if (existedUser) {
+            throw new ConflictException('Email already exists');
+          }
+        }
 
-    if (updateUserDto.departmentId !== undefined) {
-      await this.ensureDepartmentExists(updateUserDto.departmentId);
-    }
+        if (updateUserDto.departmentId !== undefined) {
+          await this.ensureDepartmentExists(
+            updateUserDto.departmentId,
+            transaction,
+          );
+        }
 
-    const updatedUser = await this.prisma.$transaction(async (transaction) => {
-      const updatedUser = await transaction.user.update({
-        where: {
-          id,
-        },
-        data,
-        select: userSelect,
-      });
+        const removesUsableAdmin =
+          user.role === UserRole.ADMIN &&
+          user.isActive &&
+          !user.isLocked &&
+          updateUserDto.role !== undefined &&
+          updateUserDto.role !== UserRole.ADMIN;
 
-      const emailChanged = updatedUser.email !== user.email;
+        if (removesUsableAdmin) {
+          await assertAnotherUsableAdmin(transaction, user.id);
+        }
 
-      if (emailChanged) {
-        await transaction.passwordResetToken.deleteMany({
+        if (
+          updateUserDto.role !== undefined &&
+          updateUserDto.role !== user.role
+        ) {
+          await assertRoleHandoff(transaction, user.id, updateUserDto.role);
+        }
+
+        const updatedUser = await transaction.user.update({
           where: {
-            userId: id,
+            id,
           },
+          data,
+          select: userSelect,
         });
-      }
 
-      await this.auditLogsService.create(
-        {
-          actorId: currentUser.userId,
-          entity: AuditLogEntity.USER,
-          entityId: user.id,
-          action: AuditLogAction.UPDATE,
-          description: `Updated user ${updatedUser.email}.`,
-          oldValues: {
-            name: user.name,
-            email: user.email,
-            role: user.role,
-            departmentId: user.departmentId,
+        const emailChanged = updatedUser.email !== user.email;
+
+        if (emailChanged) {
+          await transaction.passwordResetToken.deleteMany({
+            where: {
+              userId: id,
+            },
+          });
+        }
+
+        await this.auditLogsService.create(
+          {
+            actorId: currentUser.userId,
+            entity: AuditLogEntity.USER,
+            entityId: user.id,
+            action: AuditLogAction.UPDATE,
+            description: `Updated user ${updatedUser.email}.`,
+            oldValues: {
+              name: user.name,
+              email: user.email,
+              role: user.role,
+              departmentId: user.departmentId,
+            },
+            newValues: {
+              name: updatedUser.name,
+              email: updatedUser.email,
+              role: updatedUser.role,
+              departmentId: updatedUser.departmentId,
+              passwordResetTokensInvalidated: emailChanged,
+            },
+            ipAddress: currentUser.ipAddress,
+            userAgent: currentUser.userAgent,
           },
-          newValues: {
-            name: updatedUser.name,
-            email: updatedUser.email,
-            role: updatedUser.role,
-            departmentId: updatedUser.departmentId,
-            passwordResetTokensInvalidated: emailChanged,
-          },
-          ipAddress: currentUser.ipAddress,
-          userAgent: currentUser.userAgent,
-        },
-        transaction,
-      );
+          transaction,
+        );
 
-      return updatedUser;
-    });
+        return {
+          updatedUser,
+          departmentChanged: updatedUser.departmentId !== user.departmentId,
+        };
+      },
+    );
 
-    if (updatedUser.departmentId !== user.departmentId) {
+    if (departmentChanged) {
       await this.eventEmitter.emitAsync(
         DASHBOARD_CACHE_INVALIDATE_EVENT,
         new DashboardCacheInvalidatedEvent(
@@ -300,17 +347,45 @@ export class UsersService {
     changeUserStatusDto: ChangeUserStatusDto,
     currentUser: CurrentUserPayload,
   ) {
-    const user = await this.getUserOrThrow(id);
+    return runSerializableTransaction(this.prisma, async (transaction) => {
+      await assertActiveAdmin(transaction, currentUser.userId);
+      const user = await this.getUserOrThrow(id, transaction);
 
-    if (id === currentUser.userId && !changeUserStatusDto.isActive) {
-      throw new BadRequestException('Cannot deactivate your own account');
-    }
+      if (id === currentUser.userId && !changeUserStatusDto.isActive) {
+        throw new BadRequestException('Cannot deactivate your own account');
+      }
 
-    if (user.isActive === changeUserStatusDto.isActive) {
-      return user;
-    }
+      if (user.isActive === changeUserStatusDto.isActive) {
+        return user;
+      }
 
-    return this.prisma.$transaction(async (transaction) => {
+      if (!changeUserStatusDto.isActive) {
+        if (user.role === UserRole.ADMIN && !user.isLocked) {
+          await assertAnotherUsableAdmin(transaction, user.id);
+        }
+
+        await assertNoPendingHandoff(transaction, user.id);
+      } else {
+        // Reactivation must not restore an active report under an unavailable manager.
+        const relation = await transaction.user.findUniqueOrThrow({
+          where: { id },
+          select: {
+            manager: { select: { role: true, isActive: true, isLocked: true } },
+          },
+        });
+        if (
+          relation.manager &&
+          (!relation.manager.isActive ||
+            relation.manager.isLocked ||
+            (relation.manager.role !== UserRole.MANAGER &&
+              relation.manager.role !== UserRole.ADMIN))
+        ) {
+          throw new ConflictException(
+            'Reassign the unavailable manager before reactivating this user',
+          );
+        }
+      }
+
       const updatedUser = await transaction.user.update({
         where: {
           id,
@@ -362,6 +437,95 @@ export class UsersService {
       );
 
       return updatedUser;
+    });
+  }
+
+  async handoff(
+    id: number, //người bị thay thế
+    dto: HandoffUserDto,
+    currentUser: CurrentUserPayload,
+  ) {
+    return runSerializableTransaction(this.prisma, async (transaction) => {
+      await assertActiveAdmin(transaction, currentUser.userId);
+      await this.getUserOrThrow(id, transaction);
+      if (id === dto.replacementId) {
+        throw new BadRequestException('Replacement must be a different user');
+      }
+      const replacement = await this.getUserOrThrow(
+        //người thay thế
+        dto.replacementId,
+        transaction,
+      );
+      if (
+        !replacement.isActive ||
+        replacement.isLocked ||
+        (replacement.role !== UserRole.ADMIN &&
+          replacement.role !== UserRole.MANAGER)
+      ) {
+        throw new ConflictException(
+          'Replacement must be an active, unlocked MANAGER or ADMIN',
+        );
+      }
+
+      // Kiểm tra xem đổi manager của một user có tạo ra vòng lặp quản lý hay không.
+      const visited = new Set<number>([id]);
+      let ancestorId: number | null = replacement.id;
+      while (ancestorId !== null) {
+        if (visited.has(ancestorId))
+          throw new ConflictException('Handoff would create a reporting cycle');
+        visited.add(ancestorId);
+        const ancestor: { managerId: number | null } =
+          await transaction.user.findUniqueOrThrow({
+            where: { id: ancestorId },
+            select: { managerId: true },
+          });
+        ancestorId = ancestor.managerId;
+      }
+
+      const selfApproval = await transaction.leaveRequest.count({
+        where: {
+          approverId: id,
+          requesterId: replacement.id,
+          status: LeaveStatus.PENDING,
+        },
+      });
+      if (selfApproval)
+        throw new ConflictException(
+          'Replacement cannot approve their own leave request',
+        );
+
+      const reports = await transaction.user.updateMany({
+        where: { managerId: id },
+        data: { managerId: replacement.id },
+      });
+      const approvals = await transaction.leaveRequest.updateMany({
+        where: { approverId: id, status: LeaveStatus.PENDING },
+        data: { approverId: replacement.id },
+      });
+      const result = {
+        userId: id,
+        replacementId: replacement.id,
+        reportsTransferred: reports.count,
+        approvalsTransferred: approvals.count,
+      };
+      if (reports.count || approvals.count) {
+        await this.auditLogsService.create(
+          {
+            actorId: currentUser.userId,
+            entity: AuditLogEntity.USER,
+            entityId: id,
+            action: AuditLogAction.UPDATE,
+            description:
+              'Transferred reporting lines and pending leave approvals.',
+            oldValues: { managerId: id, approverId: id },
+            newValues: result,
+            ipAddress: currentUser.ipAddress,
+            userAgent: currentUser.userAgent,
+          },
+          transaction,
+        );
+      }
+      return result;
     });
   }
 }

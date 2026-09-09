@@ -39,6 +39,7 @@ import { CreateUserDto } from './dto/create-user.dto';
 import { ResetUserPasswordDto } from './dto/reset-user-password.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { ChangeMyPasswordDto } from './dto/change-my-password.dto';
+import { HandoffUserDto } from './dto/handoff-user.dto';
 
 @ApiTags('Users')
 @ApiBearerAuth()
@@ -108,6 +109,25 @@ export class UsersController {
       changeUserStatusDto,
       currentUser,
     );
+  }
+
+  @Patch(':id/handoff')
+  @Roles(UserRole.ADMIN)
+  @Message('Handoff reporting lines and pending approvals successfully')
+  @ApiOperation({
+    summary:
+      'Transfer direct reports and pending leave approvals; tickets and assets use their existing assignment APIs',
+  })
+  @ApiResponse({
+    status: 409,
+    description: 'Invalid replacement, reporting cycle or self-approval',
+  })
+  handoff(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: HandoffUserDto,
+    @CurrentUser() currentUser: CurrentUserPayload,
+  ) {
+    return this.usersService.handoff(id, dto, currentUser);
   }
 
   @Patch(':id/lock-status')

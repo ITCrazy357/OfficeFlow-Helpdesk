@@ -157,7 +157,7 @@ export default function AssetDetailPage() {
   const visibleUsers = useMemo(() => {
     const keyword = normalizeSearch(deferredUserSearch);
     return (usersQuery.data ?? []).filter(
-      (item) => item.isActive && matchesUser(item, keyword),
+      (item) => item.isActive && !item.isLocked && matchesUser(item, keyword),
     );
   }, [deferredUserSearch, usersQuery.data]);
 
@@ -220,9 +220,16 @@ export default function AssetDetailPage() {
   async function handleAssign() {
     const userId = Number(selectedUserId);
 
-    if (!Number.isInteger(userId) || userId <= 0) {
+    if (
+      !Number.isInteger(userId) ||
+      userId <= 0 ||
+      !(usersQuery.data ?? []).some(
+        (item) => item.id === userId && item.isActive && !item.isLocked,
+      )
+    ) {
       setFeedback({
-        message: "Hãy chọn nhân viên nhận tài sản.",
+        message:
+          "Hãy chọn nhân viên đang hoạt động và không bị khóa để nhận tài sản.",
         tone: "error",
       });
       return;
@@ -680,7 +687,15 @@ export default function AssetDetailPage() {
                     <Button
                       type="button"
                       onClick={handleAssign}
-                      disabled={isAssigning || !selectedUserId}
+                      disabled={
+                        isAssigning ||
+                        !(usersQuery.data ?? []).some(
+                          (item) =>
+                            String(item.id) === selectedUserId &&
+                            item.isActive &&
+                            !item.isLocked,
+                        )
+                      }
                     >
                       {isAssigning ? (
                         <Loader2 className="size-4 animate-spin" />

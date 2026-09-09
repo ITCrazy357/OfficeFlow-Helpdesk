@@ -16,7 +16,9 @@ import { OutboxService } from '../outbox/outbox.service';
 import { PrismaService } from '../prisma/prisma.service';
 
 const mockTransaction = {
+  user: { findUnique: jest.fn() },
   ticket: {
+    update: jest.fn(),
     delete: jest.fn(),
     findUnique: jest.fn(),
     findUniqueOrThrow: jest.fn(),
@@ -78,6 +80,13 @@ describe('TicketsService', () => {
 
   beforeEach(async () => {
     jest.clearAllMocks();
+    mockTransaction.user.findUnique.mockReset().mockResolvedValue({
+      id: 3,
+      name: 'Admin',
+      role: UserRole.IT_STAFF,
+      isActive: true,
+      isLocked: false,
+    });
     mockPrismaService.$transaction.mockImplementation(
       async (
         callback: (transaction: typeof mockTransaction) => Promise<unknown>,
@@ -529,12 +538,12 @@ describe('TicketsService', () => {
   );
 
   it('should reject assigning a ticket to an inactive IT user', async () => {
-    mockPrismaService.ticket.findUnique.mockResolvedValue({
+    mockTransaction.ticket.findUnique.mockResolvedValue({
       id: 5,
       title: 'VPN issue',
       assignedToId: null,
     });
-    mockPrismaService.user.findUnique.mockResolvedValue({
+    mockTransaction.user.findUnique.mockResolvedValue({
       id: 20,
       role: UserRole.IT_STAFF,
       isActive: false,
@@ -548,16 +557,20 @@ describe('TicketsService', () => {
       ),
     ).rejects.toThrow('Cannot assign ticket to an inactive user');
 
-    expect(mockPrismaService.$transaction).not.toHaveBeenCalled();
+    expect(mockTransaction.ticket.update).not.toHaveBeenCalled();
+    expect(mockPrismaService.$transaction).toHaveBeenCalledWith(
+      expect.any(Function),
+      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+    );
   });
 
   it('should reject assigning a ticket to a locked IT user', async () => {
-    mockPrismaService.ticket.findUnique.mockResolvedValue({
+    mockTransaction.ticket.findUnique.mockResolvedValue({
       id: 5,
       title: 'VPN issue',
       assignedToId: null,
     });
-    mockPrismaService.user.findUnique.mockResolvedValue({
+    mockTransaction.user.findUnique.mockResolvedValue({
       id: 20,
       role: UserRole.IT_STAFF,
       isActive: true,
@@ -572,7 +585,59 @@ describe('TicketsService', () => {
       ),
     ).rejects.toThrow('Cannot assign ticket to a locked user');
 
-    expect(mockPrismaService.$transaction).not.toHaveBeenCalled();
+    expect(mockTransaction.ticket.update).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    { role: UserRole.IT_STAFF, isActive: false, isLocked: false },
+    { role: UserRole.IT_STAFF, isActive: true, isLocked: true },
+    { role: UserRole.EMPLOYEE, isActive: true, isLocked: false },
+  ])('rejects reopening work for an ineligible assignee: %j', async (state) => {
+    mockTransaction.ticket.findUnique.mockReset().mockResolvedValue({
+      id: 5,
+      status: TicketStatus.RESOLVED,
+      assignedTo: { id: 3 },
+    });
+    mockTransaction.user.findUnique.mockResolvedValue({ id: 3, ...state });
+    await expect(
+      service.updateStatus(
+        5,
+        { status: TicketStatus.IN_PROGRESS },
+        { userId: 1, role: UserRole.ADMIN },
+      ),
+    ).rejects.toThrow();
+    expect(mockTransaction.ticket.updateMany).not.toHaveBeenCalled();
+    expect(mockOutboxService.enqueue).not.toHaveBeenCalled();
+    expect(mockEventEmitter.emitAsync).not.toHaveBeenCalled();
+  });
+
+  it('assigns from transaction-local state with audit, history and outbox', async () => {
+    mockTransaction.ticket.findUnique
+      .mockReset()
+      .mockResolvedValue({ id: 5, title: 'VPN', assignedToId: 4 });
+    mockTransaction.ticket.update.mockResolvedValue({
+      id: 5,
+      assignedTo: { id: 3 },
+    });
+    await service.assign(
+      5,
+      { assignedToId: 3 },
+      { userId: 1, role: UserRole.ADMIN },
+    );
+    expect(mockPrismaService.ticket.findUnique).not.toHaveBeenCalled();
+    expect(mockTransaction.ticketHistory.create).toHaveBeenCalledWith({
+      data: {
+        ticketId: 5,
+        userId: 1,
+        action: TicketHistoryAction.ASSIGNED,
+        oldValue: '4',
+        newValue: '3',
+      },
+    });
+    expect(mockOutboxService.enqueue).toHaveBeenCalledWith(
+      mockTransaction,
+      expect.objectContaining({ type: 'ticket.assigned' }),
+    );
   });
 
   it('should create a comment and bounded history in one transaction', async () => {

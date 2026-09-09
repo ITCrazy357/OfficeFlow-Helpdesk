@@ -37,7 +37,8 @@ export const ticketsQueryKeys = {
   list: (params: GetTicketsParams) =>
     [...ticketsQueryKeys.lists(), params] as const,
   detail: (id: number) => [...ticketsQueryKeys.all, "detail", id] as const,
-  comments: (id: number) => [...ticketsQueryKeys.detail(id), "comments"] as const,
+  comments: (id: number) =>
+    [...ticketsQueryKeys.detail(id), "comments"] as const,
   history: (id: number) => [...ticketsQueryKeys.detail(id), "history"] as const,
   attachments: (id: number) =>
     [...ticketsQueryKeys.detail(id), "attachments"] as const,
@@ -148,6 +149,13 @@ export function useUpdateTicketStatus() {
       id: number;
       input: UpdateTicketStatusInput;
     }) => updateTicketStatusApi(id, input),
+    onError: (_, variables) =>
+      Promise.all([
+        queryClient.invalidateQueries({
+          queryKey: ticketsQueryKeys.detail(variables.id),
+        }),
+        queryClient.invalidateQueries({ queryKey: ["users"] }),
+      ]),
     onSuccess: (ticket, variables) => {
       queryClient.invalidateQueries({ queryKey: ticketsQueryKeys.lists() });
       queryClient.invalidateQueries({ queryKey: ["dashboard"] });
@@ -163,13 +171,15 @@ export function useAssignTicket() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({
-      id,
-      input,
-    }: {
-      id: number;
-      input: AssignTicketInput;
-    }) => assignTicketApi(id, input),
+    mutationFn: ({ id, input }: { id: number; input: AssignTicketInput }) =>
+      assignTicketApi(id, input),
+    onError: (_, variables) =>
+      Promise.all([
+        queryClient.invalidateQueries({
+          queryKey: ticketsQueryKeys.detail(variables.id),
+        }),
+        queryClient.invalidateQueries({ queryKey: ["users"] }),
+      ]),
     onSuccess: (ticket, variables) => {
       queryClient.invalidateQueries({ queryKey: ticketsQueryKeys.lists() });
       queryClient.invalidateQueries({
@@ -237,13 +247,8 @@ export function useDeleteTicketAttachment() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({
-      id,
-      attachmentId,
-    }: {
-      id: number;
-      attachmentId: number;
-    }) => deleteTicketAttachmentApi(id, attachmentId),
+    mutationFn: ({ id, attachmentId }: { id: number; attachmentId: number }) =>
+      deleteTicketAttachmentApi(id, attachmentId),
     onSuccess: (deleted, variables) => {
       const deletedId = deleted.id ?? variables.attachmentId;
 
@@ -263,13 +268,8 @@ export function useLinkTicketAsset() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({
-      id,
-      input,
-    }: {
-      id: number;
-      input: LinkTicketAssetInput;
-    }) => linkTicketAssetApi(id, input),
+    mutationFn: ({ id, input }: { id: number; input: LinkTicketAssetInput }) =>
+      linkTicketAssetApi(id, input),
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ticketsQueryKeys.lists() });
       queryClient.invalidateQueries({

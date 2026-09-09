@@ -2,6 +2,7 @@
 
 import type { CSSProperties } from "react";
 import { useState } from "react";
+import Link from "next/link";
 import {
   AlertCircle,
   KeyRound,
@@ -36,6 +37,11 @@ import { useMe } from "@/features/auth/hooks";
 import { useDepartments } from "@/features/departments/hooks";
 import { ResetPasswordForm } from "@/features/users/components/reset-password-form";
 import { UserForm } from "@/features/users/components/user-form";
+import { UserHandoffForm } from "@/features/users/components/user-handoff-form";
+import {
+  isLastUsableAdmin,
+  translateLifecycleMessage,
+} from "@/features/users/lifecycle";
 import { userRoleLabels } from "@/features/users/constants";
 import {
   useChangeAccountLock,
@@ -44,6 +50,7 @@ import {
   useResetUserPassword,
   useUpdateUser,
   useUsers,
+  useHandoffUser,
 } from "@/features/users/hooks";
 import type {
   ResetPasswordFormValues,
@@ -58,6 +65,7 @@ type UserPanel =
   | { type: "reset"; user: UserListItem }
   | { type: "activation"; user: UserListItem }
   | { type: "lock"; user: UserListItem }
+  | { type: "handoff"; user: UserListItem }
   | null;
 
 function formatDate(value: string) {
@@ -98,17 +106,27 @@ export default function UsersPage() {
   const changeAccountLock = useChangeAccountLock();
   const changeUserStatus = useChangeUserStatus();
   const resetUserPassword = useResetUserPassword();
+  const handoffUser = useHandoffUser();
+  const isActionPending =
+    createUser.isPending ||
+    updateUser.isPending ||
+    changeAccountLock.isPending ||
+    changeUserStatus.isPending ||
+    resetUserPassword.isPending ||
+    handoffUser.isPending;
   const [panel, setPanel] = useState<UserPanel>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [actionMessage, setActionMessage] = useState<string | null>(null);
 
   const openPanel = (nextPanel: NonNullable<UserPanel>) => {
+    if (isActionPending) return;
     setActionError(null);
     setActionMessage(null);
     setPanel(nextPanel);
   };
 
   const closePanel = () => {
+    if (isActionPending) return;
     setActionError(null);
     setPanel(null);
   };
@@ -156,7 +174,9 @@ export default function UsersPage() {
       setActionMessage(`Đã cập nhật tài khoản ${values.email}.`);
     } catch (error) {
       setActionError(
-        getApiErrorMessage(error, "Không thể cập nhật người dùng."),
+        translateLifecycleMessage(
+          getApiErrorMessage(error, "Không thể cập nhật người dùng."),
+        ),
       );
     }
   };
@@ -236,7 +256,30 @@ export default function UsersPage() {
       );
     } catch (error) {
       setActionError(
-        getApiErrorMessage(error, "Không thể thay đổi trạng thái nhân viên."),
+        translateLifecycleMessage(
+          getApiErrorMessage(error, "Không thể thay đổi trạng thái nhân viên."),
+        ),
+      );
+    }
+  };
+
+  const handleHandoff = async (replacementId: number) => {
+    if (!isAdmin || panel?.type !== "handoff" || isActionPending) return;
+    setActionError(null);
+    try {
+      const result = await handoffUser.mutateAsync({
+        id: panel.user.id,
+        input: { replacementId },
+      });
+      setPanel(null);
+      setActionMessage(
+        `Đã bàn giao ${result.reportsTransferred} nhân viên trực thuộc và ${result.approvalsTransferred} đơn nghỉ chờ duyệt của ${panel.user.email}. Tài khoản chưa bị vô hiệu hóa; ticket và tài sản vẫn cần xử lý riêng.`,
+      );
+    } catch (error) {
+      setActionError(
+        translateLifecycleMessage(
+          getApiErrorMessage(error, "Không thể bàn giao. Vui lòng thử lại."),
+        ),
       );
     }
   };
@@ -314,7 +357,11 @@ export default function UsersPage() {
         </div>
 
         {isAdmin ? (
-          <Button type="button" onClick={() => openPanel({ type: "create" })}>
+          <Button
+            type="button"
+            disabled={isActionPending}
+            onClick={() => openPanel({ type: "create" })}
+          >
             <Plus className="size-4" />
             Tạo tài khoản
           </Button>
@@ -429,7 +476,10 @@ export default function UsersPage() {
                       </TableCell>
                       <TableCell>{formatDate(user.createdAt)}</TableCell>
                       <TableCell>
-                        <div className="flex justify-end gap-1">
+                        <fieldset
+                          disabled={isActionPending}
+                          className="flex flex-wrap justify-end gap-1"
+                        >
                           {isAdmin ? (
                             <>
                               <Button
@@ -445,14 +495,29 @@ export default function UsersPage() {
                               </Button>
                               <Button
                                 type="button"
+                                variant="ghost"
+                                size="xs"
+                                onClick={() =>
+                                  openPanel({ type: "handoff", user })
+                                }
+                              >
+                                Bàn giao
+                              </Button>
+                              <Button
+                                type="button"
                                 variant={user.isActive ? "outline" : "default"}
                                 size="xs"
                                 title={
                                   user.id === me.id
                                     ? "Không thể vô hiệu hóa tài khoản đang đăng nhập"
-                                    : undefined
+                                    : isLastUsableAdmin(user, users)
+                                      ? "Phải giữ ít nhất một ADMIN có thể sử dụng"
+                                      : undefined
                                 }
-                                disabled={user.id === me.id}
+                                disabled={
+                                  user.id === me.id ||
+                                  isLastUsableAdmin(user, users)
+                                }
                                 onClick={() =>
                                   openPanel({ type: "activation", user })
                                 }
@@ -503,7 +568,7 @@ export default function UsersPage() {
                             )}
                             {user.isLocked ? "Mở khóa" : "Khóa"}
                           </Button>
-                        </div>
+                        </fieldset>
                       </TableCell>
                     </TableRow>
                   ))}
@@ -522,40 +587,87 @@ export default function UsersPage() {
           </CardContent>
         </Card>
 
-        {panel ? (
+        {panel &&
+        (isAdmin || panel.type === "lock" || panel.type === "reset") ? (
           <Card className="shadow-sm xl:sticky xl:top-6">
             <CardHeader className="border-b">
               <CardTitle className="flex items-center gap-2">
-                {panel.type === "create"
-                  ? "Tạo tài khoản"
-                  : panel.type === "edit"
-                    ? "Chỉnh sửa người dùng"
-                    : panel.type === "reset"
-                      ? "Đặt lại mật khẩu"
-                      : panel.type === "activation"
-                        ? panel.user.isActive
-                          ? "Vô hiệu hóa nhân viên"
-                          : "Kích hoạt lại nhân viên"
-                        : panel.user.isLocked
-                          ? "Mở khóa tài khoản"
-                          : "Khóa tài khoản"}
+                {panel.type === "handoff"
+                  ? "Bàn giao trách nhiệm"
+                  : panel.type === "create"
+                    ? "Tạo tài khoản"
+                    : panel.type === "edit"
+                      ? "Chỉnh sửa người dùng"
+                      : panel.type === "reset"
+                        ? "Đặt lại mật khẩu"
+                        : panel.type === "activation"
+                          ? panel.user.isActive
+                            ? "Vô hiệu hóa nhân viên"
+                            : "Kích hoạt lại nhân viên"
+                          : panel.user.isLocked
+                            ? "Mở khóa tài khoản"
+                            : "Khóa tài khoản"}
                 {panel.type === "create" || panel.type === "reset" ? (
                   <MailCheck className="size-4 text-teal-700" />
                 ) : null}
               </CardTitle>
               <CardDescription>
-                {panel.type === "create"
-                  ? "ADMIN cấp thông tin đăng nhập ban đầu. Email thông báo tài khoản được gửi nếu tính năng email đang bật."
-                  : panel.type === "edit"
-                    ? `Cập nhật thông tin của ${panel.user.email}.`
-                    : panel.type === "reset"
-                      ? `Thiết lập mật khẩu mới cho ${panel.user.email}. Email thông báo được gửi nếu tính năng email đang bật.`
-                      : panel.type === "activation"
-                        ? `Xác nhận thay đổi trạng thái thuộc tổ chức của ${panel.user.email}.`
-                        : `Xác nhận thay đổi trạng thái khóa bảo mật của ${panel.user.email}.`}
+                {panel.type === "handoff"
+                  ? `Bàn giao nhân viên và đơn nghỉ của ${panel.user.email}.`
+                  : panel.type === "create"
+                    ? "ADMIN cấp thông tin đăng nhập ban đầu. Email thông báo tài khoản được gửi nếu tính năng email đang bật."
+                    : panel.type === "edit"
+                      ? `Cập nhật thông tin của ${panel.user.email}.`
+                      : panel.type === "reset"
+                        ? `Thiết lập mật khẩu mới cho ${panel.user.email}. Email thông báo được gửi nếu tính năng email đang bật.`
+                        : panel.type === "activation"
+                          ? `Xác nhận thay đổi trạng thái thuộc tổ chức của ${panel.user.email}.`
+                          : `Xác nhận thay đổi trạng thái khóa bảo mật của ${panel.user.email}.`}
               </CardDescription>
             </CardHeader>
             <CardContent className="pt-0">
+              {panel.type === "handoff" ? (
+                <UserHandoffForm
+                  key={`handoff-${panel.user.id}`}
+                  user={panel.user}
+                  users={users}
+                  isSubmitting={handoffUser.isPending}
+                  error={actionError}
+                  onSubmit={handleHandoff}
+                  onCancel={closePanel}
+                />
+              ) : null}
+              {isAdmin &&
+              (panel.type === "edit" ||
+                (panel.type === "activation" && panel.user.isActive)) ? (
+                <div className="mb-4 grid gap-2 rounded-lg border bg-muted/40 p-3 text-sm leading-6">
+                  <p>
+                    Trước khi vô hiệu hóa hoặc bỏ quyền xử lý, hãy bàn giao
+                    ticket, tài sản, đơn nghỉ chờ duyệt và nhân viên trực thuộc.
+                    Hệ thống phải còn ít nhất một ADMIN hoạt động, không bị
+                    khóa.
+                  </p>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    disabled={isActionPending}
+                    onClick={() =>
+                      openPanel({ type: "handoff", user: panel.user })
+                    }
+                  >
+                    Bàn giao nhân viên và đơn nghỉ
+                  </Button>
+                  <p>
+                    <Link className="underline" href="/tickets">
+                      Quản lý ticket
+                    </Link>{" "}
+                    ·{" "}
+                    <Link className="underline" href="/assets">
+                      Quản lý tài sản
+                    </Link>
+                  </p>
+                </div>
+              ) : null}
               {panel.type === "create" ? (
                 <UserForm
                   key="create-user"
@@ -572,6 +684,13 @@ export default function UsersPage() {
               {panel.type === "edit" ? (
                 <UserForm
                   key={`edit-user-${panel.user.id}`}
+                  roleDisabledReason={
+                    panel.user.id === me.id
+                      ? "Không thể tự bỏ quyền ADMIN của mình."
+                      : isLastUsableAdmin(panel.user, users)
+                        ? "Phải giữ ít nhất một ADMIN đang hoạt động và không bị khóa."
+                        : undefined
+                  }
                   mode="edit"
                   departments={departments}
                   defaultValues={{

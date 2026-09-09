@@ -101,10 +101,18 @@ export function useUpdateAsset() {
 
 export function useAssignAsset() {
   const invalidateAssetData = useInvalidateAssetData();
+  const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: ({ id, input }: { id: number; input: AssignAssetInput }) =>
       assignAssetApi(id, input),
+    onError: (_, variables) =>
+      Promise.all([
+        queryClient.invalidateQueries({
+          queryKey: assetsQueryKeys.detail(variables.id),
+        }),
+        queryClient.invalidateQueries({ queryKey: ["users"] }),
+      ]),
     onSuccess: (_, variables) => invalidateAssetData(variables.id),
   });
 }

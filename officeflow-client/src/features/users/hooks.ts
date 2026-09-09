@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import type { QueryClient } from "@tanstack/react-query";
 
 import { authQueryKeys } from "@/features/auth/hooks";
-import type { AuthUser } from "@/features/auth/types";
 
 import {
   changeAccountLockApi,
@@ -10,17 +10,42 @@ import {
   getUsersApi,
   resetUserPasswordApi,
   updateUserApi,
+  handoffUserApi,
 } from "./api";
 import type {
   ChangeAccountLockInput,
   ChangeUserStatusInput,
   ResetUserPasswordInput,
   UpdateUserInput,
+  HandoffUserInput,
 } from "./types";
 
 export const usersQueryKeys = {
   all: ["users"] as const,
 };
+
+function refreshUserLifecycle(queryClient: QueryClient) {
+  // Refresh on errors too: a conflict may mean another ADMIN changed eligibility.
+  return Promise.all(
+    [
+      usersQueryKeys.all,
+      authQueryKeys.me,
+      ["leave-requests"],
+      ["tickets"],
+      ["assets"],
+      ["dashboard"],
+    ].map((queryKey) => queryClient.invalidateQueries({ queryKey })),
+  );
+}
+
+export function useHandoffUser() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, input }: { id: number; input: HandoffUserInput }) =>
+      handoffUserApi(id, input),
+    onSettled: () => refreshUserLifecycle(queryClient),
+  });
+}
 
 export function useUsers(enabled = true) {
   return useQuery({
@@ -47,20 +72,7 @@ export function useUpdateUser() {
   return useMutation({
     mutationFn: ({ id, input }: { id: number; input: UpdateUserInput }) =>
       updateUserApi(id, input),
-    onSuccess: (_, variables) => {
-      const currentUser = queryClient.getQueryData<AuthUser>(authQueryKeys.me);
-      const invalidations = [
-        queryClient.invalidateQueries({ queryKey: usersQueryKeys.all }),
-      ];
-
-      if (currentUser?.id === variables.id) {
-        invalidations.push(
-          queryClient.invalidateQueries({ queryKey: authQueryKeys.me }),
-        );
-      }
-
-      return Promise.all(invalidations);
-    },
+    onSettled: () => refreshUserLifecycle(queryClient),
   });
 }
 
@@ -75,8 +87,7 @@ export function useChangeAccountLock() {
       id: number;
       input: ChangeAccountLockInput;
     }) => changeAccountLockApi(id, input),
-    onSuccess: () =>
-      queryClient.invalidateQueries({ queryKey: usersQueryKeys.all }),
+    onSettled: () => refreshUserLifecycle(queryClient),
   });
 }
 
@@ -86,8 +97,7 @@ export function useChangeUserStatus() {
   return useMutation({
     mutationFn: ({ id, input }: { id: number; input: ChangeUserStatusInput }) =>
       changeUserStatusApi(id, input),
-    onSuccess: () =>
-      queryClient.invalidateQueries({ queryKey: usersQueryKeys.all }),
+    onSettled: () => refreshUserLifecycle(queryClient),
   });
 }
 

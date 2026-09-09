@@ -14,6 +14,7 @@ import {
 } from '@prisma/client';
 
 import { AuditLogsService } from '../audit-logs/audit-logs.service';
+import { runSerializableTransaction } from '../common/database/serializable-transaction.util';
 import type { CurrentUserPayload } from '../common/decorators/current-user.decorator';
 import { OUTBOX_EVENT_TYPES } from '../outbox/outbox.constants';
 import { OutboxService } from '../outbox/outbox.service';
@@ -427,64 +428,66 @@ export class AssetsService {
     assignAssetDto: AssignAssetDto,
     currentUser: CurrentUserPayload,
   ) {
-    const [asset, targetUser, actor] = await Promise.all([
-      this.prisma.asset.findUnique({
-        where: { id },
-      }),
+    const result = await runSerializableTransaction(this.prisma, async (tx) => {
+      const [asset, targetUser, actor] = await Promise.all([
+        tx.asset.findUnique({
+          where: { id },
+        }),
 
-      this.prisma.user.findUnique({
-        where: {
-          id: assignAssetDto.userId,
-        },
-        select: {
-          id: true,
-          name: true,
-          isActive: true,
-          isLocked: true,
-        },
-      }),
+        tx.user.findUnique({
+          where: {
+            id: assignAssetDto.userId,
+          },
+          select: {
+            id: true,
+            name: true,
+            isActive: true,
+            isLocked: true,
+          },
+        }),
 
-      this.prisma.user.findUnique({
-        where: {
-          id: currentUser.userId,
-        },
-        select: {
-          name: true,
-        },
-      }),
-    ]);
+        tx.user.findUnique({
+          where: {
+            id: currentUser.userId,
+          },
+          select: {
+            name: true,
+          },
+        }),
+      ]);
 
-    if (!asset) {
-      throw new NotFoundException('Asset not found');
-    }
+      if (!asset) {
+        throw new NotFoundException('Asset not found');
+      }
 
-    if (!targetUser) {
-      throw new NotFoundException('User not found');
-    }
+      if (!targetUser) {
+        throw new NotFoundException('User not found');
+      }
 
-    if (!targetUser.isActive) {
-      throw new BadRequestException(
-        'Cannot assign an asset to an inactive user',
-      );
-    }
+      if (!targetUser.isActive) {
+        throw new BadRequestException(
+          'Cannot assign an asset to an inactive user',
+        );
+      }
 
-    if (targetUser.isLocked) {
-      throw new BadRequestException('Cannot assign an asset to a locked user');
-    }
+      if (targetUser.isLocked) {
+        throw new BadRequestException(
+          'Cannot assign an asset to a locked user',
+        );
+      }
 
-    if (asset.assignedToId) {
-      throw new BadRequestException(
-        'Asset is already assigned. Return it before assigning again',
-      );
-    }
+      if (asset.assignedToId) {
+        throw new BadRequestException(
+          'Asset is already assigned. Return it before assigning again',
+        );
+      }
 
-    if (asset.status !== AssetStatus.AVAILABLE) {
-      throw new BadRequestException(
-        `Asset with status ${asset.status} cannot be assigned`,
-      );
-    }
+      if (asset.status !== AssetStatus.AVAILABLE) {
+        throw new BadRequestException(
+          `Asset with status ${asset.status} cannot be assigned`,
+        );
+      }
 
-    const result = await this.prisma.$transaction(async (tx) => {
       const updateResult = await tx.asset.updateMany({
         where: {
           id: asset.id,

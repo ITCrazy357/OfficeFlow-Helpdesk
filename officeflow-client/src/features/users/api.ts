@@ -7,7 +7,17 @@ import type {
   ResetUserPasswordInput,
   UpdateUserInput,
   UserListItem,
+  HandoffUserInput,
+  HandoffUserResult,
 } from "./types";
+
+export async function handoffUserApi(id: number, input: HandoffUserInput) {
+  const res = await api.patch<ApiResponse<HandoffUserResult>>(
+    `/users/${id}/handoff`,
+    input,
+  );
+  return res.data.data;
+}
 
 export async function getUsersApi() {
   const res = await api.get<ApiResponse<UserListItem[]>>("/users");

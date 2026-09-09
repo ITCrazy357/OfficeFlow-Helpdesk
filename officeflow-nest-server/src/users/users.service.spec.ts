@@ -43,7 +43,17 @@ const mockPasswordResetTokenModel = {
 };
 
 const mockTransactionClient = {
-  user: mockUserModel,
+  user: {
+    ...mockUserModel,
+    findUnique: jest.fn(),
+    findUniqueOrThrow: jest.fn(),
+    count: jest.fn(),
+    updateMany: jest.fn(),
+  },
+  department: mockDepartmentModel,
+  ticket: { count: jest.fn() },
+  asset: { count: jest.fn() },
+  leaveRequest: { count: jest.fn(), updateMany: jest.fn() },
   refreshToken: mockRefreshTokenModel,
   passwordResetToken: mockPasswordResetTokenModel,
 };
@@ -102,6 +112,24 @@ describe('UsersService', () => {
 
   beforeEach(async () => {
     jest.resetAllMocks();
+    mockTransactionClient.user.findUnique.mockImplementation(
+      (args: { where: { id: number } }) =>
+        args.where.id === currentUser.userId
+          ? Promise.resolve({
+              ...storedUser,
+              id: currentUser.userId,
+              role: UserRole.ADMIN,
+            })
+          : (mockUserModel.findUnique(args) as Promise<unknown>),
+    );
+    mockTransactionClient.user.findUniqueOrThrow.mockResolvedValue({
+      manager: null,
+      managerId: null,
+    });
+    mockTransactionClient.user.count.mockResolvedValue(0);
+    mockTransactionClient.ticket.count.mockResolvedValue(0);
+    mockTransactionClient.asset.count.mockResolvedValue(0);
+    mockTransactionClient.leaveRequest.count.mockResolvedValue(0);
     mockBcryptHash.mockResolvedValue('hashed-password');
     mockPrismaService.refreshToken.updateMany.mockResolvedValue({ count: 1 });
     mockPasswordResetTokenModel.deleteMany.mockResolvedValue({ count: 1 });
@@ -306,5 +334,219 @@ describe('UsersService', () => {
         currentUser,
       ),
     ).rejects.toThrow(BadRequestException);
+  });
+
+  it.each(['ticket', 'asset', 'leaveRequest', 'user'] as const)(
+    'does not mutate anything when %s handoff blocks deactivation',
+    async (model) => {
+      mockUserModel.findUnique.mockResolvedValue(storedUser);
+      mockTransactionClient[model].count.mockResolvedValue(1);
+      await expect(
+        service.changeActivationStatus(2, { isActive: false }, currentUser),
+      ).rejects.toThrow(ConflictException);
+      expect(mockUserModel.update).not.toHaveBeenCalled();
+      expect(mockRefreshTokenModel.updateMany).not.toHaveBeenCalled();
+      expect(mockPasswordResetTokenModel.deleteMany).not.toHaveBeenCalled();
+      expect(mockAuditLogsService.create).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each(['update', 'deactivate'] as const)(
+    'checks remaining usable admins for %s',
+    async (operation) => {
+      mockUserModel.findUnique.mockResolvedValue({
+        ...storedUser,
+        role: UserRole.ADMIN,
+      });
+      const call = () =>
+        operation === 'update'
+          ? service.update(2, { role: UserRole.EMPLOYEE }, currentUser)
+          : service.changeActivationStatus(2, { isActive: false }, currentUser);
+      await expect(call()).rejects.toThrow(
+        'Cannot remove the last usable administrator',
+      );
+      expect(mockUserModel.update).not.toHaveBeenCalled();
+      // The first count is remaining ADMINs; subsequent counts are reports.
+      mockTransactionClient.user.count
+        .mockResolvedValueOnce(1)
+        .mockResolvedValue(0);
+      mockUserModel.update.mockResolvedValue({
+        ...storedUser,
+        isActive: operation !== 'deactivate',
+      });
+      await expect(call()).resolves.toBeDefined();
+      expect(mockPrismaService.$transaction).toHaveBeenCalledWith(
+        expect.any(Function),
+        { isolationLevel: 'Serializable' },
+      );
+    },
+  );
+
+  it.each(['update', 'deactivate', 'handoff'] as const)(
+    'rejects a stale actor before %s writes',
+    async (operation) => {
+      mockTransactionClient.user.findUnique.mockResolvedValue({
+        ...storedUser,
+        role: UserRole.EMPLOYEE,
+      });
+      const promise =
+        operation === 'update'
+          ? service.update(2, { name: 'New name' }, currentUser)
+          : operation === 'deactivate'
+            ? service.changeActivationStatus(
+                2,
+                { isActive: false },
+                currentUser,
+              )
+            : service.handoff(2, { replacementId: 3 }, currentUser);
+      await expect(promise).rejects.toThrow(
+        'An active administrator is required',
+      );
+      expect(mockUserModel.update).not.toHaveBeenCalled();
+      expect(mockTransactionClient.user.updateMany).not.toHaveBeenCalled();
+    },
+  );
+
+  it('does not let ADMIN remove their own role', async () => {
+    await expect(
+      service.update(1, { role: UserRole.EMPLOYEE }, currentUser),
+    ).rejects.toThrow('Cannot remove your own ADMIN role');
+    expect(mockUserModel.update).not.toHaveBeenCalled();
+  });
+
+  it('reads the target inside the transaction and keeps repeated deactivation idempotent', async () => {
+    mockTransactionClient.user.findUnique
+      .mockResolvedValueOnce({
+        role: UserRole.ADMIN,
+        isActive: true,
+        isLocked: false,
+      })
+      .mockResolvedValueOnce({ ...storedUser, isActive: false });
+    await service.changeActivationStatus(2, { isActive: false }, currentUser);
+    expect(mockUserModel.findUnique).not.toHaveBeenCalled();
+    expect(mockUserModel.update).not.toHaveBeenCalled();
+    expect(mockAuditLogsService.create).not.toHaveBeenCalled();
+  });
+
+  it('blocks role changes that abandon active tickets', async () => {
+    mockUserModel.findUnique.mockResolvedValue({
+      ...storedUser,
+      role: UserRole.IT_STAFF,
+    });
+    mockTransactionClient.ticket.count.mockResolvedValue(1);
+    await expect(
+      service.update(2, { role: UserRole.EMPLOYEE }, currentUser),
+    ).rejects.toThrow('Reassign active tickets');
+    expect(mockUserModel.update).not.toHaveBeenCalled();
+  });
+
+  it('blocks reactivation under an unavailable manager', async () => {
+    mockUserModel.findUnique.mockResolvedValue({
+      ...storedUser,
+      isActive: false,
+    });
+    mockTransactionClient.user.findUniqueOrThrow.mockResolvedValue({
+      manager: { role: UserRole.MANAGER, isActive: false, isLocked: false },
+    });
+    await expect(
+      service.changeActivationStatus(2, { isActive: true }, currentUser),
+    ).rejects.toThrow('Reassign the unavailable manager');
+    expect(mockUserModel.update).not.toHaveBeenCalled();
+  });
+
+  describe('handoff', () => {
+    beforeEach(() => {
+      mockUserModel.findUnique.mockImplementation(
+        (args: { where: { id: number } }) =>
+          Promise.resolve({
+            ...storedUser,
+            id: args.where.id,
+            role: UserRole.MANAGER,
+          }),
+      );
+      mockTransactionClient.user.updateMany.mockResolvedValue({ count: 2 });
+      mockTransactionClient.leaveRequest.updateMany.mockResolvedValue({
+        count: 1,
+      });
+    });
+
+    it('transfers reports and only pending approvals together with audit', async () => {
+      await expect(
+        service.handoff(2, { replacementId: 3 }, currentUser),
+      ).resolves.toEqual({
+        userId: 2,
+        replacementId: 3,
+        reportsTransferred: 2,
+        approvalsTransferred: 1,
+      });
+      expect(mockTransactionClient.user.updateMany).toHaveBeenCalledWith({
+        where: { managerId: 2 },
+        data: { managerId: 3 },
+      });
+      expect(
+        mockTransactionClient.leaveRequest.updateMany,
+      ).toHaveBeenCalledWith({
+        where: { approverId: 2, status: 'PENDING' },
+        data: { approverId: 3 },
+      });
+      expect(mockAuditLogsService.create).toHaveBeenCalledWith(
+        expect.objectContaining({ actorId: 1, entityId: 2 }),
+        mockTransactionClient,
+      );
+      expect(mockUserModel.update).not.toHaveBeenCalled();
+      expect(mockRefreshTokenModel.updateMany).not.toHaveBeenCalled();
+    });
+
+    it('rejects self replacement', async () => {
+      await expect(
+        service.handoff(2, { replacementId: 2 }, currentUser),
+      ).rejects.toThrow('Replacement must be a different user');
+      expect(mockTransactionClient.user.updateMany).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      { role: UserRole.EMPLOYEE, isActive: true, isLocked: false },
+      { role: UserRole.MANAGER, isActive: false, isLocked: false },
+      { role: UserRole.MANAGER, isActive: true, isLocked: true },
+    ])('rejects an ineligible replacement: %j', async (state) => {
+      mockUserModel.findUnique.mockResolvedValue({
+        ...storedUser,
+        id: 3,
+        ...state,
+      });
+      await expect(
+        service.handoff(2, { replacementId: 3 }, currentUser),
+      ).rejects.toThrow('Replacement must be an active');
+      expect(mockTransactionClient.user.updateMany).not.toHaveBeenCalled();
+    });
+
+    it('rejects a reporting cycle', async () => {
+      mockTransactionClient.user.findUniqueOrThrow.mockResolvedValue({
+        managerId: 2,
+      });
+      await expect(
+        service.handoff(2, { replacementId: 3 }, currentUser),
+      ).rejects.toThrow('reporting cycle');
+      expect(mockTransactionClient.user.updateMany).not.toHaveBeenCalled();
+    });
+
+    it('rejects handing an approver their own pending leave request', async () => {
+      mockTransactionClient.leaveRequest.count.mockResolvedValue(1);
+      await expect(
+        service.handoff(2, { replacementId: 3 }, currentUser),
+      ).rejects.toThrow('cannot approve their own');
+      expect(
+        mockTransactionClient.leaveRequest.updateMany,
+      ).not.toHaveBeenCalled();
+    });
+
+    it('does not audit an empty handoff', async () => {
+      mockTransactionClient.user.updateMany.mockResolvedValue({ count: 0 });
+      mockTransactionClient.leaveRequest.updateMany.mockResolvedValue({
+        count: 0,
+      });
+      await service.handoff(2, { replacementId: 3 }, currentUser);
+      expect(mockAuditLogsService.create).not.toHaveBeenCalled();
+    });
   });
 });

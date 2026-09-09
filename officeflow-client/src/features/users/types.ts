@@ -42,6 +42,15 @@ export type ChangeUserStatusInput = {
   isActive: boolean;
 };
 
+export type HandoffUserInput = { replacementId: number };
+
+export type HandoffUserResult = {
+  userId: number;
+  replacementId: number;
+  reportsTransferred: number;
+  approvalsTransferred: number;
+};
+
 export type ResetUserPasswordInput = {
   password: string;
 };
