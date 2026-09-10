@@ -1,7 +1,6 @@
 import {
   CallHandler,
   ExecutionContext,
-  HttpException,
   Injectable,
   Logger,
   NestInterceptor,
@@ -10,6 +9,7 @@ import type { Request, Response } from 'express';
 import { tap, type Observable } from 'rxjs';
 
 import type { CurrentUserPayload } from '../decorators/current-user.decorator';
+import { getRequestDiagnostics } from '../diagnostics/request-diagnostics';
 
 type AuthRequest = Request & {
   user?: CurrentUserPayload;
@@ -24,6 +24,8 @@ export class RequestLoggingInterceptor implements NestInterceptor {
     const request = httpContext.getRequest<AuthRequest>();
     const response = httpContext.getResponse<Response>();
     const startedAt = Date.now();
+    const { requestId } = getRequestDiagnostics(request);
+    response.setHeader('X-Request-Id', requestId);
     const method = request.method;
     const url = request.path || request.originalUrl.split('?', 1)[0];
     const userId = request.user?.userId ?? 'guest';
@@ -36,21 +38,10 @@ export class RequestLoggingInterceptor implements NestInterceptor {
 
           this.logger.log(
             `${method} ${url} ${response.statusCode} ${duration}ms ` +
-              `userId=${userId} ip=${ipAddress}`,
+              `userId=${userId} ip=${ipAddress} requestId=${requestId}`,
           );
         },
-        error: (error: unknown) => {
-          const duration = Date.now() - startedAt;
-          const statusCode =
-            error instanceof HttpException ? error.getStatus() : 500;
-          const stack = error instanceof Error ? error.stack : undefined;
-
-          this.logger.error(
-            `${method} ${url} ${statusCode} ${duration}ms ` +
-              `userId=${userId} ip=${ipAddress}`,
-            stack,
-          );
-        },
+        // The exception filter logs failures once, with the final mapped status.
       }),
     );
   }

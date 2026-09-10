@@ -24,6 +24,7 @@ describe('RequestLoggingInterceptor', () => {
         }),
         getResponse: () => ({
           statusCode: 200,
+          setHeader: jest.fn(),
         }),
       }),
     } as unknown as ExecutionContext;
@@ -35,7 +36,7 @@ describe('RequestLoggingInterceptor', () => {
 
     expect(logSpy).toHaveBeenCalledWith(
       expect.stringMatching(
-        /^GET \/api\/audit-logs 200 \d+ms userId=1 ip=127\.0\.0\.1$/,
+        /^GET \/api\/audit-logs 200 \d+ms userId=1 ip=127\.0\.0\.1 requestId=[a-f0-9-]{36}$/,
       ),
     );
   });

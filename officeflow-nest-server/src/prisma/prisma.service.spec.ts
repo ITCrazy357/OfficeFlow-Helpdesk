@@ -4,6 +4,8 @@ describe('Prisma startup readiness', () => {
   let service: PrismaService;
   let connectSpy: jest.SpyInstance<Promise<void>, []>;
   let disconnectSpy: jest.SpyInstance<Promise<void>, []>;
+  let outboxReadSpy: jest.SpyInstance;
+  let notificationReadSpy: jest.SpyInstance;
   const originalDatabaseUrl = process.env.DATABASE_URL;
 
   beforeEach(() => {
@@ -13,6 +15,12 @@ describe('Prisma startup readiness', () => {
     disconnectSpy = jest
       .spyOn(service, '$disconnect')
       .mockResolvedValue(undefined);
+    outboxReadSpy = jest
+      .spyOn(service.outboxEvent, 'findFirst')
+      .mockResolvedValue(null);
+    notificationReadSpy = jest
+      .spyOn(service.notification, 'findFirst')
+      .mockResolvedValue(null);
   });
 
   afterEach(() => {
@@ -33,6 +41,8 @@ describe('Prisma startup readiness', () => {
 
     expect(connectSpy).toHaveBeenCalledTimes(1);
     expect(querySpy).toHaveBeenCalledWith(['SELECT 1']);
+    expect(outboxReadSpy).toHaveBeenCalledTimes(1);
+    expect(notificationReadSpy).toHaveBeenCalledTimes(1);
     expect(disconnectSpy).not.toHaveBeenCalled();
   });
 
@@ -42,6 +52,15 @@ describe('Prisma startup readiness', () => {
 
     await expect(service.onModuleInit()).rejects.toBe(error);
     expect(disconnectSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it('closes the pool and fails startup when the outbox schema check fails', async () => {
+    jest.spyOn(service, '$queryRaw').mockResolvedValue([{ ok: 1 }]);
+    const error = new Error('Schema unavailable');
+    outboxReadSpy.mockRejectedValue(error);
+    await expect(service.onModuleInit()).rejects.toBe(error);
+    expect(disconnectSpy).toHaveBeenCalledTimes(1);
+    expect(notificationReadSpy).not.toHaveBeenCalled();
   });
 
   it('preserves the connection error even if pool cleanup fails', async () => {

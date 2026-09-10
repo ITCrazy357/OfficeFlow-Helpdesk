@@ -12,4 +12,5 @@ export type ApiErrorResponse = {
   errors?: unknown;
   path: string;
   timestamp: string;
+  requestId?: string;
 };

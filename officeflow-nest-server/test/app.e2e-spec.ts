@@ -8,6 +8,7 @@ import request from 'supertest';
 import { AppModule } from '../src/app.module';
 import { HttpExceptionFilter } from '../src/common/filters/http-exception.filter';
 import { ResponseInterceptor } from '../src/common/interceptors/response.interceptor';
+import { RequestLoggingInterceptor } from '../src/common/interceptors/request-logging.interceptor';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { ResilientThrottlerStorage } from '../src/redis/resilient-throttler.storage';
 
@@ -31,6 +32,7 @@ type SuccessResponseBody = {
 type ErrorResponseBody = SuccessResponseBody & {
   message: string;
   path: string;
+  requestId: string;
 };
 
 describe('AppController (e2e)', () => {
@@ -63,7 +65,10 @@ describe('AppController (e2e)', () => {
 
     app.useGlobalFilters(new HttpExceptionFilter());
 
-    app.useGlobalInterceptors(new ResponseInterceptor(app.get(Reflector)));
+    app.useGlobalInterceptors(
+      new RequestLoggingInterceptor(),
+      new ResponseInterceptor(app.get(Reflector)),
+    );
 
     await app.init();
     httpServer = app.getHttpServer() as Server;
@@ -82,6 +87,7 @@ describe('AppController (e2e)', () => {
 
         expect(body.success).toBe(true);
         expect(body.statusCode).toBe(200);
+        expect(res.headers['x-request-id']).toMatch(/^[a-f0-9-]{36}$/);
         expect(body.data).toEqual({
           status: 'ok',
           version: 'local',
@@ -117,6 +123,8 @@ describe('AppController (e2e)', () => {
         expect(body.statusCode).toBe(400);
         expect(body.message).toBe('Validation failed');
         expect(body.path).toBe('/api/auth/login');
+        expect(body.requestId).toMatch(/^[a-f0-9-]{36}$/);
+        expect(res.headers['x-request-id']).toBe(body.requestId);
       });
   });
 
