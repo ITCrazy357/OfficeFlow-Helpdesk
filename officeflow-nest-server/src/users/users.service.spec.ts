@@ -5,7 +5,12 @@ import {
 } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { Test, TestingModule } from '@nestjs/testing';
-import { AuditLogAction, AuditLogEntity, UserRole } from '@prisma/client';
+import {
+  AuditLogAction,
+  AuditLogEntity,
+  Prisma,
+  UserRole,
+} from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 
 import { AuditLogsService } from '../audit-logs/audit-logs.service';
@@ -100,6 +105,7 @@ const storedUser = {
   unlockedAt: null,
   unlockedById: null,
   departmentId: 1,
+  managerId: null,
   createdAt: new Date(),
   department: {
     id: 1,
@@ -521,7 +527,10 @@ describe('UsersService', () => {
     });
 
     it('rejects a reporting cycle', async () => {
-      mockTransactionClient.user.findUniqueOrThrow.mockResolvedValue({
+      mockUserModel.findUnique.mockResolvedValue({
+        ...storedUser,
+        id: 3,
+        role: UserRole.MANAGER,
         managerId: 2,
       });
       await expect(
@@ -547,6 +556,102 @@ describe('UsersService', () => {
       });
       await service.handoff(2, { replacementId: 3 }, currentUser);
       expect(mockAuditLogsService.create).not.toHaveBeenCalled();
+    });
+
+    it('reads minimal fields and does not re-read a recipient without a manager', async () => {
+      await service.handoff(2, { replacementId: 3 }, currentUser);
+      expect(mockTransactionClient.user.findUnique).toHaveBeenCalledWith({
+        where: { id: 2 },
+        select: { id: true },
+      });
+      expect(mockTransactionClient.user.findUnique).toHaveBeenCalledWith({
+        where: { id: 3 },
+        select: {
+          id: true,
+          role: true,
+          isActive: true,
+          isLocked: true,
+          managerId: true,
+        },
+      });
+      expect(
+        mockTransactionClient.user.findUniqueOrThrow,
+      ).not.toHaveBeenCalled();
+    });
+
+    it.each([2, 3])(
+      'rejects missing user %s without writes',
+      async (missingId) => {
+        mockUserModel.findUnique.mockImplementation(
+          (args: { where: { id: number } }) =>
+            Promise.resolve(
+              args.where.id === missingId
+                ? null
+                : { ...storedUser, id: args.where.id, role: UserRole.MANAGER },
+            ),
+        );
+        await expect(
+          service.handoff(2, { replacementId: 3 }, currentUser),
+        ).rejects.toThrow(NotFoundException);
+        expect(mockTransactionClient.user.updateMany).not.toHaveBeenCalled();
+        expect(
+          mockTransactionClient.leaveRequest.updateMany,
+        ).not.toHaveBeenCalled();
+        expect(mockAuditLogsService.create).not.toHaveBeenCalled();
+      },
+    );
+
+    it.each([2, 3, 4])(
+      'rejects a deeper cycle back to user %s',
+      async (cycleId) => {
+        mockUserModel.findUnique.mockResolvedValue({
+          ...storedUser,
+          id: 3,
+          role: UserRole.MANAGER,
+          managerId: 4,
+        });
+        mockTransactionClient.user.findUniqueOrThrow.mockResolvedValue({
+          managerId: cycleId,
+        });
+        await expect(
+          service.handoff(2, { replacementId: 3 }, currentUser),
+        ).rejects.toThrow('reporting cycle');
+        expect(mockTransactionClient.user.updateMany).not.toHaveBeenCalled();
+      },
+    );
+
+    it('still walks a valid multi-level reporting chain', async () => {
+      mockUserModel.findUnique.mockResolvedValue({
+        ...storedUser,
+        id: 3,
+        role: UserRole.MANAGER,
+        managerId: 4,
+      });
+      mockTransactionClient.user.findUniqueOrThrow
+        .mockResolvedValueOnce({ managerId: 5 })
+        .mockResolvedValueOnce({ managerId: null });
+      await service.handoff(2, { replacementId: 3 }, currentUser);
+      expect(mockTransactionClient.user.findUniqueOrThrow.mock.calls).toEqual([
+        [{ where: { id: 4 }, select: { managerId: true } }],
+        [{ where: { id: 5 }, select: { managerId: true } }],
+      ]);
+      expect(mockTransactionClient.user.updateMany).toHaveBeenCalledTimes(1);
+    });
+
+    it('propagates an audit transaction failure without retrying or returning success', async () => {
+      const error = new Prisma.PrismaClientKnownRequestError('Expired', {
+        code: 'P2028',
+        clientVersion: '7',
+      });
+      mockAuditLogsService.create.mockRejectedValue(error);
+      await expect(
+        service.handoff(2, { replacementId: 3 }, currentUser),
+      ).rejects.toBe(error);
+      expect(mockPrismaService.$transaction).toHaveBeenCalledTimes(1);
+      expect(mockAuditLogsService.create).toHaveBeenCalledWith(
+        expect.any(Object),
+        mockTransactionClient,
+      );
     });
   });
 });

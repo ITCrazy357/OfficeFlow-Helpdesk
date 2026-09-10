@@ -50,6 +50,48 @@ export function getSafeErrorDetails(error: unknown) {
     errorName,
     code,
     hint: code && Object.hasOwn(hints, code) ? hints[code] : undefined,
+    ...getTransactionFailureDetails(error),
     stack,
   };
+}
+
+function getTransactionFailureDetails(error: unknown) {
+  if (
+    !(error instanceof Prisma.PrismaClientKnownRequestError) ||
+    error.code !== 'P2028'
+  ) {
+    return {};
+  }
+
+  // Inspect internally, but emit only allowlisted categories and numbers.
+  // Never return the raw Prisma message or meta (which can contain SQL/data).
+  const detail =
+    typeof error.meta?.error === 'string' ? error.meta.error : error.message;
+  if (/cannot be executed on an expired transaction\./.test(detail)) {
+    const timing =
+      /The timeout for this transaction was (\d{1,9}) ms, however (\d{1,9}) ms passed since the start of the transaction\./.exec(
+        detail,
+      );
+    return {
+      transactionFailure: 'expired',
+      ...(timing
+        ? {
+            transactionTimeoutMs: Number(timing[1]),
+            transactionElapsedMs: Number(timing[2]),
+          }
+        : {}),
+    };
+  }
+  if (detail.includes('Unable to start a transaction in the given time.')) {
+    return { transactionFailure: 'start_timeout' };
+  }
+  if (detail.includes('cannot be executed on a committed transaction.')) {
+    return { transactionFailure: 'already_committed' };
+  }
+  if (
+    detail.includes('cannot be executed on a transaction that was rolled back.')
+  ) {
+    return { transactionFailure: 'already_rolled_back' };
+  }
+  return { transactionFailure: 'unknown' };
 }

@@ -51,6 +51,10 @@ describe('runSerializableTransaction', () => {
   it.each([
     new ConflictException('Handoff required'),
     new Error('Database unavailable'),
+    new Prisma.PrismaClientKnownRequestError('Transaction expired', {
+      code: 'P2028',
+      clientVersion: '7',
+    }),
     new Prisma.PrismaClientKnownRequestError('Duplicate', {
       code: 'P2002',
       clientVersion: '7',

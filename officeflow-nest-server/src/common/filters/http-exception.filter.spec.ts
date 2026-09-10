@@ -82,4 +82,27 @@ describe('HttpExceptionFilter', () => {
       }),
     );
   });
+
+  it('logs transaction expiry details only on the server', () => {
+    const exception = new Prisma.PrismaClientKnownRequestError('Private SQL', {
+      code: 'P2028',
+      clientVersion: '7',
+      meta: {
+        error:
+          'A query cannot be executed on an expired transaction. ' +
+          'The timeout for this transaction was 5000 ms, however 6866 ms passed since the start of the transaction.',
+      },
+    });
+    new HttpExceptionFilter().catch(exception, host);
+    expect(errorLog).toHaveBeenCalledWith(
+      expect.objectContaining({
+        transactionFailure: 'expired',
+        transactionTimeoutMs: 5000,
+        transactionElapsedMs: 6866,
+      }),
+    );
+    const body = (json.mock.calls[0] as unknown[])[0];
+    expect(body).not.toHaveProperty('transactionFailure');
+    expect(JSON.stringify(body)).not.toContain('Private SQL');
+  });
 });

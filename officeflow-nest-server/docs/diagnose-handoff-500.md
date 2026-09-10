@@ -7,6 +7,56 @@
 - Ngày 10/09/2026, kiểm tra **chỉ đọc** bằng `prisma migrate status` với DATABASE_URL của checkout cho thấy 21 migrations, còn đúng `20260906170000_add_transactional_outbox` pending. Người dùng đã xác nhận local và Render dùng chung database; chưa xác nhận có backup/snapshot khôi phục được.
 - `UsersService.handoff()` cập nhật Users, Leave_requests và Audit_logs; không gọi OutboxService. Vì vậy áp dụng migration Outbox sửa được lỗi thiếu bảng đã xác nhận, nhưng chưa chứng minh sẽ sửa được 500 bàn giao.
 
+## Cập nhật: log đúng request bàn giao ngày 10/09/2026
+
+Ảnh Render mới ghi `PATCH /api/users/19/handoff`, request ID
+`6e3e5e42-4226-49cf-bc91-35bce279ce5f`, status 500, `durationMs: 6866`,
+`PrismaClientKnownRequestError`, code `P2028`. Stack trỏ tới
+`dist/users/users.service.js:418:17`. Trong bản build local trước thay đổi này,
+vị trí đó là lời gọi ghi audit trong transaction; cần đối chiếu đúng commit Render
+để xác nhận mapping. Đây là bằng chứng lỗi transaction của request, không phải
+log worker Outbox.
+
+Hết hạn transaction là giả thuyết mạnh, chưa phải kết luận: helper chỉ đặt
+`Serializable`, không đặt timeout; Prisma 7 mặc định cho interactive transaction
+chạy 5 giây. Tuy nhiên 6866 ms là thời gian request, không phải thời gian riêng
+transaction. `P2028` cũng có thể xảy ra khi không khởi tạo được transaction đúng
+hạn hoặc sử dụng transaction đã đóng. Xem
+[Prisma 7 transaction options](https://www.prisma.io/docs/orm/v7/reference/prisma-client-reference#transactionoptions).
+
+Bản sửa local:
+
+- `UsersService.handoff()` chỉ đọc ID của người bàn giao và các trường cần kiểm
+  tra của người nhận. Không tải relation phòng ban không sử dụng; dùng luôn
+  `replacement.managerId` vừa đọc để đi tiếp lên tuyến quản lý, bỏ lần đọc lại
+  người nhận. Vẫn kiểm tra quyền và dữ liệu trong cùng transaction Serializable.
+- Cập nhật nhân viên, đơn nghỉ và audit vẫn dùng cùng transaction. Lỗi ghi audit
+  phải làm request thất bại, không nuốt lỗi rồi báo thành công.
+- `getSafeErrorDetails()` phân loại P2028 từ thông báo nội bộ nhưng chỉ xuất
+  giá trị cho phép: `expired`, `start_timeout`, `already_committed`,
+  `already_rolled_back`, `unknown`. Khi nhận dạng đúng thông báo hết hạn, log thêm
+  `transactionTimeoutMs` và `transactionElapsedMs` dạng số; không xuất raw message,
+  SQL hoặc meta. Nếu Prisma đổi định dạng, có thể trả `unknown`.
+- Giữ nguyên timeout và chính sách chỉ retry P2034. Test mock kiểm tra query,
+  policy và lan truyền lỗi, không chứng minh rollback/hiệu năng trên MySQL thật.
+
+Sau khi deploy bản code này theo quy trình hiện có, kiểm tra trạng thái bàn giao
+hiện tại trước khi thử một trường hợp có kiểm soát. Nếu còn lỗi, lấy log cùng
+request ID:
+
+- `expired`: xác nhận hết hạn bằng hai số thời gian; đo thời gian từng truy vấn,
+  chờ lock và độ trễ Render–Aiven. Khi có số đo, cân nhắc budget timeout riêng cho
+  bàn giao, không tăng toàn hệ thống tùy tiện. Transaction dài giữ lock lâu hơn.
+- `start_timeout`: kiểm tra pool, số kết nối và chờ khởi tạo transaction; tăng
+  thời gian chạy callback không giải quyết đúng vấn đề này.
+- `already_committed` / `already_rolled_back`: tìm việc dùng transaction sau khi
+  callback kết thúc, promise chưa await hoặc dùng sai transaction client.
+- `unknown`: cần kiểm tra chi tiết lỗi tại môi trường vận hành qua kênh bảo mật,
+  không bật log toàn bộ Prisma message/SQL công khai.
+
+Chưa có kết quả smoke test Render sau bản sửa này; chưa xác nhận hết lỗi 500.
+Không chạy backup, migration hoặc ghi dữ liệu production trong lần sửa này.
+
 ## Khôi phục schema an toàn
 
 1. Xác nhận đúng backend/database đích, đúng branch/commit đang triển khai. Không gửi DATABASE_URL, mật khẩu hoặc token vào chat/log.

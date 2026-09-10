@@ -447,15 +447,26 @@ export class UsersService {
   ) {
     return runSerializableTransaction(this.prisma, async (transaction) => {
       await assertActiveAdmin(transaction, currentUser.userId);
-      await this.getUserOrThrow(id, transaction);
+      // Handoff needs existence, not the profile and its department relation.
+      const source = await transaction.user.findUnique({
+        where: { id },
+        select: { id: true },
+      });
+      if (!source) throw new NotFoundException('User not found');
       if (id === dto.replacementId) {
         throw new BadRequestException('Replacement must be a different user');
       }
-      const replacement = await this.getUserOrThrow(
-        //người thay thế
-        dto.replacementId,
-        transaction,
-      );
+      const replacement = await transaction.user.findUnique({
+        where: { id: dto.replacementId },
+        select: {
+          id: true,
+          role: true,
+          isActive: true,
+          isLocked: true,
+          managerId: true,
+        },
+      });
+      if (!replacement) throw new NotFoundException('User not found');
       if (
         !replacement.isActive ||
         replacement.isLocked ||
@@ -468,8 +479,10 @@ export class UsersService {
       }
 
       // Kiểm tra xem đổi manager của một user có tạo ra vòng lặp quản lý hay không.
-      const visited = new Set<number>([id]);
-      let ancestorId: number | null = replacement.id;
+      // The recipient was already read inside this transaction. Start at their
+      // manager instead of issuing the same recipient lookup again.
+      const visited = new Set<number>([id, replacement.id]);
+      let ancestorId: number | null = replacement.managerId;
       while (ancestorId !== null) {
         if (visited.has(ancestorId))
           throw new ConflictException('Handoff would create a reporting cycle');
