@@ -31,11 +31,18 @@ import {
 } from './redis/rate-limit.config';
 import { ResilientThrottlerStorage } from './redis/resilient-throttler.storage';
 import { RedisService } from './redis/redis.service';
+import { ConfigModule } from '@nestjs/config';
+import { validateEnvironment } from './config/environment.validation';
 
 @Module({
   imports: [
     EventEmitterModule.forRoot(),
     RedisModule,
+    ConfigModule.forRoot({
+      isGlobal: true,
+      cache: true,
+      validate: validateEnvironment,
+    }),
 
     ScheduleModule.forRoot(),
     ThrottlerModule.forRootAsync({

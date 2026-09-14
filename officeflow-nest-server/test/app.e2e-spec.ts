@@ -11,6 +11,11 @@ import { ResponseInterceptor } from '../src/common/interceptors/response.interce
 import { RequestLoggingInterceptor } from '../src/common/interceptors/request-logging.interceptor';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { ResilientThrottlerStorage } from '../src/redis/resilient-throttler.storage';
+import { RedisService } from '../src/redis/redis.service';
+import { MailService } from '../src/mail/mail.service';
+import { OutboxProcessor } from '../src/outbox/outbox.processor';
+import { SlaService } from '../src/sla/sla.service';
+import { RefreshTokenCleanupService } from '../src/auth/refresh-token-cleanup.service';
 
 const mockPrismaService = {
   $queryRaw: jest.fn().mockResolvedValue([{ connected: 1 }]),
@@ -47,6 +52,20 @@ describe('AppController (e2e)', () => {
     })
       .overrideProvider(PrismaService)
       .useValue(mockPrismaService)
+      .overrideProvider(RedisService)
+      .useValue({
+        key: (...parts: Array<string | number>) =>
+          ['officeflow:http-test', ...parts].join(':'),
+        isReady: () => false,
+      })
+      .overrideProvider(MailService)
+      .useValue({ isEnabled: () => false })
+      .overrideProvider(OutboxProcessor)
+      .useValue({})
+      .overrideProvider(SlaService)
+      .useValue({})
+      .overrideProvider(RefreshTokenCleanupService)
+      .useValue({})
       .overrideProvider(ResilientThrottlerStorage)
       .useValue(new ThrottlerStorageService())
       .compile();

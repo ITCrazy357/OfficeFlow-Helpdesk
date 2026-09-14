@@ -1,16 +1,18 @@
 import { PrismaService } from './prisma.service';
-
+import { ConfigService } from '@nestjs/config';
+import { describe, expect, it, beforeEach } from '@jest/globals';
 describe('Prisma startup readiness', () => {
   let service: PrismaService;
   let connectSpy: jest.SpyInstance<Promise<void>, []>;
   let disconnectSpy: jest.SpyInstance<Promise<void>, []>;
   let outboxReadSpy: jest.SpyInstance;
   let notificationReadSpy: jest.SpyInstance;
-  const originalDatabaseUrl = process.env.DATABASE_URL;
 
   beforeEach(() => {
-    process.env.DATABASE_URL = 'mysql://test:test@localhost:3306/test';
-    service = new PrismaService();
+    const config = new ConfigService({
+      DATABASE_URL: 'mysql://test:test@localhost:3306/test',
+    });
+    service = new PrismaService(config);
     connectSpy = jest.spyOn(service, '$connect').mockResolvedValue(undefined);
     disconnectSpy = jest
       .spyOn(service, '$disconnect')
@@ -25,11 +27,6 @@ describe('Prisma startup readiness', () => {
 
   afterEach(() => {
     jest.restoreAllMocks();
-    if (originalDatabaseUrl === undefined) {
-      delete process.env.DATABASE_URL;
-    } else {
-      process.env.DATABASE_URL = originalDatabaseUrl;
-    }
   });
 
   it('requires a successful database query before becoming ready', async () => {

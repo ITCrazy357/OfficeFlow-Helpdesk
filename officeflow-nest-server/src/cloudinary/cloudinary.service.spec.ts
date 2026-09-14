@@ -192,4 +192,82 @@ describe('CloudinaryService', () => {
       service.downloadFile('https://res.cloudinary.com/demo/file.pdf'),
     ).rejects.toThrow(InternalServerErrorException);
   });
+  it.each(['not found', 'ok'])(
+    'accepts idempotent destroy result %s',
+    async (result) => {
+      jest.mocked(cloudinary.uploader.destroy).mockResolvedValue({ result });
+      await expect(
+        service.deleteFile('asset', 'raw', 'authenticated'),
+      ).resolves.toBeUndefined();
+    },
+  );
+
+  it.each([undefined, {}, { result: 'error' }])(
+    'rejects an invalid destroy result %j',
+    async (response) => {
+      jest.mocked(cloudinary.uploader.destroy).mockResolvedValue(response);
+      await expect(
+        service.deleteFile('asset', 'raw', 'authenticated'),
+      ).rejects.toThrow('Delete file failed');
+    },
+  );
+
+  it('sanitizes a destroy transport error', async () => {
+    jest
+      .mocked(cloudinary.uploader.destroy)
+      .mockRejectedValue(new Error('secret=private'));
+    await expect(
+      service.deleteFile('asset', 'raw', 'authenticated'),
+    ).rejects.toThrow(new Error('Delete file failed'));
+  });
+
+  it.each([
+    { ...uploadResponse, resource_type: 'invalid' },
+    { ...uploadResponse, format: '' },
+  ])('rejects incomplete upload metadata', async (response) => {
+    mockSuccessfulUpload(response as UploadApiResponse);
+    await expect(
+      service.uploadFile(
+        { buffer: Buffer.from('file') } as Express.Multer.File,
+        'test',
+      ),
+    ).rejects.toThrow(InternalServerErrorException);
+  });
+
+  it.each([
+    'http://api.cloudinary.com/file',
+    'https://api.cloudinary.com.evil.test/file',
+    'invalid',
+  ])('does not fetch untrusted URL %s', async (url) => {
+    const fetchSpy = jest.spyOn(global, 'fetch');
+    await expect(service.downloadFile(url)).rejects.toThrow(
+      'Download file failed',
+    );
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it('sanitizes a fetch failure', async () => {
+    jest.spyOn(global, 'fetch').mockRejectedValue(new Error('token=private'));
+    await expect(
+      service.downloadFile('https://api.cloudinary.com/file'),
+    ).rejects.toThrow(new Error('Download file failed'));
+  });
+
+  it('rejects a failed HTTP response', async () => {
+    jest
+      .spyOn(global, 'fetch')
+      .mockResolvedValue(new Response(null, { status: 404 }));
+    await expect(
+      service.downloadFile('https://api.cloudinary.com/file'),
+    ).rejects.toThrow('Download file failed');
+  });
+
+  it('checks the actual download size when Content-Length is missing', async () => {
+    jest
+      .spyOn(global, 'fetch')
+      .mockResolvedValue(new Response(new Uint8Array(10 * 1024 * 1024 + 1)));
+    await expect(
+      service.downloadFile('https://api.cloudinary.com/file'),
+    ).rejects.toThrow('Download file failed');
+  });
 });

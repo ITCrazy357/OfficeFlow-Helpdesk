@@ -1,3 +1,5 @@
+name: officeflow
+
 services:
   mysql:
     image: mysql:8.4
@@ -73,3 +75,5 @@ services:
 
 volumes:
   officeflow_nest_mysql_data:
+    external: true
+    name: officeflowhelpdesk_officeflow_mysql_data
