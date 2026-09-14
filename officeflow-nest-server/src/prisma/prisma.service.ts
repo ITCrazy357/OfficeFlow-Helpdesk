@@ -3,6 +3,7 @@ import { PrismaClient } from '@prisma/client';
 import { PrismaMariaDb } from '@prisma/adapter-mariadb';
 import { getDatabaseUrl } from './database.config';
 import { assertOutboxSchemaReady } from './schema-readiness';
+import { ConfigService } from '@nestjs/config';
 
 @Injectable()
 //Được đánh dấu là Injectable để có thể được sử dụng trong các lớp khác trong NestJS.
@@ -11,9 +12,11 @@ export class PrismaService
   extends PrismaClient
   implements OnModuleInit, OnModuleDestroy
 {
-  constructor() {
+  constructor(config: ConfigService) {
     super({
-      adapter: new PrismaMariaDb(getDatabaseUrl()),
+      adapter: new PrismaMariaDb(
+        getDatabaseUrl(config.getOrThrow<string>('DATABASE_URL')),
+      ),
     });
   }
 

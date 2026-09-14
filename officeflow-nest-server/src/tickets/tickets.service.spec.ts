@@ -9,6 +9,11 @@ import {
 } from '@prisma/client';
 
 import { TicketsService } from './tickets.service';
+import { TicketAccessPolicyService } from './ticket-access-policy.service';
+import { TicketQueryService } from './ticket-query.service';
+import { TicketWorkflowService } from './ticket-workflow.service';
+import { TicketAttachmentService } from './ticket-attachment.service';
+import { TicketCommentService } from './ticket-comment.service';
 import { TicketSlaFilter } from './dto/get-tickets-query.dto';
 import { AuditLogsService } from '../audit-logs/audit-logs.service';
 import { CloudinaryService } from '../cloudinary/cloudinary.service';
@@ -96,6 +101,11 @@ describe('TicketsService', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         TicketsService,
+        TicketAccessPolicyService,
+        TicketQueryService,
+        TicketWorkflowService,
+        TicketAttachmentService,
+        TicketCommentService,
         {
           provide: PrismaService,
           useValue: mockPrismaService,

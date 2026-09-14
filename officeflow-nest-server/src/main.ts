@@ -13,8 +13,14 @@ import { ResponseInterceptor } from './common/interceptors/response.interceptor'
 import { RequestLoggingInterceptor } from './common/interceptors/request-logging.interceptor';
 import { isAllowedOrigin } from './common/security/allowed-origins';
 
+import { ConfigService } from '@nestjs/config';
+
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
+
+  app.enableShutdownHooks();
+
+  const config = app.get(ConfigService);
 
   if (process.env.TRUST_PROXY === '1') {
     const expressApp = app.getHttpAdapter().getInstance() as Application;
@@ -70,7 +76,7 @@ async function bootstrap() {
     SwaggerModule.setup('api/docs', app, document);
   }
 
-  const port = process.env.PORT || 5001;
+  const port = config.getOrThrow<number>('PORT');
   await app.listen(port);
 
   console.log(`NestJS API is running on port ${port}`);
