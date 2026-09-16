@@ -74,6 +74,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
     }
 
     const errorResponse: ApiErrorResponse = {
+      //Dành cho Client
       success: false,
       statusCode,
       message,
@@ -84,6 +85,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
     };
 
     const diagnostic = {
+      // Dành cho server log
       event: 'http_request_failed',
       requestId,
       method: request.method,

@@ -32,14 +32,21 @@ export class RequestLoggingInterceptor implements NestInterceptor {
     const ipAddress = request.ip;
 
     return next.handle().pipe(
+      //Tiếp tục cho request đi vào Controller/handler
       tap({
         next: () => {
           const duration = Date.now() - startedAt;
 
-          this.logger.log(
-            `${method} ${url} ${response.statusCode} ${duration}ms ` +
-              `userId=${userId} ip=${ipAddress} requestId=${requestId}`,
-          );
+          this.logger.log({
+            event: 'http_handler_succeeded',
+            requestId,
+            method,
+            path: url,
+            statusCode: response.statusCode,
+            durationMs: duration,
+            userId,
+            ip: ipAddress,
+          });
         },
         // The exception filter logs failures once, with the final mapped status.
       }),

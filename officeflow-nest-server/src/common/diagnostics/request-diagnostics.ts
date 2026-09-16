@@ -36,8 +36,7 @@ export function getSafeErrorDetails(error: unknown) {
     P2003: 'foreign_key_constraint',
     P2025: 'record_not_found',
   };
-  // Prisma messages/meta can contain SQL, values and connection strings.
-  // Keep only code, a fixed hint and stack locations, never the raw message.
+
   const stack =
     error instanceof Error
       ? error.stack
