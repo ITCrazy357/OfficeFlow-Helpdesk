@@ -35,9 +35,14 @@ describe('RequestLoggingInterceptor', () => {
     await lastValueFrom(interceptor.intercept(context, next));
 
     expect(logSpy).toHaveBeenCalledWith(
-      expect.stringMatching(
-        /^GET \/api\/audit-logs 200 \d+ms userId=1 ip=127\.0\.0\.1 requestId=[a-f0-9-]{36}$/,
-      ),
+      expect.objectContaining({
+        event: 'http_handler_succeeded',
+        method: 'GET',
+        path: '/api/audit-logs',
+        statusCode: 200,
+        userId: 1,
+        ip: '127.0.0.1',
+      }),
     );
   });
 });
