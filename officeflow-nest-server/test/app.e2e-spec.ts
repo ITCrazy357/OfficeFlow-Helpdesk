@@ -8,7 +8,7 @@ import request from 'supertest';
 import { AppModule } from '../src/app.module';
 import { HttpExceptionFilter } from '../src/common/filters/http-exception.filter';
 import { ResponseInterceptor } from '../src/common/interceptors/response.interceptor';
-import { RequestLoggingInterceptor } from '../src/common/interceptors/request-logging.interceptor';
+import { requestObservabilityMiddleware } from '../src/common/middleware/request-observability.middleware';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { ResilientThrottlerStorage } from '../src/redis/resilient-throttler.storage';
 import { RedisService } from '../src/redis/redis.service';
@@ -71,6 +71,7 @@ describe('AppController (e2e)', () => {
       .compile();
 
     app = moduleFixture.createNestApplication();
+    app.use(requestObservabilityMiddleware);
 
     app.setGlobalPrefix('api');
 
@@ -84,10 +85,7 @@ describe('AppController (e2e)', () => {
 
     app.useGlobalFilters(new HttpExceptionFilter());
 
-    app.useGlobalInterceptors(
-      new RequestLoggingInterceptor(),
-      new ResponseInterceptor(app.get(Reflector)),
-    );
+    app.useGlobalInterceptors(new ResponseInterceptor(app.get(Reflector)));
 
     await app.init();
     httpServer = app.getHttpServer() as Server;
@@ -217,7 +215,12 @@ describe('AppController (e2e)', () => {
     return request(httpServer)
       .patch('/api/users/16/status')
       .send({ isActive: false })
-      .expect(401);
+      .expect(401)
+      .expect((res) => {
+        const body = res.body as ErrorResponseBody;
+        expect(body.requestId).toMatch(/^[a-f0-9-]{36}$/);
+        expect(res.headers['x-request-id']).toBe(body.requestId);
+      });
   });
 
   it('/api/users/:id/lock-status should be registered and protected', () => {
