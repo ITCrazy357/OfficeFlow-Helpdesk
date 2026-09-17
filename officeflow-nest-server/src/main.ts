@@ -10,10 +10,11 @@ import type { Application } from 'express';
 import { AppModule } from './app.module';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 import { ResponseInterceptor } from './common/interceptors/response.interceptor';
-import { RequestLoggingInterceptor } from './common/interceptors/request-logging.interceptor';
+
 import { isAllowedOrigin } from './common/security/allowed-origins';
 
 import { ConfigService } from '@nestjs/config';
+import { requestObservabilityMiddleware } from './common/middleware/request-observability.middleware';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, {
@@ -23,6 +24,7 @@ async function bootstrap() {
   });
 
   app.enableShutdownHooks();
+  app.use(requestObservabilityMiddleware);
 
   const config = app.get(ConfigService);
 
@@ -44,7 +46,6 @@ async function bootstrap() {
   });
 
   app.useGlobalInterceptors(
-    new RequestLoggingInterceptor(),
     new ResponseInterceptor(app.get(Reflector)),
   );
 
