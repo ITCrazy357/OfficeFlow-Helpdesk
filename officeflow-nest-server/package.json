@@ -36,7 +36,7 @@
   "dependencies": {
     "@nestjs-redis/throttler-storage": "^1.4.0",
     "@nestjs/common": "^11.0.1",
-    "@nestjs/config": "^12.0.0",
+    "@nestjs/config": "4.0.4",
     "@nestjs/core": "^11.0.1",
     "@nestjs/event-emitter": "^3.1.0",
     "@nestjs/jwt": "^11.0.2",
@@ -109,6 +109,19 @@
       "**/*.(t|j)s"
     ],
     "coverageDirectory": "../coverage",
+    "coverageReporters": [
+      "text-summary",
+      "json-summary",
+      "lcov"
+    ],
+    "coverageThreshold": {
+      "global": {
+        "statements": 60,
+        "branches": 58,
+        "functions": 60,
+        "lines": 60
+      }
+    },
     "testEnvironment": "node"
   }
 }

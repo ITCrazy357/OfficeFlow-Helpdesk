@@ -3,6 +3,9 @@ import * as nodemailer from 'nodemailer';
 import type { Transporter } from 'nodemailer';
 import type SMTPTransport from 'nodemailer/lib/smtp-transport';
 import { MetricsService } from '../metrics/metrics.service';
+import { observeSafely } from '../common/diagnostics/safe-observation';
+import { getSafeErrorDetails } from '../common/diagnostics/request-diagnostics';
+import { getCurrentRequestId } from '../common/diagnostics/request-context';
 
 export type SendEmailParams = {
   to: string;
@@ -25,6 +28,7 @@ export class MailService implements OnModuleInit {
   > | null;
 
   constructor(private readonly metrics: MetricsService) {
+    observeSafely(() => this.metrics.setMailEnabled(this.enabled));
     if (!this.enabled) {
       this.transporter = null;
 
@@ -67,13 +71,18 @@ export class MailService implements OnModuleInit {
 
     try {
       await this.transporter.verify();
+      observeSafely(() => this.metrics.recordSmtpVerify('success'));
 
       this.logger.log('SMTP connection verified successfully');
     } catch (error: unknown) {
-      const message =
-        error instanceof Error ? error.message : 'Unknown SMTP error';
-
-      this.logger.error(`SMTP connection verification failed: ${message}`);
+      observeSafely(() => {
+        this.metrics.recordSmtpVerify('error');
+        this.metrics.recordError('smtp');
+      });
+      this.logger.error({
+        event: 'smtp_verify_failed',
+        ...getSafeErrorDetails(error),
+      });
     }
   }
 
@@ -83,11 +92,8 @@ export class MailService implements OnModuleInit {
 
   async sendEmail(params: SendEmailParams) {
     if (!this.isEnabled() || !this.transporter) {
-      this.logger.debug(
-        `Skipped email "${params.subject}" because email is disabled`,
-      );
-
-      this.metrics.recordMailAttempt('skipped');
+      this.logger.debug({ event: 'mail_skipped_disabled' });
+      observeSafely(() => this.metrics.recordMailAttempt('skipped'));
 
       return {
         skipped: true,
@@ -105,16 +111,16 @@ export class MailService implements OnModuleInit {
         html: params.html,
       });
     } catch (error: unknown) {
-      const message =
-        error instanceof Error ? error.message : 'Unknown SMTP error';
-
-      this.logger.error(
-        `Failed to send email "${params.subject}" to ${params.to}: ${message}`,
-      );
-
-      this.metrics.recordMailAttempt('error');
-
-      throw new Error(`Failed to send email: ${message}`);
+      observeSafely(() => {
+        this.metrics.recordMailAttempt('error');
+        this.metrics.recordError('smtp');
+      });
+      this.logger.error({
+        event: 'mail_send_failed',
+        requestId: getCurrentRequestId(),
+        ...getSafeErrorDetails(error),
+      });
+      throw error;
     }
 
     const result =
@@ -124,7 +130,7 @@ export class MailService implements OnModuleInit {
           ? 'partial'
           : 'accepted';
 
-    this.metrics.recordMailAttempt(result);
+    observeSafely(() => this.metrics.recordMailAttempt(result));
 
     return {
       skipped: false,

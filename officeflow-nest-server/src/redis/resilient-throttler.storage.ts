@@ -9,7 +9,9 @@ import {
 } from '@nestjs-redis/throttler-storage';
 
 import { RedisService } from './redis.service';
-import { MetricsService } from 'src/metrics/metrics.service';
+import { MetricsService } from '../metrics/metrics.service';
+import { observeSafely } from '../common/diagnostics/safe-observation';
+import { getSafeErrorDetails } from '../common/diagnostics/request-diagnostics';
 
 @Injectable()
 export class ResilientThrottlerStorage
@@ -36,10 +38,10 @@ export class ResilientThrottlerStorage
     }
 
     this.degraded = true;
-    const detail = error instanceof Error ? `: ${error.message}` : '';
-    this.logger.warn(
-      `Redis rate-limit storage unavailable; using per-instance memory fallback${detail}`,
-    );
+    this.logger.warn({
+      event: 'redis_rate_limit_degraded',
+      ...getSafeErrorDetails(error),
+    });
   }
 
   async increment(
@@ -72,13 +74,7 @@ export class ResilientThrottlerStorage
       this.logDegraded();
     }
 
-    try {
-      this.metrics.recordRedisFallback('rate_limit');
-    } catch (error) {
-      this.logger.warn(
-        `Failed to record Redis fallback metric: ${error instanceof Error ? error.message : String(error)}`,
-      );
-    }
+    observeSafely(() => this.metrics.recordRedisFallback('rate_limit'));
 
     // Ưu tiên API vẫn hoạt động hơn là đảm bảo distributed rate limit tuyệt đối.
     return this.memoryFallback.increment(

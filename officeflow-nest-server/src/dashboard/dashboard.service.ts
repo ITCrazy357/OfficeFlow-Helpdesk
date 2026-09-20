@@ -3,6 +3,8 @@ import { Prisma, TicketStatus, UserRole } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { RedisService } from '../redis/redis.service';
 import { MetricsService } from '../metrics/metrics.service';
+import { observeSafely } from '../common/diagnostics/safe-observation';
+import { getSafeErrorDetails } from '../common/diagnostics/request-diagnostics';
 
 const DEFAULT_DASHBOARD_CACHE_TTL_SECONDS = 60;
 
@@ -88,8 +90,10 @@ export class DashboardService {
     }
 
     this.cacheErrorLogged = true;
-    const detail = error instanceof Error ? `: ${error.message}` : '';
-    this.logger.warn(`Dashboard cache unavailable; using database${detail}`);
+    this.logger.warn({
+      event: 'dashboard_cache_degraded',
+      ...getSafeErrorDetails(error),
+    });
   }
 
   private markCacheAvailable() {
@@ -125,10 +129,14 @@ export class DashboardService {
           return cached;
         }
       } catch (error) {
-        this.metrics.recordRedisFallback('dashboard_cache');
+        observeSafely(() =>
+          this.metrics.recordRedisFallback('dashboard_cache'),
+        );
         this.logCacheError(error);
         cacheKey = null;
       }
+    } else {
+      observeSafely(() => this.metrics.recordRedisFallback('dashboard_cache'));
     }
 
     const loadKey = cacheKey ?? `database:${report}:${scope.cacheKey}`;
@@ -149,7 +157,7 @@ export class DashboardService {
           await this.redis.setJson(cacheKey, result, this.cacheTtlSeconds);
           this.markCacheAvailable();
         } catch (error) {
-          this.metrics.recordRedisFallback('dashboard_cache');
+          // A failed cache write is not another DB read fallback.
           this.logCacheError(error);
         }
       }

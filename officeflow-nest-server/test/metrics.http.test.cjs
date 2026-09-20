@@ -1,6 +1,6 @@
 // Run after npm run build:ci:
 // node --test test/metrics.http.test.cjs
-// Native Node loads the real ESM @nestjs/config on Node 22, unlike Jest's VM.
+// Test compiled modules over real local HTTP with the installed dependencies.
 // Never bootstrap AppModule: only inspect its metadata for the wiring test.
 require('./setup-env.cjs');
 require('reflect-metadata');
@@ -77,10 +77,10 @@ describe(
       );
       app.setGlobalPrefix('api');
       app.useGlobalInterceptors(new ResponseInterceptor(app.get(Reflector)));
-      app.useGlobalFilters(new HttpExceptionFilter());
-    // One stable ephemeral loopback server for the whole suite; Supertest must
-    // not auto-close a port still referenced by another pending test request.
-    await app.listen(0, '127.0.0.1');
+      app.useGlobalFilters(new HttpExceptionFilter(metrics));
+      // One stable ephemeral loopback server for the whole suite; Supertest must
+      // not auto-close a port still referenced by another pending test request.
+      await app.listen(0, '127.0.0.1');
       server = app.getHttpServer();
     });
 
@@ -165,6 +165,7 @@ describe(
       const after = (await scrape().expect(200)).text;
       assert.equal(counter(after, '4xx'), counter(before, '4xx') + 1);
       assert.equal(counter(after, '5xx'), counter(before, '5xx') + 1);
+      assert.match(after, /officeflow_errors_total\{source="http"\} 1/);
     });
 
     it('does not count repeated scrapes including case, trailing slash and query variants', async () => {

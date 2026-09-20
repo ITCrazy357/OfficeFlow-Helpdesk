@@ -1,0 +1,110 @@
+rule_files: [alerts.yml]
+evaluation_interval: 1m
+tests:
+  - interval: 1m
+    input_series:
+      - series: 'officeflow_smtp_verify_success{job="officeflow-api",instance="test"}'
+        values: '0+0x4 1+0x4'
+      - series: 'officeflow_mail_enabled{job="officeflow-api",instance="test"}'
+        values: '1+0x9'
+    alert_rule_test:
+      - eval_time: 3m
+        alertname: OfficeFlowSmtpVerifyFailure
+        exp_alerts:
+          - exp_labels:
+              { job: officeflow-api, instance: test, severity: warning }
+            exp_annotations: { summary: 'SMTP connection verification failed' }
+      - eval_time: 6m
+        alertname: OfficeFlowSmtpVerifyFailure
+        exp_alerts: []
+  - interval: 1m
+    input_series:
+      - series: 'officeflow_outbox_ready_jobs{job="officeflow-api",instance="test"}'
+        values: '4+0x12'
+      - series: 'officeflow_outbox_oldest_ready_age_seconds{job="officeflow-api",instance="test"}'
+        values: '600+0x12'
+      - series: 'officeflow_outbox_collection_success{job="officeflow-api",instance="test"}'
+        values: '1+0x12'
+      - series: 'officeflow_outbox_last_collection_timestamp_seconds{job="officeflow-api",instance="test"}'
+        values: '0+60x12'
+    alert_rule_test:
+      - eval_time: 4m
+        alertname: OfficeFlowOutboxBacklog
+        exp_alerts: []
+      - eval_time: 6m
+        alertname: OfficeFlowOutboxBacklog
+        exp_alerts:
+          - exp_labels:
+              { job: officeflow-api, instance: test, severity: warning }
+            exp_annotations:
+              { summary: 'Eligible outbox work has been waiting too long' }
+  - interval: 1m
+    input_series:
+      - series: 'officeflow_outbox_ready_jobs{job="officeflow-api",instance="test"}'
+        values: '4+0x12'
+      - series: 'officeflow_outbox_oldest_ready_age_seconds{job="officeflow-api",instance="test"}'
+        values: '600+0x12'
+      - series: 'officeflow_outbox_collection_success{job="officeflow-api",instance="test"}'
+        values: '0+0x12'
+      - series: 'officeflow_outbox_last_collection_timestamp_seconds{job="officeflow-api",instance="test"}'
+        values: '0+0x12'
+    alert_rule_test:
+      - eval_time: 6m
+        alertname: OfficeFlowOutboxBacklog
+        exp_alerts: []
+      - eval_time: 6m
+        alertname: OfficeFlowOutboxCollectionStale
+        exp_alerts:
+          - exp_labels:
+              { job: officeflow-api, instance: test, severity: warning }
+            exp_annotations:
+              {
+                summary: 'Outbox snapshot is unavailable or stale; backlog is unknown',
+              }
+  - interval: 1m
+    input_series:
+      - series: 'officeflow_redis_fallback_total{job="officeflow-api",instance="test",component="rate_limit"}'
+        values: '0+10x12'
+      - series: 'officeflow_mail_send_attempts_total{job="officeflow-api",instance="test",result="error"}'
+        values: '0+1x12'
+      - series: 'officeflow_mail_enabled{job="officeflow-api",instance="test"}'
+        values: '1+0x12'
+    alert_rule_test:
+      - eval_time: 5m
+        alertname: OfficeFlowRedisFallback
+        exp_alerts:
+          - exp_labels:
+              {
+                job: officeflow-api,
+                instance: test,
+                component: rate_limit,
+                severity: warning,
+              }
+            exp_annotations:
+              {
+                summary: 'Redis fallback has been observed; distributed guarantees may be degraded',
+              }
+      - eval_time: 5m
+        alertname: OfficeFlowSmtpFailure
+        exp_alerts:
+          - exp_labels:
+              {
+                job: officeflow-api,
+                instance: test,
+                result: error,
+                severity: warning,
+              }
+            exp_annotations:
+              {
+                summary: 'SMTP send attempts failed or recipients were rejected',
+              }
+  - interval: 1m
+    input_series:
+      - series: 'officeflow_mail_send_attempts_total{job="officeflow-api",instance="test",result="error"}'
+        values: '0+1x12'
+      - series: 'officeflow_mail_enabled{job="officeflow-api",instance="test"}'
+        values: '0+0x12'
+    alert_rule_test:
+      - eval_time: 5m
+        alertname: OfficeFlowSmtpFailure
+        exp_alerts: []

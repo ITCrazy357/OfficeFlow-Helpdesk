@@ -724,7 +724,6 @@ export class TicketWorkflowService {
     return { id };
   }
 
-
   async linkAsset(
     ticketId: number,
     linkTicketAssetDto: LinkTicketAssetDto,

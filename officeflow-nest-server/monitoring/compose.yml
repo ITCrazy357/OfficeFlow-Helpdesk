@@ -1,0 +1,26 @@
+name: officeflow-monitoring
+services:
+  prometheus:
+    image: prom/prometheus:v3.5.0
+    ports: ['127.0.0.1:9090:9090']
+    extra_hosts: ['host.docker.internal:host-gateway']
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./alerts.yml:/etc/prometheus/alerts.yml:ro
+      - ./secrets/metrics_token:/run/secrets/metrics_token:ro
+      - prometheus-data:/prometheus
+    command:
+      [
+        '--config.file=/etc/prometheus/prometheus.yml',
+        '--storage.tsdb.retention.time=15d',
+      ]
+  alertmanager:
+    image: prom/alertmanager:v0.28.1
+    ports: ['127.0.0.1:9093:9093']
+    volumes:
+      - ./secrets/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+      - alertmanager-data:/alertmanager
+    command: ['--config.file=/etc/alertmanager/alertmanager.yml']
+volumes:
+  prometheus-data:
+  alertmanager-data:

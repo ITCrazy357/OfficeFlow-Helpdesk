@@ -9,3 +9,6 @@ coverage
 README.md
 test
 src/**/*.spec.ts
+.backups
+monitoring
+**/*.sql

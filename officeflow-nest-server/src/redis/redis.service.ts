@@ -5,7 +5,7 @@ import {
   OnModuleInit,
 } from '@nestjs/common';
 import { createClient, type RedisClientType } from 'redis';
-import { MetricsService } from 'src/metrics/metrics.service';
+import { getSafeErrorDetails } from '../common/diagnostics/request-diagnostics';
 
 const DEFAULT_REDIS_URL = 'redis://127.0.0.1:6379';
 const DEFAULT_CONNECT_TIMEOUT_MS = 3_000;
@@ -42,14 +42,14 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
     }
 
     this.unavailableLogged = true;
-    const detail = error instanceof Error ? `: ${error.message}` : '';
-    this.logger.warn(`${message}${detail}`);
+    this.logger.warn({
+      event: 'redis_unavailable',
+      message,
+      ...getSafeErrorDetails(error),
+    });
   }
 
-  constructor(
-    private readonly redis: RedisService,
-    private readonly metrics: MetricsService,
-  ) {
+  constructor() {
     //cấu hình Redis client.
     this.client = createClient({
       url: process.env.REDIS_URL?.trim() || DEFAULT_REDIS_URL,

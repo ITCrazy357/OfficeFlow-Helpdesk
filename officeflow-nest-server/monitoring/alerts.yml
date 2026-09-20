@@ -1,0 +1,72 @@
+groups:
+  - name: officeflow
+    rules:
+      - alert: OfficeFlowTargetDown
+        expr: up{job="officeflow-api"} == 0
+        for: 2m
+        labels: { severity: critical }
+        annotations: { summary: 'Backend metrics endpoint cannot be scraped' }
+      - alert: OfficeFlowOutboxBacklog
+        expr: |
+          (officeflow_outbox_ready_jobs > 0)
+          and (officeflow_outbox_oldest_ready_age_seconds > 300)
+          and (officeflow_outbox_collection_success == 1)
+          and (time() - officeflow_outbox_last_collection_timestamp_seconds < 90)
+        for: 5m
+        labels: { severity: warning }
+        annotations:
+          { summary: 'Eligible outbox work has been waiting too long' }
+      - alert: OfficeFlowOutboxExhausted
+        expr: |
+          (officeflow_outbox_exhausted_jobs > 0)
+          and (officeflow_outbox_collection_success == 1)
+          and (time() - officeflow_outbox_last_collection_timestamp_seconds < 90)
+        for: 2m
+        labels: { severity: critical }
+        annotations: { summary: 'Outbox jobs exhausted their retry budget' }
+      - alert: OfficeFlowOutboxCollectionStale
+        expr: |
+          (officeflow_outbox_collection_success == 0)
+          or (time() - officeflow_outbox_last_collection_timestamp_seconds > 90)
+        for: 2m
+        labels: { severity: warning }
+        annotations:
+          {
+            summary: 'Outbox snapshot is unavailable or stale; backlog is unknown',
+          }
+      - alert: OfficeFlowOutboxWorkerStalled
+        expr: time() - officeflow_outbox_last_poll_success_timestamp_seconds > 120
+        for: 3m
+        labels: { severity: warning }
+        annotations:
+          { summary: 'Worker has not completed a successful poll recently' }
+      - alert: OfficeFlowRedisFallback
+        expr: increase(officeflow_redis_fallback_total[5m]) > 0
+        for: 2m
+        labels: { severity: warning }
+        annotations:
+          {
+            summary: 'Redis fallback has been observed; distributed guarantees may be degraded',
+          }
+      - alert: OfficeFlowSmtpFailure
+        expr: |
+          (increase(officeflow_mail_send_attempts_total{result=~"error|partial|rejected"}[5m]) > 0)
+          and on(job, instance) (officeflow_mail_enabled == 1)
+        for: 2m
+        labels: { severity: warning }
+        annotations:
+          { summary: 'SMTP send attempts failed or recipients were rejected' }
+      - alert: OfficeFlowSmtpVerifyFailure
+        expr: |
+          (officeflow_smtp_verify_success == 0)
+          and on(job, instance) (officeflow_mail_enabled == 1)
+        for: 2m
+        labels: { severity: warning }
+        annotations: { summary: 'SMTP connection verification failed' }
+      - alert: OfficeFlowHttpErrors
+        expr: |
+          sum by(job, instance) (rate(officeflow_http_requests_total{status_class="5xx"}[5m]))
+          / clamp_min(sum by(job, instance) (rate(officeflow_http_requests_total[5m])), 0.01) > 0.05
+        for: 5m
+        labels: { severity: warning }
+        annotations: { summary: 'HTTP 5xx rate exceeds 5 percent' }

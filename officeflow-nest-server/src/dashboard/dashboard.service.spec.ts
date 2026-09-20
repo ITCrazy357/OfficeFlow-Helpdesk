@@ -3,6 +3,7 @@ import { UserRole } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { RedisService } from '../redis/redis.service';
 import { DashboardService } from './dashboard.service';
+import { MetricsService } from '../metrics/metrics.service';
 
 const mockPrisma = {
   user: {
@@ -30,15 +31,18 @@ const mockRedis = {
 
 describe('DashboardService Redis cache', () => {
   let service: DashboardService;
+  let metrics: MetricsService;
 
   beforeEach(() => {
     jest.resetAllMocks();
     mockRedis.key.mockImplementation((...parts: Array<string | number>) =>
       ['officeflow:test', ...parts].join(':'),
     );
+    metrics = new MetricsService();
     service = new DashboardService(
       mockPrisma as unknown as PrismaService,
       mockRedis as unknown as RedisService,
+      metrics,
     );
   });
 
@@ -140,5 +144,22 @@ describe('DashboardService Redis cache', () => {
       'officeflow:test:dashboard:report-v1:data-v9:priority:department:4',
     );
     expect(mockPrisma.ticket.groupBy).not.toHaveBeenCalled();
+  });
+
+  it('counts unavailable Redis as fallback but not a normal cache miss or write failure', async () => {
+    mockRedis.isReady.mockReturnValue(false);
+    mockPrisma.ticket.groupBy.mockResolvedValue([]);
+    await service.getTicketsByStatus({ userId: 1, role: UserRole.ADMIN });
+    expect(await metrics.render()).toContain(
+      'officeflow_redis_fallback_total{component="dashboard_cache"} 1',
+    );
+    mockRedis.isReady.mockReturnValue(true);
+    mockRedis.getDashboardVersion.mockResolvedValue(1);
+    mockRedis.getJson.mockResolvedValue(null);
+    mockRedis.setJson.mockRejectedValue(new Error('write failed'));
+    await service.getTicketsByStatus({ userId: 1, role: UserRole.ADMIN });
+    expect(await metrics.render()).toContain(
+      'officeflow_redis_fallback_total{component="dashboard_cache"} 1',
+    );
   });
 });

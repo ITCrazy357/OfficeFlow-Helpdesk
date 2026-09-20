@@ -1,33 +1,26 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { ArrowRight, CheckCircle2, LockKeyhole, LogIn } from "lucide-react";
+import { ArrowRight, CheckCheck, CircleCheck, Eye, EyeOff, Headset, LoaderCircle, LockKeyhole, LogIn, Mail, ShieldCheck, UsersRound } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import type { CSSProperties } from "react";
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import type { SubmitHandler } from "react-hook-form";
 
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useLogin } from "@/features/auth/hooks";
 import { restoreSessionApi } from "@/features/auth/api";
 import { loginSchema, type LoginFormValues } from "@/features/auth/schemas";
 import { getApiErrorMessage } from "@/lib/axios";
+import styles from "./login.module.css";
 
 const productNotes = [
-  "Theo dõi ticket theo trạng thái và độ ưu tiên",
-  "Phân quyền theo ADMIN, IT_STAFF và EMPLOYEE",
-  "Dữ liệu đồng bộ trực tiếp với OfficeFlow API",
+  { icon: CheckCheck, title: "Mọi yêu cầu, một nơi theo dõi", description: "Nắm rõ trạng thái, tiến độ và mức độ ưu tiên." },
+  { icon: UsersRound, title: "Kết nối đúng người, xử lý đúng việc", description: "Phối hợp dễ dàng giữa nhân viên và đội ngũ IT." },
+  { icon: ShieldCheck, title: "Không gian làm việc nội bộ", description: "Truy cập tính năng phù hợp với vai trò của bạn." },
 ];
 
 export default function LoginPage() {
@@ -35,6 +28,7 @@ export default function LoginPage() {
   const loginMutation = useLogin();
   const [isRestoringSession, setIsRestoringSession] = useState(true);
   const [formError, setFormError] = useState<string | null>(null);
+  const [showPassword, setShowPassword] = useState(false);
 
   const form = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
@@ -87,128 +81,145 @@ export default function LoginPage() {
   const emailError = form.formState.errors.email?.message;
   const passwordError = form.formState.errors.password?.message;
 
-  return (
-    <main className="relative grid min-h-[100dvh] overflow-hidden bg-background px-4 py-8 text-foreground sm:px-6 lg:grid-cols-[1fr_520px] lg:px-8">
-      <section className="relative hidden min-h-full items-center lg:flex">
-        <div className="max-w-2xl motion-enter">
-          <div className="mb-8 inline-flex items-center gap-2 rounded-full border border-teal-900/10 bg-white/80 px-3 py-1 text-sm font-medium text-teal-950 shadow-sm">
-            <LockKeyhole className="size-4" />
-            OfficeFlow Helpdesk
-          </div>
-          <h1 className="max-w-xl text-5xl font-semibold leading-tight tracking-normal">
-            Quản lý yêu cầu hỗ trợ nội bộ gọn gàng hơn.
-          </h1>
-          <p className="mt-5 max-w-lg text-base leading-7 text-slate-600">
-            Giao diện client kết nối đúng hệ thống hiện có, hỗ trợ tạo ticket,
-            theo dõi tiến độ và xử lý theo vai trò đăng nhập.
-          </p>
+  const isBusy = loginMutation.isPending || isRestoringSession;
 
-          <div className="mt-10 grid max-w-xl gap-3">
-            {productNotes.map((note, index) => (
-              <div
-                key={note}
-                className="motion-card flex items-center gap-3 rounded-xl border border-white/70 bg-white/75 p-4 shadow-sm shadow-slate-200/70"
-                style={{ "--motion-index": index } as CSSProperties}
-              >
-                <div className="grid size-9 place-items-center rounded-lg bg-teal-950 text-white">
-                  <CheckCircle2 className="size-4" />
+  return (
+    <main className={styles.page}>
+      <section className={styles.introduction} aria-labelledby="welcome-title">
+        <div className={styles.orbits} aria-hidden="true" />
+        <div className={styles.brand}>
+          <LockKeyhole className="size-3.5" aria-hidden="true" />
+          <span>OfficeFlow Helpdesk</span>
+        </div>
+        <div className={`${styles.introContent} motion-enter`}>
+          <h1 id="welcome-title" className={styles.headline}>
+            Hỗ trợ nội bộ,<br />
+            <span>gọn gàng hơn.</span>
+          </h1>
+          <p className="mt-5 max-w-[29rem] text-base leading-7 text-teal-50/80">
+            Gửi yêu cầu, theo dõi tiến độ và kết nối với đội ngũ IT.
+            Mọi việc trong một không gian chung.
+          </p>
+          <ul className="mt-8 hidden gap-3 lg:grid">
+            {productNotes.map(({ icon: Icon, title, description }) => (
+              <li key={title} className={styles.feature}>
+                <span className={styles.featureIcon}><Icon className="size-5" aria-hidden="true" /></span>
+                <div>
+                  <p className="text-sm font-semibold text-white">{title}</p>
+                  <p className="mt-1 text-sm leading-5 text-teal-50/75">{description}</p>
                 </div>
-                <p className="text-sm font-medium text-slate-700">{note}</p>
-              </div>
+              </li>
             ))}
+          </ul>
+        </div>
+        <div className={styles.introFooter}>
+          <div className="flex items-center gap-3">
+            <div className="flex -space-x-2" aria-hidden="true">
+              <span className={`${styles.teamMark} bg-teal-700`}>IT</span>
+              <span className={`${styles.teamMark} bg-emerald-800`}>HR</span>
+              <span className={`${styles.teamMark} bg-slate-600`}>OP</span>
+            </div>
+            <span className="text-xs text-teal-50/80">Cùng kết nối. Cùng giải quyết.</span>
           </div>
+          <span className="flex items-center gap-1.5 text-xs text-emerald-200">
+            <Headset className="size-4" aria-hidden="true" />Hỗ trợ nội bộ
+          </span>
         </div>
       </section>
 
-      <section className="relative flex items-center justify-center">
-        <Card className="w-full max-w-md border-white/80 bg-white/95 shadow-xl shadow-slate-200/80 motion-panel">
-          <CardHeader className="space-y-4">
-            <div className="flex size-11 items-center justify-center rounded-xl bg-teal-950 text-white shadow-sm shadow-teal-950/20">
-              <LogIn className="size-5" />
+      <section className={styles.formSection} aria-labelledby="login-title">
+        <div className={styles.formDecoration} aria-hidden="true" />
+        <div className={`${styles.loginCard} motion-enter`}>
+          <div className="mb-8">
+            <div className="mb-6 flex items-center justify-between gap-3">
+              <div className={styles.loginIcon}><LogIn className="size-6" aria-hidden="true" /></div>
+              <span className="rounded-full border border-emerald-100 bg-emerald-50 px-3 py-1.5 text-xs font-medium text-emerald-800">Dành cho nội bộ</span>
             </div>
-            <div>
-              <CardTitle className="text-2xl">Đăng nhập</CardTitle>
-              <CardDescription>
-                Truy cập OfficeFlow Helpdesk bằng tài khoản nội bộ.
-              </CardDescription>
-            </div>
-          </CardHeader>
+            <h2 id="login-title" className="text-[1.75rem] font-bold tracking-tight text-slate-900">Đăng nhập</h2>
+            <p className="mt-2 text-sm leading-6 text-slate-500">
+              Chào mừng bạn trở lại! Truy cập OfficeFlow bằng tài khoản được cấp.
+            </p>
+          </div>
 
-          <CardContent>
-            <form
-              className="grid gap-4"
-              onSubmit={form.handleSubmit(onSubmit)}
-              noValidate
-            >
-              <div className="grid gap-2">
-                <Label htmlFor="email">Email</Label>
+          <form className="grid gap-5" onSubmit={form.handleSubmit(onSubmit)} aria-busy={isBusy} noValidate>
+            <div className="grid gap-2">
+              <Label htmlFor="email" className="text-sm font-semibold text-slate-700">Email công việc</Label>
+              <div className={styles.inputWrap}>
+                <Mail className={styles.inputIcon} aria-hidden="true" />
                 <Input
                   id="email"
                   type="email"
                   autoComplete="email"
-                  placeholder="admin@officeflow.com"
+                  autoCapitalize="none"
+                  spellCheck={false}
+                  placeholder="ban@congty.com"
+                  className={styles.input}
                   aria-invalid={Boolean(emailError)}
-                  disabled={loginMutation.isPending || isRestoringSession}
+                  aria-describedby={emailError ? "email-error" : undefined}
+                  disabled={isBusy}
                   {...form.register("email")}
                 />
-                {emailError ? (
-                  <p className="text-xs font-medium text-destructive">
-                    {emailError}
-                  </p>
-                ) : null}
               </div>
+              {emailError ? <p id="email-error" role="alert" className="text-xs font-medium text-red-700">{emailError}</p> : null}
+            </div>
 
-              <div className="grid gap-2">
-                <div className="flex items-center justify-between gap-3">
-                  <Label htmlFor="password">Mật khẩu</Label>
-                  <Link
-                    href="/forgot-password"
-                    className="text-sm font-medium text-teal-800 hover:text-teal-950 hover:underline"
-                  >
-                    Quên mật khẩu?
-                  </Link>
-                </div>
+            <div className="grid gap-2">
+              <div className="flex items-center justify-between gap-3">
+                <Label htmlFor="password" className="text-sm font-semibold text-slate-700">Mật khẩu</Label>
+                <Link href="/forgot-password" className="rounded-sm text-xs font-semibold text-teal-700 hover:text-teal-950 hover:underline">Quên mật khẩu?</Link>
+              </div>
+              <div className={styles.inputWrap}>
+                <LockKeyhole className={styles.inputIcon} aria-hidden="true" />
                 <Input
                   id="password"
-                  type="password"
+                  type={showPassword ? "text" : "password"}
                   autoComplete="current-password"
                   placeholder="Nhập mật khẩu"
+                  className={`${styles.input} ${styles.passwordInput}`}
                   aria-invalid={Boolean(passwordError)}
-                  disabled={loginMutation.isPending || isRestoringSession}
+                  aria-describedby={passwordError ? "password-error" : undefined}
+                  disabled={isBusy}
                   {...form.register("password")}
                 />
-                {passwordError ? (
-                  <p className="text-xs font-medium text-destructive">
-                    {passwordError}
-                  </p>
-                ) : null}
+                <button
+                  type="button"
+                  className={styles.passwordToggle}
+                  aria-label={showPassword ? "Ẩn mật khẩu" : "Hiện mật khẩu"}
+                  aria-pressed={showPassword}
+                  aria-controls="password"
+                  disabled={isBusy}
+                  onClick={() => setShowPassword((visible) => !visible)}
+                >
+                  {showPassword ? <EyeOff className="size-4" aria-hidden="true" /> : <Eye className="size-4" aria-hidden="true" />}
+                </button>
               </div>
+              {passwordError ? <p id="password-error" role="alert" className="text-xs font-medium text-red-700">{passwordError}</p> : null}
+            </div>
 
-              {formError ? (
-                <div className="rounded-lg border border-destructive/25 bg-destructive/10 px-3 py-2 text-sm font-medium text-destructive motion-toast">
-                  {formError}
-                </div>
-              ) : null}
+            {formError ? (
+              <div role="alert" className="motion-toast rounded-lg border border-red-200 bg-red-50 px-3 py-2.5 text-sm font-medium text-red-700">{formError}</div>
+            ) : null}
 
-              <Button
-                type="submit"
-                className="h-10 w-full bg-teal-950 hover:bg-teal-900"
-                disabled={loginMutation.isPending || isRestoringSession}
-              >
-                {isRestoringSession
-                  ? "Đang kiểm tra phiên..."
-                  : loginMutation.isPending
-                    ? "Đang đăng nhập..."
-                    : "Đăng nhập"}
-                <ArrowRight className="size-4" />
-              </Button>
+            <Button type="submit" className={styles.submitButton} disabled={isBusy}>
+              <span aria-live="polite">
+                {isRestoringSession ? "Đang kiểm tra phiên..." : loginMutation.isPending ? "Đang đăng nhập..." : "Đăng nhập vào hệ thống"}
+              </span>
+              {isBusy ? <LoaderCircle className="size-4 motion-safe:animate-spin" aria-hidden="true" /> : <ArrowRight className="size-4 text-emerald-200" aria-hidden="true" />}
+            </Button>
+          </form>
 
-              <p className="text-center text-sm text-muted-foreground">
-                Tài khoản được cấp bởi quản trị viên của hệ thống.
-              </p>
-            </form>
-          </CardContent>
-        </Card>
+          <div className="mt-7 border-t border-slate-100 pt-5 text-center">
+            <p className="text-xs leading-5 text-slate-500">Tài khoản được cấp bởi quản trị viên.</p>
+            <p className="mt-1 text-xs leading-5 text-slate-500">
+              Liên hệ <span className="font-semibold text-teal-700">đội ngũ IT</span> nếu bạn cần hỗ trợ truy cập.
+            </p>
+            <div className="mt-5 flex items-center justify-center gap-2 rounded-lg border border-emerald-100/80 bg-emerald-50/70 px-3 py-2.5 text-xs font-medium text-teal-800">
+              <CircleCheck className="size-3.5 shrink-0" aria-hidden="true" />
+              Không gian hỗ trợ dành cho đội ngũ của bạn
+            </div>
+          </div>
+        </div>
+        <p className="relative mt-6 text-center text-xs text-slate-500">OfficeFlow Helpdesk · Kết nối công việc mỗi ngày</p>
       </section>
     </main>
   );

@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { getSafeErrorDetails } from '../../common/diagnostics/request-diagnostics';
 import { OnEvent } from '@nestjs/event-emitter';
 
 import { TicketAssignedEvent } from '../../notifications/events/ticket-assigned.event';
@@ -264,11 +265,10 @@ export class TicketEmailListener {
   }
 
   private logError(eventName: string, error: unknown) {
-    const message =
-      error instanceof Error ? error.message : 'Unknown email error';
-
-    const stack = error instanceof Error ? error.stack : undefined;
-
-    this.logger.error(`Failed to send ${eventName} email: ${message}`, stack);
+    this.logger.error({
+      event: 'mail_listener_failed',
+      operation: eventName,
+      ...getSafeErrorDetails(error),
+    });
   }
 }
