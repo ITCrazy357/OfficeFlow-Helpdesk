@@ -108,5 +108,4 @@ export class TicketCommentService {
 
     return comments;
   }
-
 }

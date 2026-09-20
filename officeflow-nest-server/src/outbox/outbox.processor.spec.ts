@@ -4,6 +4,7 @@ import { OutboxStatus } from '@prisma/client';
 
 import { PrismaService } from '../prisma/prisma.service';
 import { OutboxProcessor } from './outbox.processor';
+import { MetricsService } from '../metrics/metrics.service';
 
 // Jest matchers return any; keep nested expected values explicitly unknown.
 function objectContaining(value: Record<string, unknown>): unknown {
@@ -44,6 +45,7 @@ describe('OutboxProcessor', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         OutboxProcessor,
+        MetricsService,
         { provide: PrismaService, useValue: mockPrisma },
         { provide: EventEmitter2, useValue: mockEventEmitter },
       ],

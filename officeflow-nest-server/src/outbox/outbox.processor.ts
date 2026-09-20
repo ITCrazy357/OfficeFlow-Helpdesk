@@ -5,13 +5,19 @@ import { OutboxStatus, type Prisma } from '@prisma/client';
 import { randomUUID } from 'node:crypto';
 
 import { PrismaService } from '../prisma/prisma.service';
+import { MetricsService } from '../metrics/metrics.service';
+import { observeSafely } from '../common/diagnostics/safe-observation';
+import { getSafeErrorDetails } from '../common/diagnostics/request-diagnostics';
+import {
+  getReadyOutboxWhere,
+  LOCK_TIMEOUT_IN_MS,
+  MAX_ATTEMPTS,
+} from './outbox-policy';
 
 const POLL_INTERVAL_IN_MS = 5_000;
-const LOCK_TIMEOUT_IN_MS = 2 * 60_000;
 const HEARTBEAT_INTERVAL_IN_MS = 30_000;
 const RETENTION_IN_MS = 30 * 24 * 60 * 60_000;
 const BATCH_SIZE = 20;
-const MAX_ATTEMPTS = 8;
 const BASE_RETRY_DELAY_IN_MS = 5_000;
 const MAX_RETRY_DELAY_IN_MS = 5 * 60_000;
 const MAX_ERROR_LENGTH = 2_000;
@@ -46,6 +52,7 @@ export class OutboxProcessor {
   constructor(
     private readonly prisma: PrismaService,
     private readonly eventEmitter: EventEmitter2,
+    private readonly metrics: MetricsService,
   ) {}
 
   @Interval(POLL_INTERVAL_IN_MS)
@@ -73,8 +80,16 @@ export class OutboxProcessor {
         },
       });
       await this.processBatch();
+      observeSafely(() => this.metrics.recordOutboxPoll('success'));
     } catch (error: unknown) {
-      this.logger.error(`Outbox polling failed: ${getErrorMessage(error)}`);
+      observeSafely(() => {
+        this.metrics.recordOutboxPoll('error');
+        this.metrics.recordError('outbox');
+      });
+      this.logger.error({
+        event: 'outbox_poll_failed',
+        ...getSafeErrorDetails(error),
+      });
     } finally {
       this.isProcessing = false;
     }
@@ -82,19 +97,8 @@ export class OutboxProcessor {
 
   async processBatch(): Promise<number> {
     const now = new Date();
-    const staleBefore = new Date(now.getTime() - LOCK_TIMEOUT_IN_MS);
     const candidates = await this.prisma.outboxEvent.findMany({
-      where: {
-        attempts: { lt: MAX_ATTEMPTS },
-        availableAt: { lte: now },
-        OR: [
-          { status: { in: [OutboxStatus.PENDING, OutboxStatus.FAILED] } },
-          {
-            status: OutboxStatus.PROCESSING,
-            lockedAt: { lt: staleBefore },
-          },
-        ],
-      },
+      where: getReadyOutboxWhere(now),
       orderBy: [{ availableAt: 'asc' }, { createdAt: 'asc' }],
       take: BATCH_SIZE,
       select: {
@@ -186,9 +190,12 @@ export class OutboxProcessor {
         .updateMany({ where: ownership, data: { lockedAt: new Date() } })
         .then(() => undefined)
         .catch((error: unknown) => {
-          this.logger.error(
-            `Outbox heartbeat failed for ${event.id}: ${getErrorMessage(error)}`,
-          );
+          observeSafely(() => this.metrics.recordError('outbox'));
+          this.logger.error({
+            event: 'outbox_heartbeat_failed',
+            outboxEventId: event.id,
+            ...getSafeErrorDetails(error),
+          });
         })
         .finally(() => {
           heartbeatPending = undefined;
@@ -239,9 +246,13 @@ export class OutboxProcessor {
         },
       });
 
-      this.logger.error(
-        `Outbox event ${event.id} (${event.type}) failed on attempt ${attempt}/${MAX_ATTEMPTS}: ${message}`,
-      );
+      observeSafely(() => this.metrics.recordError('outbox'));
+      this.logger.error({
+        event: 'outbox_event_failed',
+        outboxEventId: event.id,
+        attempt,
+        ...getSafeErrorDetails(error),
+      });
     } finally {
       clearInterval(heartbeat);
       await heartbeatPending;

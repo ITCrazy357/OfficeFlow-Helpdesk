@@ -10,6 +10,8 @@ import { Prisma } from '@prisma/client';
 import type { Request, Response } from 'express';
 
 import type { ApiErrorResponse } from '../types/api-response.type';
+import type { MetricsService } from '../../metrics/metrics.service';
+import { observeSafely } from '../diagnostics/safe-observation';
 import {
   getRequestDiagnostics,
   getSafeErrorDetails,
@@ -18,6 +20,7 @@ import {
 @Catch()
 export class HttpExceptionFilter implements ExceptionFilter {
   private readonly logger = new Logger(HttpExceptionFilter.name);
+  constructor(private readonly metrics?: Pick<MetricsService, 'recordError'>) {}
   catch(exception: unknown, host: ArgumentsHost) {
     const context = host.switchToHttp();
     const response = context.getResponse<Response>();
@@ -94,9 +97,10 @@ export class HttpExceptionFilter implements ExceptionFilter {
       durationMs,
       ...getSafeErrorDetails(exception),
     };
-    if (statusCode >= HttpStatus.INTERNAL_SERVER_ERROR)
+    if (statusCode >= HttpStatus.INTERNAL_SERVER_ERROR) {
+      observeSafely(() => this.metrics?.recordError('http'));
       this.logger.error(diagnostic);
-    else this.logger.warn(diagnostic);
+    } else this.logger.warn(diagnostic);
 
     return response.status(statusCode).json(errorResponse);
   }

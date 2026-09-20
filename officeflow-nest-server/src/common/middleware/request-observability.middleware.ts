@@ -5,7 +5,7 @@ import { performance } from 'node:perf_hooks';
 import { getRequestDiagnostics } from '../diagnostics/request-diagnostics';
 import { runWithRequestContext } from '../diagnostics/request-context';
 
-import { MetricsService } from 'src/metrics/metrics.service';
+import type { MetricsService } from '../../metrics/metrics.service';
 
 const logger = new Logger('RequestObservability');
 

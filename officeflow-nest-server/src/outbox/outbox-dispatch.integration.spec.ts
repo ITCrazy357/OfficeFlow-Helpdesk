@@ -9,6 +9,7 @@ import { NotificationsService } from '../notifications/notifications.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { CloudinaryCleanupListener } from './cloudinary-cleanup.listener';
 import { OutboxProcessor } from './outbox.processor';
+import { MetricsService } from '../metrics/metrics.service';
 
 // Jest matchers return any; keep nested expected values explicitly unknown.
 function objectContaining(value: Record<string, unknown>): unknown {
@@ -70,6 +71,7 @@ describe('Outbox dispatch through real Nest event subscribers', () => {
       imports: [EventEmitterModule.forRoot()],
       providers: [
         OutboxProcessor,
+        MetricsService,
         CloudinaryCleanupListener,
         TicketEmailListener,
         NotificationsListener,

@@ -15,6 +15,7 @@ import { ResilientThrottlerStorage } from '../src/redis/resilient-throttler.stor
 import { RedisService } from '../src/redis/redis.service';
 import { MailService } from '../src/mail/mail.service';
 import { OutboxProcessor } from '../src/outbox/outbox.processor';
+import { OutboxMetricsCollector } from '../src/outbox/outbox-metrics.collector';
 import { SlaService } from '../src/sla/sla.service';
 import { RefreshTokenCleanupService } from '../src/auth/refresh-token-cleanup.service';
 import { MetricsService } from '../src/metrics/metrics.service';
@@ -63,6 +64,8 @@ describe('AppController (e2e)', () => {
       .overrideProvider(MailService)
       .useValue({ isEnabled: () => false })
       .overrideProvider(OutboxProcessor)
+      .useValue({})
+      .overrideProvider(OutboxMetricsCollector)
       .useValue({})
       .overrideProvider(SlaService)
       .useValue({})

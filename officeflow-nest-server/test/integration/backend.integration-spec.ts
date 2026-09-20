@@ -11,6 +11,7 @@ import { TicketsService } from '../../src/tickets/tickets.service';
 import { CloudinaryService } from '../../src/cloudinary/cloudinary.service';
 import { RedisService } from '../../src/redis/redis.service';
 import { ResilientThrottlerStorage } from '../../src/redis/resilient-throttler.storage';
+import { MetricsService } from '../../src/metrics/metrics.service';
 import { TicketAccessPolicyService } from '../../src/tickets/ticket-access-policy.service';
 import { TicketQueryService } from '../../src/tickets/ticket-query.service';
 import { TicketWorkflowService } from '../../src/tickets/ticket-workflow.service';
@@ -79,7 +80,7 @@ describe('Real MySQL/Redis integration (disposable containers only)', () => {
     tickets = module.get(TicketsService);
     redis = new RedisService();
     await redis.getClient().connect();
-    limiter = new ResilientThrottlerStorage(redis);
+    limiter = new ResilientThrottlerStorage(redis, new MetricsService());
   });
 
   afterEach(() => {
@@ -259,7 +260,7 @@ describe('Real MySQL/Redis integration (disposable containers only)', () => {
   });
 
   it('shares a distributed rate limit and falls back on a disconnected client', async () => {
-    const other = new ResilientThrottlerStorage(redis);
+    const other = new ResilientThrottlerStorage(redis, new MetricsService());
     try {
       const key = redis.key('limit', randomUUID());
       await limiter.increment(key, 60000, 1, 60000, 'default');

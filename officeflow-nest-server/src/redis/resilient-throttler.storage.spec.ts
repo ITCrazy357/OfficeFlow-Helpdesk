@@ -1,4 +1,5 @@
 import { RedisService } from './redis.service';
+import { MetricsService } from '../metrics/metrics.service';
 import { ResilientThrottlerStorage } from './resilient-throttler.storage';
 
 describe('ResilientThrottlerStorage', () => {
@@ -13,6 +14,7 @@ describe('ResilientThrottlerStorage', () => {
     };
     const storage = new ResilientThrottlerStorage(
       redis as unknown as RedisService,
+      new MetricsService(),
     );
 
     await expect(
@@ -28,12 +30,14 @@ describe('ResilientThrottlerStorage', () => {
   });
 
   it('keeps enforcing limits per instance when Redis is unavailable', async () => {
+    const metrics = new MetricsService();
     const redis = {
       isReady: jest.fn().mockReturnValue(false),
       getClient: jest.fn().mockReturnValue({}),
     };
     const storage = new ResilientThrottlerStorage(
       redis as unknown as RedisService,
+      metrics,
     );
 
     const first = await storage.increment(
@@ -53,6 +57,9 @@ describe('ResilientThrottlerStorage', () => {
 
     expect(first.isBlocked).toBe(false);
     expect(second.isBlocked).toBe(true);
+    expect(await metrics.render()).toContain(
+      'officeflow_redis_fallback_total{component="rate_limit"} 2',
+    );
     storage.onApplicationShutdown();
   });
 });

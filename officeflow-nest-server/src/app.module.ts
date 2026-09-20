@@ -103,7 +103,7 @@ import { MetricsModule } from './metrics/metrics.module';
     TicketCategoriesModule,
     AuditLogsModule,
     MailModule,
-    MetricsModule
+    MetricsModule,
   ],
   controllers: [AppController],
   providers: [

@@ -1,6 +1,11 @@
 import 'dotenv/config';
 
-import { RequestMethod, ValidationPipe, ConsoleLogger } from '@nestjs/common';
+import {
+  RequestMethod,
+  ValidationPipe,
+  ConsoleLogger,
+  Logger,
+} from '@nestjs/common';
 import { NestFactory, Reflector } from '@nestjs/core';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import cookieParser from 'cookie-parser';
@@ -60,7 +65,7 @@ async function bootstrap() {
     }),
   );
 
-  app.useGlobalFilters(new HttpExceptionFilter());
+  app.useGlobalFilters(new HttpExceptionFilter(metrics));
 
   app.enableCors({
     origin: (
@@ -70,6 +75,7 @@ async function bootstrap() {
       callback(null, !origin || isAllowedOrigin(origin));
     },
     credentials: true,
+    exposedHeaders: ['X-Request-Id'],
   });
 
   if (process.env.NODE_ENV !== 'production') {
@@ -87,7 +93,7 @@ async function bootstrap() {
   const port = config.getOrThrow<number>('PORT');
   await app.listen(port);
 
-  console.log(`NestJS API is running on port ${port}`);
+  new Logger('Bootstrap').log({ event: 'application_started', port });
 }
 
 void bootstrap();
