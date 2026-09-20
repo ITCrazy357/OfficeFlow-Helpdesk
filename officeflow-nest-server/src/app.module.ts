@@ -33,6 +33,7 @@ import { ResilientThrottlerStorage } from './redis/resilient-throttler.storage';
 import { RedisService } from './redis/redis.service';
 import { ConfigModule } from '@nestjs/config';
 import { validateEnvironment } from './config/environment.validation';
+import { MetricsModule } from './metrics/metrics.module';
 
 @Module({
   imports: [
@@ -102,6 +103,7 @@ import { validateEnvironment } from './config/environment.validation';
     TicketCategoriesModule,
     AuditLogsModule,
     MailModule,
+    MetricsModule
   ],
   controllers: [AppController],
   providers: [

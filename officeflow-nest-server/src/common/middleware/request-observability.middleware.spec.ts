@@ -29,8 +29,10 @@ function createExchange(path: string | undefined = '/api/tickets/42') {
 describe('Request observability middleware', () => {
   let log: jest.SpyInstance;
   let warn: jest.SpyInstance;
+  const metrics = { recordHttp: jest.fn() };
 
   beforeEach(() => {
+    metrics.recordHttp.mockReset();
     log = jest.spyOn(Logger.prototype, 'log').mockImplementation();
     warn = jest.spyOn(Logger.prototype, 'warn').mockImplementation();
   });
@@ -49,7 +51,7 @@ describe('Request observability middleware', () => {
       expect(res.setHeader).toHaveBeenCalledWith('X-Request-Id', requestId);
       expect(getCurrentRequestId()).toBe(requestId);
     });
-    requestObservabilityMiddleware(req, response, next);
+    requestObservabilityMiddleware(req, response, next, metrics);
     expect(next).toHaveBeenCalledTimes(1);
     expect(log).not.toHaveBeenCalled();
     expect(warn).not.toHaveBeenCalled();
@@ -59,13 +61,19 @@ describe('Request observability middleware', () => {
 
   it('logs the final status once and removes both listeners after finish', () => {
     const { req, res, response } = createExchange();
-    requestObservabilityMiddleware(req, response, jest.fn());
+    requestObservabilityMiddleware(req, response, jest.fn(), metrics);
     res.statusCode = 201;
     res.writableFinished = true;
     res.emit('finish');
     res.emit('close');
     res.emit('finish');
     expect(log).toHaveBeenCalledTimes(1);
+    expect(metrics.recordHttp).toHaveBeenCalledTimes(1);
+    expect(metrics.recordHttp).toHaveBeenCalledWith(
+      'completed',
+      expect.any(Number),
+      201,
+    );
     expect(log).toHaveBeenCalledWith({
       event: 'http_request_completed',
       requestId: getRequestDiagnostics(req).requestId,
@@ -83,10 +91,16 @@ describe('Request observability middleware', () => {
 
   it('logs an early close as aborted, never as a successful 200', () => {
     const { req, res, response } = createExchange();
-    requestObservabilityMiddleware(req, response, jest.fn());
+    requestObservabilityMiddleware(req, response, jest.fn(), metrics);
     res.emit('close');
     res.emit('finish');
     expect(warn).toHaveBeenCalledTimes(1);
+    expect(metrics.recordHttp).toHaveBeenCalledTimes(1);
+    expect(metrics.recordHttp).toHaveBeenCalledWith(
+      'aborted',
+      expect.any(Number),
+      null,
+    );
     expect(warn).toHaveBeenCalledWith(
       expect.objectContaining({
         event: 'http_request_aborted',
@@ -101,7 +115,7 @@ describe('Request observability middleware', () => {
 
   it('treats close after writableFinished as completed, not aborted', () => {
     const { req, res, response } = createExchange();
-    requestObservabilityMiddleware(req, response, jest.fn());
+    requestObservabilityMiddleware(req, response, jest.fn(), metrics);
     res.writableFinished = true;
     res.emit('close');
     expect(log).toHaveBeenCalledTimes(1);
@@ -112,9 +126,14 @@ describe('Request observability middleware', () => {
     'records a completed %i response with its actual status',
     (statusCode) => {
       const { req, res, response } = createExchange();
-      requestObservabilityMiddleware(req, response, jest.fn());
+      requestObservabilityMiddleware(req, response, jest.fn(), metrics);
       res.statusCode = statusCode;
       res.emit('finish');
+      expect(metrics.recordHttp).toHaveBeenCalledWith(
+        'completed',
+        expect.any(Number),
+        statusCode,
+      );
       expect(log).toHaveBeenCalledWith(
         expect.objectContaining({
           event: 'http_request_completed',
@@ -127,7 +146,7 @@ describe('Request observability middleware', () => {
   it('strips queries from the fallback URL and does not serialize secrets', () => {
     const { req, res, response } = createExchange();
     delete (req as Partial<Request>).path;
-    requestObservabilityMiddleware(req, response, jest.fn());
+    requestObservabilityMiddleware(req, response, jest.fn(), metrics);
     res.emit('finish');
     expect(log).toHaveBeenCalledWith(
       expect.objectContaining({ path: '/api/tickets/42' }),
@@ -139,7 +158,7 @@ describe('Request observability middleware', () => {
 
   it('captures the original path even if routing later changes request.path', () => {
     const { req, res, response } = createExchange();
-    requestObservabilityMiddleware(req, response, jest.fn());
+    requestObservabilityMiddleware(req, response, jest.fn(), metrics);
     Object.defineProperty(req, 'path', { value: '/rewritten' });
     res.emit('finish');
     expect(log).toHaveBeenCalledWith(
@@ -151,18 +170,33 @@ describe('Request observability middleware', () => {
     jest.useFakeTimers();
     jest.setSystemTime(1000);
     const { req, res, response } = createExchange();
-    requestObservabilityMiddleware(req, response, () => {
-      jest.setSystemTime(1250);
-      expect(getRequestDiagnostics(req).durationMs).toBe(250);
-    });
+    requestObservabilityMiddleware(
+      req,
+      response,
+      () => {
+        jest.setSystemTime(1250);
+        expect(getRequestDiagnostics(req).durationMs).toBe(250);
+      },
+      metrics,
+    );
     res.emit('finish');
   });
 
   it('keeps the correct ID when responses finish outside context in reverse order', () => {
     const first = createExchange();
     const second = createExchange();
-    requestObservabilityMiddleware(first.req, first.response, jest.fn());
-    requestObservabilityMiddleware(second.req, second.response, jest.fn());
+    requestObservabilityMiddleware(
+      first.req,
+      first.response,
+      jest.fn(),
+      metrics,
+    );
+    requestObservabilityMiddleware(
+      second.req,
+      second.response,
+      jest.fn(),
+      metrics,
+    );
     const firstId = getRequestDiagnostics(first.req).requestId;
     const secondId = getRequestDiagnostics(second.req).requestId;
     expect(firstId).not.toBe(secondId);
@@ -176,6 +210,47 @@ describe('Request observability middleware', () => {
     expect(log).toHaveBeenNthCalledWith(
       2,
       expect.objectContaining({ requestId: firstId }),
+    );
+  });
+  it.each(['/api/metrics', '/api/metrics/', '/API/METRICS'])(
+    'excludes scrape path %s from metrics, but retains access logging',
+    (path) => {
+      const { req, res, response } = createExchange(path);
+      requestObservabilityMiddleware(req, response, jest.fn(), metrics);
+      res.emit('finish');
+      expect(metrics.recordHttp).not.toHaveBeenCalled();
+      expect(log).toHaveBeenCalledTimes(1);
+    },
+  );
+
+  it('does not exclude other URLs merely starting with /api/metrics', () => {
+    const { req, res, response } = createExchange('/api/metrics-extra');
+    requestObservabilityMiddleware(req, response, jest.fn(), metrics);
+    res.statusCode = 404;
+    res.emit('finish');
+    expect(metrics.recordHttp).toHaveBeenCalledWith(
+      'completed',
+      expect.any(Number),
+      404,
+    );
+  });
+
+  it('does not throw or leak details when the metrics recorder fails', () => {
+    metrics.recordHttp.mockImplementation(() => {
+      throw new Error('token=private-test-secret');
+    });
+    const { req, res, response } = createExchange();
+    requestObservabilityMiddleware(req, response, jest.fn(), metrics);
+    expect(() => res.emit('finish')).not.toThrow();
+    res.emit('close');
+    expect(metrics.recordHttp).toHaveBeenCalledTimes(1);
+    expect(log).toHaveBeenCalledTimes(1);
+    expect(warn).toHaveBeenCalledWith({
+      event: 'http_metrics_record_failed',
+      requestId: getRequestDiagnostics(req).requestId,
+    });
+    expect(JSON.stringify(warn.mock.calls)).not.toContain(
+      'private-test-secret',
     );
   });
 });

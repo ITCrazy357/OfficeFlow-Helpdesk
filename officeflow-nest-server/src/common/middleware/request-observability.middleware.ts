@@ -5,12 +5,15 @@ import { performance } from 'node:perf_hooks';
 import { getRequestDiagnostics } from '../diagnostics/request-diagnostics';
 import { runWithRequestContext } from '../diagnostics/request-context';
 
+import { MetricsService } from 'src/metrics/metrics.service';
+
 const logger = new Logger('RequestObservability');
 
 export function requestObservabilityMiddleware(
   request: Request,
   response: Response,
   next: NextFunction,
+  metrics: Pick<MetricsService, 'recordHttp'>,
 ): void {
   const startedAt = performance.now();
   const { requestId } = getRequestDiagnostics(request);
@@ -39,6 +42,23 @@ export function requestObservabilityMiddleware(
       statusCode: completed ? response.statusCode : null,
       durationMs: Math.round(performance.now() - startedAt),
     };
+
+    const isMetricsRequest = /^\/api\/metrics\/?$/i.test(path);
+
+    if (!isMetricsRequest) {
+      try {
+        metrics.recordHttp(
+          completed ? 'completed' : 'aborted',
+          entry.durationMs,
+          entry.statusCode,
+        );
+      } catch {
+        logger.warn({
+          event: 'http_metrics_record_failed',
+          requestId,
+        });
+      }
+    }
 
     if (completed) {
       logger.log(entry);

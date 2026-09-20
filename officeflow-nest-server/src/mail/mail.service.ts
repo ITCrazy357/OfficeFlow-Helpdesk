@@ -2,6 +2,7 @@ import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import * as nodemailer from 'nodemailer';
 import type { Transporter } from 'nodemailer';
 import type SMTPTransport from 'nodemailer/lib/smtp-transport';
+import { MetricsService } from '../metrics/metrics.service';
 
 export type SendEmailParams = {
   to: string;
@@ -23,7 +24,7 @@ export class MailService implements OnModuleInit {
     SMTPTransport.Options
   > | null;
 
-  constructor() {
+  constructor(private readonly metrics: MetricsService) {
     if (!this.enabled) {
       this.transporter = null;
 
@@ -86,20 +87,44 @@ export class MailService implements OnModuleInit {
         `Skipped email "${params.subject}" because email is disabled`,
       );
 
+      this.metrics.recordMailAttempt('skipped');
+
       return {
         skipped: true,
       };
     }
 
-    const info = await this.transporter.sendMail({
-      from: this.from,
-      to: params.to,
-      subject: params.subject,
-      text: params.text,
-      html: params.html,
-    });
+    let info: SMTPTransport.SentMessageInfo;
 
-    this.logger.log(`Email sent successfully: messageId=${info.messageId}`);
+    try {
+      info = await this.transporter.sendMail({
+        from: this.from,
+        to: params.to,
+        subject: params.subject,
+        text: params.text,
+        html: params.html,
+      });
+    } catch (error: unknown) {
+      const message =
+        error instanceof Error ? error.message : 'Unknown SMTP error';
+
+      this.logger.error(
+        `Failed to send email "${params.subject}" to ${params.to}: ${message}`,
+      );
+
+      this.metrics.recordMailAttempt('error');
+
+      throw new Error(`Failed to send email: ${message}`);
+    }
+
+    const result =
+      info.accepted.length === 0
+        ? 'rejected'
+        : info.rejected.length > 0
+          ? 'partial'
+          : 'accepted';
+
+    this.metrics.recordMailAttempt(result);
 
     return {
       skipped: false,

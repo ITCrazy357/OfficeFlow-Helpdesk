@@ -5,7 +5,8 @@ import { NestFactory, Reflector } from '@nestjs/core';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import cookieParser from 'cookie-parser';
 import helmet from 'helmet';
-import type { Application } from 'express';
+import type { Application, NextFunction, Request, Response } from 'express';
+import { MetricsService } from './metrics/metrics.service';
 
 import { AppModule } from './app.module';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
@@ -24,7 +25,11 @@ async function bootstrap() {
   });
 
   app.enableShutdownHooks();
-  app.use(requestObservabilityMiddleware);
+  const metrics = app.get(MetricsService);
+
+  app.use((req: Request, res: Response, next: NextFunction) => {
+    requestObservabilityMiddleware(req, res, next, metrics);
+  });
 
   const config = app.get(ConfigService);
 
@@ -45,9 +50,7 @@ async function bootstrap() {
     exclude: [{ path: '', method: RequestMethod.GET }],
   });
 
-  app.useGlobalInterceptors(
-    new ResponseInterceptor(app.get(Reflector)),
-  );
+  app.useGlobalInterceptors(new ResponseInterceptor(app.get(Reflector)));
 
   app.useGlobalPipes(
     new ValidationPipe({

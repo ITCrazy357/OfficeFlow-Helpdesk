@@ -2,6 +2,7 @@ import { ForbiddenException, Injectable, Logger } from '@nestjs/common';
 import { Prisma, TicketStatus, UserRole } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { RedisService } from '../redis/redis.service';
+import { MetricsService } from '../metrics/metrics.service';
 
 const DEFAULT_DASHBOARD_CACHE_TTL_SECONDS = 60;
 
@@ -33,6 +34,7 @@ export class DashboardService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly redis: RedisService,
+    private readonly metrics: MetricsService,
   ) {}
 
   private async getTicketScope(
@@ -123,6 +125,7 @@ export class DashboardService {
           return cached;
         }
       } catch (error) {
+        this.metrics.recordRedisFallback('dashboard_cache');
         this.logCacheError(error);
         cacheKey = null;
       }
@@ -146,6 +149,7 @@ export class DashboardService {
           await this.redis.setJson(cacheKey, result, this.cacheTtlSeconds);
           this.markCacheAvailable();
         } catch (error) {
+          this.metrics.recordRedisFallback('dashboard_cache');
           this.logCacheError(error);
         }
       }
