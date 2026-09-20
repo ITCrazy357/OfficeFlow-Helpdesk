@@ -55,6 +55,16 @@ export function validateEnvironment(
     );
   }
 
+  const metricsToken = raw.METRICS_TOKEN;
+
+  if (
+    metricsToken !== undefined &&
+    (typeof metricsToken !== 'string' || !/^[a-f0-9]{64}$/.test(metricsToken))
+  ) {
+    throw new Error(
+      'METRICS_TOKEN must contain exactly 64 lowercase hexadecimal characters',
+    );
+  }
   return {
     ...raw,
     NODE_ENV: nodeEnv,

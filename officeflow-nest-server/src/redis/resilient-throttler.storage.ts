@@ -9,6 +9,7 @@ import {
 } from '@nestjs-redis/throttler-storage';
 
 import { RedisService } from './redis.service';
+import { MetricsService } from 'src/metrics/metrics.service';
 
 @Injectable()
 export class ResilientThrottlerStorage
@@ -19,7 +20,10 @@ export class ResilientThrottlerStorage
   private readonly memoryFallback = new ThrottlerStorageService();
   private degraded = false;
 
-  constructor(private readonly redis: RedisService) {
+  constructor(
+    private readonly redis: RedisService,
+    private readonly metrics: MetricsService,
+  ) {
     this.redisStorage = new RedisThrottlerStorage(
       redis.getClient(),
       ThrottlerAlgorithm.SlidingWindowCounter,
@@ -66,6 +70,14 @@ export class ResilientThrottlerStorage
       }
     } else {
       this.logDegraded();
+    }
+
+    try {
+      this.metrics.recordRedisFallback('rate_limit');
+    } catch (error) {
+      this.logger.warn(
+        `Failed to record Redis fallback metric: ${error instanceof Error ? error.message : String(error)}`,
+      );
     }
 
     // Ưu tiên API vẫn hoạt động hơn là đảm bảo distributed rate limit tuyệt đối.

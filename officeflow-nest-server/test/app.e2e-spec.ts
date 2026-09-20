@@ -3,6 +3,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { Reflector } from '@nestjs/core';
 import { ThrottlerStorageService } from '@nestjs/throttler';
 import { Server } from 'node:http';
+import type { NextFunction, Request, Response } from 'express';
 import request from 'supertest';
 
 import { AppModule } from '../src/app.module';
@@ -16,6 +17,7 @@ import { MailService } from '../src/mail/mail.service';
 import { OutboxProcessor } from '../src/outbox/outbox.processor';
 import { SlaService } from '../src/sla/sla.service';
 import { RefreshTokenCleanupService } from '../src/auth/refresh-token-cleanup.service';
+import { MetricsService } from '../src/metrics/metrics.service';
 
 const mockPrismaService = {
   $queryRaw: jest.fn().mockResolvedValue([{ connected: 1 }]),
@@ -71,7 +73,11 @@ describe('AppController (e2e)', () => {
       .compile();
 
     app = moduleFixture.createNestApplication();
-    app.use(requestObservabilityMiddleware);
+    // Resolve from the real AppModule: missing MetricsModule registration must fail.
+    const metrics = app.get(MetricsService);
+    app.use((req: Request, res: Response, next: NextFunction) => {
+      requestObservabilityMiddleware(req, res, next, metrics);
+    });
 
     app.setGlobalPrefix('api');
 

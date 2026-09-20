@@ -11,6 +11,7 @@ import {
 import { Reflector } from '@nestjs/core';
 import { Test } from '@nestjs/testing';
 import type { Server } from 'node:http';
+import type { NextFunction, Request, Response } from 'express';
 import request from 'supertest';
 
 import { getCurrentRequestId } from '../src/common/diagnostics/request-context';
@@ -76,7 +77,10 @@ describe('Request observability (HTTP)', () => {
       providers: [ContextProbeService, RejectingGuard],
     }).compile();
     app = module.createNestApplication();
-    app.use(requestObservabilityMiddleware);
+    const metrics = { recordHttp: jest.fn() };
+    app.use((req: Request, res: Response, next: NextFunction) => {
+      requestObservabilityMiddleware(req, res, next, metrics);
+    });
     app.setGlobalPrefix('api');
     app.useGlobalInterceptors(new ResponseInterceptor(app.get(Reflector)));
     app.useGlobalFilters(new HttpExceptionFilter());
