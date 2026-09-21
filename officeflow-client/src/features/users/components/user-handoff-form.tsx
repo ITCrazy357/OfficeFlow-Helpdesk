@@ -108,12 +108,13 @@ export function UserHandoffForm({
         bằng chức năng hiện có trước khi vô hiệu hóa.
       </div>
       {error ? (
-        <p
+        <div
           role="alert"
           className="rounded-lg border border-destructive/25 bg-destructive/10 p-3 text-sm text-destructive"
         >
-          {error}
-        </p>
+          <p className="font-semibold">Chưa xác nhận bàn giao thành công</p>
+          <p className="mt-1">{error}</p>
+        </div>
       ) : null}
       <div className="flex flex-wrap justify-end gap-2">
         <Button
