@@ -1,7 +1,20 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { ArrowRight, CheckCheck, CircleCheck, Eye, EyeOff, Headset, LoaderCircle, LockKeyhole, LogIn, Mail, ShieldCheck, UsersRound } from "lucide-react";
+import {
+  ArrowRight,
+  CheckCheck,
+  CircleCheck,
+  Eye,
+  EyeOff,
+  Headset,
+  LoaderCircle,
+  LockKeyhole,
+  LogIn,
+  Mail,
+  ShieldCheck,
+  UsersRound,
+} from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -18,9 +31,21 @@ import { getApiErrorMessage } from "@/lib/axios";
 import styles from "./login.module.css";
 
 const productNotes = [
-  { icon: CheckCheck, title: "Mọi yêu cầu, một nơi theo dõi", description: "Nắm rõ trạng thái, tiến độ và mức độ ưu tiên." },
-  { icon: UsersRound, title: "Kết nối đúng người, xử lý đúng việc", description: "Phối hợp dễ dàng giữa nhân viên và đội ngũ IT." },
-  { icon: ShieldCheck, title: "Không gian làm việc nội bộ", description: "Truy cập tính năng phù hợp với vai trò của bạn." },
+  {
+    icon: CheckCheck,
+    title: "Mọi yêu cầu, một nơi theo dõi",
+    description: "Nắm rõ trạng thái, tiến độ và mức độ ưu tiên.",
+  },
+  {
+    icon: UsersRound,
+    title: "Kết nối đúng người, xử lý đúng việc",
+    description: "Phối hợp dễ dàng giữa nhân viên và đội ngũ IT.",
+  },
+  {
+    icon: ShieldCheck,
+    title: "Không gian làm việc nội bộ",
+    description: "Truy cập tính năng phù hợp với vai trò của bạn.",
+  },
 ];
 
 export default function LoginPage() {
@@ -96,7 +121,7 @@ export default function LoginPage() {
             Hỗ trợ nội bộ,<br />
             <span>gọn gàng hơn.</span>
           </h1>
-          <p className="mt-5 max-w-[29rem] text-base leading-7 text-teal-50/80">
+          <p className="mt-5 hidden max-w-[29rem] text-base leading-7 text-teal-50/80 sm:block">
             Gửi yêu cầu, theo dõi tiến độ và kết nối với đội ngũ IT.
             Mọi việc trong một không gian chung.
           </p>

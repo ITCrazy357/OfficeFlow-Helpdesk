@@ -11,7 +11,7 @@
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  padding: 32px 24px 48px;
+  padding: 24px 24px 28px;
   color: #fff;
   background:
     radial-gradient(ellipse at 0% 0%, #11584b 0%, transparent 55%),
@@ -36,7 +36,7 @@
   text-transform: uppercase;
 }
 
-.introContent { position: relative; margin: 32px 0 0; }
+.introContent { position: relative; margin: 24px 0 0; }
 .headline { font-size: clamp(2rem, 4vw, 3.5rem); font-weight: 750; line-height: 1.18; letter-spacing: -0.035em; }
 .headline span { color: #83e4c2; }
 
@@ -102,7 +102,7 @@
   align-items: center;
   justify-content: center;
   overflow: hidden;
-  padding: 32px 20px;
+  padding: 24px 20px;
   background: radial-gradient(ellipse at 100% 0%, #dff3e9 0%, transparent 55%), #f5f9f8;
 }
 .formDecoration {
