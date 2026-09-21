@@ -52,6 +52,7 @@ services:
     restart: always
     ports:
       - "5001:5001"
+    command: ["node", "dist/main.js"]
     environment:
       PORT: ${PORT:-5001}
       NODE_ENV: ${NODE_ENV:-production}
@@ -67,6 +68,7 @@ services:
       REDIS_CONNECT_TIMEOUT_MS: ${REDIS_CONNECT_TIMEOUT_MS:-3000}
       REDIS_COMMAND_TIMEOUT_MS: ${REDIS_COMMAND_TIMEOUT_MS:-1500}
       DASHBOARD_CACHE_TTL_SECONDS: ${DASHBOARD_CACHE_TTL_SECONDS:-60}
+      METRICS_TOKEN: ${METRICS_TOKEN:?METRICS_TOKEN is required}
     depends_on:
       mysql:
         condition: service_healthy
