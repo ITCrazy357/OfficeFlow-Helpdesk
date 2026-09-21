@@ -12,6 +12,7 @@ export type ApiErrorResponse = {
   message?: string;
   error?: unknown;
   errors?: unknown;
+  requestId?: string;
 };
 
 export type Pagination = {

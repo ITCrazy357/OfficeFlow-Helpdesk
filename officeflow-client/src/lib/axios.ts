@@ -112,19 +112,53 @@ api.interceptors.response.use(
   },
 );
 
+// Use the backend's identifier, never an outgoing/client-generated value.
+export function getApiRequestId(error: unknown): string | undefined {
+  if (!axios.isAxiosError<ApiErrorResponse>(error)) return undefined;
+
+  const headers = error.response?.headers;
+  const candidates: unknown[] = [
+    headers instanceof axios.AxiosHeaders
+      ? headers.get("x-request-id")
+      : headers?.["x-request-id"],
+    error.response?.data?.requestId,
+  ];
+  return candidates.find(
+    (value): value is string =>
+      typeof value === "string" &&
+      /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i.test(
+        value,
+      ),
+  );
+}
+
 export function getApiErrorMessage(
   error: unknown,
   fallback = "Đã xảy ra lỗi. Vui lòng thử lại.",
 ) {
   if (axios.isAxiosError<ApiErrorResponse>(error)) {
+    // Keep 4xx messages unchanged: feature-level translators match those strings.
+    const requestId =
+      error.response &&
+      error.response.status >= 500 &&
+      error.response.status < 600
+        ? getApiRequestId(error)
+        : undefined;
+    const withRequestId = (message: string) =>
+      requestId ? `${message} (Mã yêu cầu: ${requestId})` : message;
+
     if (
       error.code === "ECONNABORTED" ||
       error.message.toLowerCase().includes("timeout")
     ) {
-      return "Máy chủ đang khởi động, vui lòng thử lại sau ít giây.";
+      return withRequestId(
+        "Máy chủ đang khởi động, vui lòng thử lại sau ít giây.",
+      );
     }
 
-    return error.response?.data?.message || error.message || fallback;
+    return withRequestId(
+      error.response?.data?.message || error.message || fallback,
+    );
   }
 
   if (error instanceof Error) {
