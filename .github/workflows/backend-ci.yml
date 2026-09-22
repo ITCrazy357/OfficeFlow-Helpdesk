@@ -11,6 +11,7 @@ on:
     paths:
       - "officeflow-nest-server/**"
       - ".github/workflows/backend-ci.yml"
+      - ".gitleaksignore"
 
   workflow_dispatch:
 
@@ -83,7 +84,7 @@ jobs:
 
       - name: Upload coverage report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: backend-coverage
           path: officeflow-nest-server/coverage
@@ -122,13 +123,14 @@ jobs:
         run: npm audit --omit=dev --audit-level=high
       - name: Scan all Git history for secrets (redacted output)
         run: >-
-          docker run --rm -v "$PWD:/repo:ro"
+          docker run --rm --network none -v "$PWD:/repo:ro"
           ghcr.io/gitleaks/gitleaks:v8.30.1
           git /repo --redact --no-banner --log-opts="--all" --exit-code=1
+          --gitleaks-ignore-path /repo/.gitleaksignore
       - name: Build backend image locally; do not push
         run: docker build -t officeflow-backend:ci officeflow-nest-server
       - name: Scan image OS and libraries
-        uses: aquasecurity/trivy-action@a9c7b0f06e461e9d4b4d1711f154ee024b8d7ab8 # v0.36.0
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
           image-ref: officeflow-backend:ci
           scanners: vuln
