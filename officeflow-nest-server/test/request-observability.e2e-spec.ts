@@ -84,7 +84,9 @@ describe('Request observability (HTTP)', () => {
     app.setGlobalPrefix('api');
     app.useGlobalInterceptors(new ResponseInterceptor(app.get(Reflector)));
     app.useGlobalFilters(new HttpExceptionFilter());
-    await app.init();
+    // Keep one listener alive for the whole suite. Otherwise Supertest owns the
+    // listener and can close it while concurrent requests are still in flight.
+    await app.listen(0, '127.0.0.1');
     server = app.getHttpServer() as Server;
   });
 
