@@ -1,7 +1,14 @@
-# Reviewed false positives only. Keep real historical JWT secrets detectable.
+# Exact historical fingerprints only; new secret findings remain blocking.
 # Deterministic hexadecimal fixture in the metrics-token validation test.
 ab55d88fafea34c92d24e746bba7d1bc3912507d:officeflow-nest-server/src/config/metrics-environment.validation.spec.ts:generic-api-key:15
 # Asset title ending in "Keys", followed by the AssetType enum ACCESSORY.
 9a80dcbb205beb7ec82e8fab069b27f0336bef58:officeflow-nest-server/officeflow-deploy.sql:generic-api-key:93
 # Placeholder token abc123def456 from the generated NestJS README badge.
 3ce18da3de246b33ebdb1aec16159d1d3017e8e1:officeflow-nest-server/README.md:generic-api-key:5
+
+# Retired JWT keys: owner confirmed rotation in local and Render environments
+# and a Render redeploy on 2026-09-22. Scope exceptions to these four occurrences.
+8193dc2015cc4d0e8b2dd552e92d2be04fe94118:officeflow-nest-server/docker-compose.nest.yml:generic-api-key:32
+8193dc2015cc4d0e8b2dd552e92d2be04fe94118:officeflow-nest-server/docker-compose.nest.yml:generic-api-key:33
+f46c67aa390077ef5f86b274108de0cfd9d0a8da:docker-compose.yml:generic-api-key:32
+f46c67aa390077ef5f86b274108de0cfd9d0a8da:docker-compose.yml:generic-api-key:33
