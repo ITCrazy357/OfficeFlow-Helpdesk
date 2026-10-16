@@ -1,10 +1,16 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
-import { TicketStatus } from '@prisma/client';
+import {
+  BadRequestException,
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
+import { TicketStatus, UserRole } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import type { CurrentUserPayload } from '../common/decorators/current-user.decorator';
 import {
   GetTicketsQueryDto,
   TicketSlaFilter,
+  TicketQueue,
 } from './dto/get-tickets-query.dto';
 import { TicketAccessPolicyService } from './ticket-access-policy.service';
 
@@ -27,6 +33,25 @@ export class TicketQueryService {
     const skip = (page - 1) * limit;
 
     const where = await this.access.getScope(currentUser);
+
+    if (query.queue && query.assignedToId) {
+      throw new BadRequestException('Use either queue or assignedToId');
+    }
+    if (query.activeOnly && query.status) {
+      throw new BadRequestException('Use either activeOnly or status');
+    }
+
+    if (query.queue === TicketQueue.MINE) {
+      where.assignedToId = currentUser.userId;
+    } else if (query.queue === TicketQueue.UNASSIGNED) {
+      where.assignedToId = null;
+    } else if (query.assignedToId) {
+      where.assignedToId = query.assignedToId;
+    }
+
+    if (query.activeOnly) {
+      where.status = { in: [TicketStatus.OPEN, TicketStatus.IN_PROGRESS] };
+    }
 
     if (query.status) {
       where.status = query.status;
@@ -173,6 +198,72 @@ export class TicketQueryService {
         totalItems,
         totalPages: Math.ceil(totalItems / limit),
       },
+    };
+  }
+
+  async getWorkload(currentUser: CurrentUserPayload) {
+    if (
+      currentUser.role !== UserRole.ADMIN &&
+      currentUser.role !== UserRole.IT_STAFF
+    ) {
+      throw new ForbiddenException('Forbidden');
+    }
+
+    const [users, counts] = await Promise.all([
+      this.prisma.user.findMany({
+        where: { role: { in: [UserRole.ADMIN, UserRole.IT_STAFF] } },
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          isActive: true,
+          isLocked: true,
+        },
+        orderBy: [{ name: 'asc' }, { id: 'asc' }],
+      }),
+      this.prisma.ticket.groupBy({
+        by: ['assignedToId', 'status'],
+        where: {
+          status: { in: [TicketStatus.OPEN, TicketStatus.IN_PROGRESS] },
+        },
+        _count: { id: true },
+      }),
+    ]);
+
+    const workload = new Map<
+      number,
+      { openTickets: number; inProgressTickets: number }
+    >();
+    let unassignedTickets = 0;
+    for (const count of counts) {
+      if (count.assignedToId === null) {
+        unassignedTickets += count._count.id;
+        continue;
+      }
+      const item = workload.get(count.assignedToId) ?? {
+        openTickets: 0,
+        inProgressTickets: 0,
+      };
+      if (count.status === TicketStatus.OPEN)
+        item.openTickets += count._count.id;
+      if (count.status === TicketStatus.IN_PROGRESS)
+        item.inProgressTickets += count._count.id;
+      workload.set(count.assignedToId, item);
+    }
+
+    return {
+      unassignedTickets,
+      items: users.map((user) => {
+        const counts = workload.get(user.id) ?? {
+          openTickets: 0,
+          inProgressTickets: 0,
+        };
+        return {
+          ...user,
+          ...counts,
+          totalTickets: counts.openTickets + counts.inProgressTickets,
+        };
+      }),
     };
   }
 

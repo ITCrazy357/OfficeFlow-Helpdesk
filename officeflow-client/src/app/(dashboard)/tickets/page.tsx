@@ -46,6 +46,8 @@ import {
 } from "@/features/tickets/components/ticket-badges";
 import { getTicketCategoryLabel } from "@/features/ticket-categories/constants";
 import { useTicketCategories } from "@/features/ticket-categories/hooks";
+import { useMe } from "@/features/auth/hooks";
+import { TicketWorkQueue } from "@/features/tickets/components/ticket-work-queue";
 import {
   getTicketDueAt,
   ticketSlaOptions,
@@ -64,7 +66,7 @@ import { getApiErrorMessage } from "@/lib/axios";
 
 const PAGE_SIZE = 10;
 
-type StatusFilter = "ALL" | TicketStatus;
+type StatusFilter = "ALL" | "ACTIVE" | TicketStatus;
 type PriorityFilter = "ALL" | TicketPriority;
 type SlaFilter = "ALL" | TicketSlaFilter;
 
@@ -85,11 +87,46 @@ function formatDateTime(value?: string | null) {
   }).format(date);
 }
 
-function TicketsTable({ tickets }: { tickets: Ticket[] }) {
+type TicketSelection = {
+  ids: number[];
+  disabled: boolean;
+  toggle: (id: number) => void;
+  toggleAll: () => void;
+};
+
+function isActiveTicket(ticket: Ticket) {
+  return ticket.status === "OPEN" || ticket.status === "IN_PROGRESS";
+}
+
+function TicketsTable({
+  tickets,
+  selection,
+}: {
+  tickets: Ticket[];
+  selection?: TicketSelection;
+}) {
+  const activeTickets = tickets.filter(isActiveTicket);
   return (
     <Table>
       <TableHeader>
         <TableRow>
+          {selection ? (
+            <TableHead className="w-10">
+              <input
+                type="checkbox"
+                aria-label="Chọn tất cả ticket đang cần xử lý trên trang"
+                className="size-4 cursor-pointer accent-teal-800"
+                checked={
+                  activeTickets.length > 0 &&
+                  activeTickets.every((ticket) =>
+                    selection.ids.includes(ticket.id),
+                  )
+                }
+                disabled={selection.disabled || activeTickets.length === 0}
+                onChange={selection.toggleAll}
+              />
+            </TableHead>
+          ) : null}
           <TableHead className="w-20">ID</TableHead>
           <TableHead>Tiêu đề</TableHead>
           <TableHead>Trạng thái</TableHead>
@@ -108,6 +145,18 @@ function TicketsTable({ tickets }: { tickets: Ticket[] }) {
             className="motion-row"
             style={{ "--motion-index": index } as CSSProperties}
           >
+            {selection ? (
+              <TableCell>
+                <input
+                  type="checkbox"
+                  aria-label={`Chọn ticket #${ticket.id}`}
+                  className="size-4 cursor-pointer accent-teal-800"
+                  checked={selection.ids.includes(ticket.id)}
+                  disabled={selection.disabled || !isActiveTicket(ticket)}
+                  onChange={() => selection.toggle(ticket.id)}
+                />
+              </TableCell>
+            ) : null}
             <TableCell className="font-medium">#{ticket.id}</TableCell>
             <TableCell className="min-w-72 max-w-sm whitespace-normal">
               <Link
@@ -149,38 +198,58 @@ function TicketsTable({ tickets }: { tickets: Ticket[] }) {
   );
 }
 
-function TicketsMobileList({ tickets }: { tickets: Ticket[] }) {
+function TicketsMobileList({
+  tickets,
+  selection,
+}: {
+  tickets: Ticket[];
+  selection?: TicketSelection;
+}) {
   return (
     <div className="grid gap-3 md:hidden">
       {tickets.map((ticket, index) => (
-        <Link
+        <div
           key={ticket.id}
-          href={`/tickets/${ticket.id}`}
           className="motion-card rounded-xl border bg-card p-4 shadow-sm"
           style={{ "--motion-index": index } as CSSProperties}
         >
-          <div className="flex items-start justify-between gap-3">
-            <div className="min-w-0">
-              <p className="text-xs font-medium text-muted-foreground">
-                #{ticket.id}
-              </p>
-              <h3 className="mt-1 line-clamp-2 font-semibold leading-snug">
-                {ticket.title}
-              </h3>
+          {selection ? (
+            <label className="mb-3 flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                className="size-4 accent-teal-800"
+                aria-label={`Chọn ticket #${ticket.id}`}
+                checked={selection.ids.includes(ticket.id)}
+                disabled={selection.disabled || !isActiveTicket(ticket)}
+                onChange={() => selection.toggle(ticket.id)}
+              />
+              Chọn ticket
+            </label>
+          ) : null}
+          <Link href={`/tickets/${ticket.id}`} className="block">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <p className="text-xs font-medium text-muted-foreground">
+                  #{ticket.id}
+                </p>
+                <h3 className="mt-1 line-clamp-2 font-semibold leading-snug">
+                  {ticket.title}
+                </h3>
+              </div>
+              <TicketStatusBadge status={ticket.status} />
             </div>
-            <TicketStatusBadge status={ticket.status} />
-          </div>
-          <p className="mt-3 line-clamp-2 text-sm leading-6 text-muted-foreground">
-            {ticket.description}
-          </p>
-          <div className="mt-4 flex flex-wrap items-center gap-2">
-            <TicketPriorityBadge priority={ticket.priority} />
-            <TicketSlaBadge ticket={ticket} />
-            <span className="text-xs text-muted-foreground">
-              Hạn: {formatDateTime(getTicketDueAt(ticket))}
-            </span>
-          </div>
-        </Link>
+            <p className="mt-3 line-clamp-2 text-sm leading-6 text-muted-foreground">
+              {ticket.description}
+            </p>
+            <div className="mt-4 flex flex-wrap items-center gap-2">
+              <TicketPriorityBadge priority={ticket.priority} />
+              <TicketSlaBadge ticket={ticket} />
+              <span className="text-xs text-muted-foreground">
+                Hạn: {formatDateTime(getTicketDueAt(ticket))}
+              </span>
+            </div>
+          </Link>
+        </div>
       ))}
     </div>
   );
@@ -206,27 +275,59 @@ function TicketsSkeleton() {
 }
 
 export default function TicketsPage() {
-  const [page, setPage] = useState(1);
+  const { data: user } = useMe();
+  const canManageQueue = user?.role === "ADMIN" || user?.role === "IT_STAFF";
+  const [page, setPageNumber] = useState(1);
   const [searchInput, setSearchInput] = useState("");
   const [keyword, setKeyword] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("ALL");
-  const [priorityFilter, setPriorityFilter] =
-    useState<PriorityFilter>("ALL");
+  const [priorityFilter, setPriorityFilter] = useState<PriorityFilter>("ALL");
   const [slaFilter, setSlaFilter] = useState<SlaFilter>("ALL");
   const [categoryFilter, setCategoryFilter] = useState("ALL");
+  const [assignmentFilter, setAssignmentFilter] = useState("ALL");
+  const [selection, setSelection] = useState<{ key: string; ids: number[] }>({
+    key: "",
+    ids: [],
+  });
+
+  function setPage(value: number | ((current: number) => number)) {
+    setPageNumber(value);
+    setSelection({ key: "", ids: [] });
+  }
 
   const params = useMemo<GetTicketsParams>(
     () => ({
       page,
       limit: PAGE_SIZE,
       keyword: keyword || undefined,
-      status: statusFilter === "ALL" ? undefined : statusFilter,
+      status:
+        statusFilter === "ALL" || statusFilter === "ACTIVE"
+          ? undefined
+          : statusFilter,
+      activeOnly: statusFilter === "ACTIVE" ? true : undefined,
+      queue:
+        canManageQueue &&
+        (assignmentFilter === "MINE" || assignmentFilter === "UNASSIGNED")
+          ? assignmentFilter
+          : undefined,
+      assignedToId:
+        canManageQueue && /^\d+$/.test(assignmentFilter)
+          ? Number(assignmentFilter)
+          : undefined,
       priority: priorityFilter === "ALL" ? undefined : priorityFilter,
       slaState: slaFilter === "ALL" ? undefined : slaFilter,
-      categoryId:
-        categoryFilter === "ALL" ? undefined : Number(categoryFilter),
+      categoryId: categoryFilter === "ALL" ? undefined : Number(categoryFilter),
     }),
-    [categoryFilter, keyword, page, priorityFilter, slaFilter, statusFilter],
+    [
+      assignmentFilter,
+      canManageQueue,
+      categoryFilter,
+      keyword,
+      page,
+      priorityFilter,
+      slaFilter,
+      statusFilter,
+    ],
   );
 
   const { data, error, isError, isFetching, isLoading, refetch } =
@@ -247,10 +348,37 @@ export default function TicketsPage() {
     setPriorityFilter("ALL");
     setSlaFilter("ALL");
     setCategoryFilter("ALL");
+    setAssignmentFilter("ALL");
     setPage(1);
   }
 
   const tickets = data?.items ?? [];
+  // Selections belong to the current filters and page, never to hidden results.
+  const selectionKey = JSON.stringify(params);
+  const selectedIds = selection.key === selectionKey ? selection.ids : [];
+  const selectedTickets = tickets.filter(
+    (ticket) => isActiveTicket(ticket) && selectedIds.includes(ticket.id),
+  );
+  const ticketSelection: TicketSelection | undefined = canManageQueue
+    ? {
+        ids: selectedTickets.map((ticket) => ticket.id),
+        disabled: isFetching,
+        toggle: (id) =>
+          setSelection({
+            key: selectionKey,
+            ids: selectedIds.includes(id)
+              ? selectedIds.filter((item) => item !== id)
+              : [...selectedIds, id],
+          }),
+        toggleAll: () => {
+          const ids = tickets.filter(isActiveTicket).map((ticket) => ticket.id);
+          setSelection({
+            key: selectionKey,
+            ids: ids.every((id) => selectedIds.includes(id)) ? [] : ids,
+          });
+        },
+      }
+    : undefined;
   const pagination = data?.pagination;
   const totalPages = Math.max(pagination?.totalPages ?? 1, 1);
   const currentPage = pagination?.page ?? page;
@@ -261,7 +389,8 @@ export default function TicketsPage() {
     statusFilter !== "ALL" ||
     priorityFilter !== "ALL" ||
     slaFilter !== "ALL" ||
-    categoryFilter !== "ALL";
+    categoryFilter !== "ALL" ||
+    assignmentFilter !== "ALL";
 
   return (
     <div className="grid gap-6 motion-enter">
@@ -273,7 +402,8 @@ export default function TicketsPage() {
           </div>
           <h1 className="text-2xl font-semibold tracking-normal">Tickets</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Quản lý yêu cầu hỗ trợ theo quyền, trạng thái, độ ưu tiên và hạn SLA.
+            Quản lý yêu cầu hỗ trợ theo quyền, trạng thái, độ ưu tiên và hạn
+            SLA.
           </p>
         </div>
 
@@ -284,6 +414,20 @@ export default function TicketsPage() {
           </Link>
         </Button>
       </section>
+
+      {canManageQueue ? (
+        <TicketWorkQueue
+          key={selectionKey}
+          filter={assignmentFilter}
+          selectedTickets={isError ? [] : selectedTickets}
+          onAssigned={() => setSelection({ key: selectionKey, ids: [] })}
+          onFilterChange={(filter) => {
+            setAssignmentFilter(filter);
+            setStatusFilter(filter === "ALL" ? "ALL" : "ACTIVE");
+            setPage(1);
+          }}
+        />
+      ) : null}
 
       <Card className="shadow-sm motion-panel">
         <CardHeader className="border-b">
@@ -324,6 +468,7 @@ export default function TicketsPage() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="ALL">Tất cả trạng thái</SelectItem>
+                <SelectItem value="ACTIVE">Đang cần xử lý</SelectItem>
                 {ticketStatusOptions.map((status) => (
                   <SelectItem key={status.value} value={status.value}>
                     {status.label}
@@ -383,10 +528,7 @@ export default function TicketsPage() {
                 <SelectContent>
                   <SelectItem value="ALL">Tất cả danh mục</SelectItem>
                   {categories.map((category) => (
-                    <SelectItem
-                      key={category.id}
-                      value={String(category.id)}
-                    >
+                    <SelectItem key={category.id} value={String(category.id)}>
                       {getTicketCategoryLabel(category.name)}
                     </SelectItem>
                   ))}
@@ -445,7 +587,10 @@ export default function TicketsPage() {
               <div>
                 <CardTitle>Không thể tải danh sách tickets</CardTitle>
                 <CardDescription className="mt-1">
-                  {getApiErrorMessage(error, "Không thể tải danh sách tickets.")}
+                  {getApiErrorMessage(
+                    error,
+                    "Không thể tải danh sách tickets.",
+                  )}
                 </CardDescription>
               </div>
               <Button type="button" variant="outline" onClick={() => refetch()}>
@@ -473,9 +618,12 @@ export default function TicketsPage() {
             {tickets.length > 0 ? (
               <>
                 <div className="hidden md:block">
-                  <TicketsTable tickets={tickets} />
+                  <TicketsTable tickets={tickets} selection={ticketSelection} />
                 </div>
-                <TicketsMobileList tickets={tickets} />
+                <TicketsMobileList
+                  tickets={tickets}
+                  selection={ticketSelection}
+                />
               </>
             ) : (
               <div className="grid min-h-72 place-items-center px-4 text-center">

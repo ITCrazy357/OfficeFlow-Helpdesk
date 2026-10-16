@@ -1,6 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { assetsQueryKeys } from "@/features/assets/hooks";
 import {
+  bulkAssignTicketsApi,
+  getTicketWorkloadApi,
   addTicketCommentApi,
   assignTicketApi,
   createTicketApi,
@@ -42,7 +44,25 @@ export const ticketsQueryKeys = {
   history: (id: number) => [...ticketsQueryKeys.detail(id), "history"] as const,
   attachments: (id: number) =>
     [...ticketsQueryKeys.detail(id), "attachments"] as const,
+  workload: () => [...ticketsQueryKeys.all, "workload"] as const,
 };
+
+export function useTicketWorkload(enabled = true) {
+  return useQuery({
+    queryKey: ticketsQueryKeys.workload(),
+    queryFn: getTicketWorkloadApi,
+    enabled,
+  });
+}
+
+export function useBulkAssignTickets() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: bulkAssignTicketsApi,
+    onSettled: () =>
+      queryClient.invalidateQueries({ queryKey: ticketsQueryKeys.all }),
+  });
+}
 
 export function useTickets(params: GetTicketsParams = {}) {
   return useQuery({
@@ -117,6 +137,7 @@ export function useCreateTicket() {
       queryClient.invalidateQueries({ queryKey: ticketsQueryKeys.lists() });
       queryClient.invalidateQueries({ queryKey: ["dashboard"] });
       queryClient.setQueryData(ticketsQueryKeys.detail(ticket.id), ticket);
+      queryClient.invalidateQueries({ queryKey: ticketsQueryKeys.workload() });
     },
   });
 }
@@ -157,6 +178,7 @@ export function useUpdateTicketStatus() {
         queryClient.invalidateQueries({ queryKey: ["users"] }),
       ]),
     onSuccess: (ticket, variables) => {
+      queryClient.invalidateQueries({ queryKey: ticketsQueryKeys.workload() });
       queryClient.invalidateQueries({ queryKey: ticketsQueryKeys.lists() });
       queryClient.invalidateQueries({ queryKey: ["dashboard"] });
       queryClient.invalidateQueries({
@@ -181,6 +203,7 @@ export function useAssignTicket() {
         queryClient.invalidateQueries({ queryKey: ["users"] }),
       ]),
     onSuccess: (ticket, variables) => {
+      queryClient.invalidateQueries({ queryKey: ticketsQueryKeys.workload() });
       queryClient.invalidateQueries({ queryKey: ticketsQueryKeys.lists() });
       queryClient.invalidateQueries({
         queryKey: ticketsQueryKeys.history(variables.id),
@@ -196,6 +219,7 @@ export function useDeleteTicket() {
   return useMutation({
     mutationFn: (id: number) => deleteTicketApi(id),
     onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ticketsQueryKeys.workload() });
       queryClient.invalidateQueries({ queryKey: ticketsQueryKeys.lists() });
       queryClient.invalidateQueries({ queryKey: ["dashboard"] });
     },

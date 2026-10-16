@@ -1,20 +1,12 @@
 import type { AssetStatus, AssetType } from "@/features/assets/types";
 
 export type TicketStatus =
-  | "OPEN"
-  | "IN_PROGRESS"
-  | "RESOLVED"
-  | "CLOSED"
-  | "CANCELLED";
+  "OPEN" | "IN_PROGRESS" | "RESOLVED" | "CLOSED" | "CANCELLED";
 
 export type TicketPriority = "LOW" | "MEDIUM" | "HIGH" | "URGENT";
 
 export type TicketSlaState =
-  | "NO_DEADLINE"
-  | "ON_TRACK"
-  | "DUE_SOON"
-  | "OVERDUE"
-  | "DONE";
+  "NO_DEADLINE" | "ON_TRACK" | "DUE_SOON" | "OVERDUE" | "DONE";
 
 export type TicketSlaFilter = Extract<
   TicketSlaState,
@@ -71,6 +63,9 @@ export type TicketAsset = {
 };
 
 export type GetTicketsParams = {
+  queue?: "MINE" | "UNASSIGNED";
+  assignedToId?: number;
+  activeOnly?: boolean;
   page?: number;
   limit?: number;
   keyword?: string;
@@ -96,6 +91,29 @@ export type UpdateTicketStatusInput = {
 
 export type AssignTicketInput = {
   assignedToId: number;
+};
+
+export type BulkAssignTicketsInput = {
+  ticketIds: number[];
+  assignedToId: number;
+};
+export type BulkAssignTicketsResult = {
+  assignedCount: number;
+  unchangedCount: number;
+};
+
+export type TicketWorkload = {
+  unassignedTickets: number;
+  items: Array<{
+    id: number;
+    name: string;
+    email: string;
+    isActive: boolean;
+    isLocked: boolean;
+    openTickets: number;
+    inProgressTickets: number;
+    totalTickets: number;
+  }>;
 };
 
 export type LinkTicketAssetInput = {
