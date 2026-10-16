@@ -19,6 +19,8 @@ import { AuditLogsService } from '../audit-logs/audit-logs.service';
 import { CloudinaryService } from '../cloudinary/cloudinary.service';
 import { OutboxService } from '../outbox/outbox.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { SlaPolicyService } from '../sla/sla-policy.service';
+import { DEFAULT_SLA_POLICY } from '../sla/sla-policy';
 
 const mockTransaction = {
   user: { findUnique: jest.fn() },
@@ -108,6 +110,12 @@ describe('TicketsService', () => {
         TicketAttachmentService,
         TicketCommentService,
         {
+          provide: SlaPolicyService,
+          useValue: {
+            get: () => Promise.resolve({ config: DEFAULT_SLA_POLICY }),
+          },
+        },
+        {
           provide: PrismaService,
           useValue: mockPrismaService,
         },
@@ -166,10 +174,9 @@ describe('TicketsService', () => {
     });
   });
 
-  it('should apply distinct SLA filters using the 24-hour threshold', async () => {
+  it('applies distinct SLA filters using the saved warning time', async () => {
     jest.useFakeTimers();
     const now = new Date('2026-07-31T08:00:00.000Z');
-    const dueSoonAt = new Date('2026-08-01T08:00:00.000Z');
     jest.setSystemTime(now);
     mockPrismaService.ticket.findMany.mockResolvedValue([]);
     mockPrismaService.ticket.count.mockResolvedValue(0);
@@ -200,8 +207,8 @@ describe('TicketsService', () => {
           },
           dueAt: {
             gt: now,
-            lte: dueSoonAt,
           },
+          resolutionWarningAt: { lte: now },
         },
       });
 
@@ -229,8 +236,12 @@ describe('TicketsService', () => {
             ],
           },
           dueAt: {
-            gt: dueSoonAt,
+            gt: now,
           },
+          OR: [
+            { resolutionWarningAt: null },
+            { resolutionWarningAt: { gt: now } },
+          ],
         },
       });
 

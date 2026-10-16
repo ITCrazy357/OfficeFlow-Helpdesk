@@ -5,6 +5,7 @@ import {
   Boxes,
   Building2,
   CalendarRange,
+  Clock3,
   CircleCheck,
   LayoutDashboard,
   ScrollText,
@@ -90,6 +91,13 @@ const navigationItems: NavigationItem[] = [
     label: "Audit Logs",
     description: "Nhật ký hệ thống",
     icon: ScrollText,
+    roles: ["ADMIN"],
+  },
+  {
+    href: "/sla",
+    label: "Chính sách SLA",
+    description: "Lịch và thời hạn hỗ trợ",
+    icon: Clock3,
     roles: ["ADMIN"],
   },
 ];

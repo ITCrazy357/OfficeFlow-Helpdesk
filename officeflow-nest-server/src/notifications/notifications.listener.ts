@@ -10,10 +10,39 @@ import { TicketAssignedEvent } from './events/ticket-assigned.event';
 import { TicketCommentedEvent } from './events/ticket-commented.event';
 import { TicketOverdueEvent } from './events/ticket-overdue.event';
 import { TicketStatusChangedEvent } from './events/ticket-status-changed.event';
+import {
+  formatSlaDeadline,
+  type TicketSlaAlertEvent,
+} from './events/ticket-sla-alert.event';
 
 @Injectable()
 export class NotificationsListener {
   constructor(private readonly notificationsService: NotificationsService) {}
+
+  @OnEvent('ticket.sla_alert', { suppressErrors: false })
+  async handleTicketSlaAlert(event: TicketSlaAlertEvent) {
+    const milestone =
+      event.milestone === 'RESPONSE' ? 'phản hồi đầu tiên' : 'xử lý';
+    const title =
+      event.kind === 'WARNING'
+        ? 'Ticket sắp quá hạn SLA'
+        : event.kind === 'ESCALATED'
+          ? 'Ticket cần quản lý hỗ trợ'
+          : 'Ticket quá hạn phản hồi';
+    await this.notificationsService.createdMany({
+      userIds: event.recipientIds,
+      type:
+        event.kind === 'ESCALATED'
+          ? NotificationType.TICKET_SLA_ESCALATED
+          : event.kind === 'WARNING'
+            ? NotificationType.TICKET_SLA_WARNING
+            : NotificationType.TICKET_RESPONSE_OVERDUE,
+      title,
+      message: `${title}: "${event.ticketTitle}" (hạn ${milestone}: ${formatSlaDeadline(event.dueAt)} giờ Việt Nam).`,
+      targetUrl: `/tickets/${event.ticketId}`,
+      sourceEventId: event.outboxEventId,
+    });
+  }
 
   @OnEvent('ticket.assigned', { suppressErrors: false })
   async handleTicketAssignedEvent(

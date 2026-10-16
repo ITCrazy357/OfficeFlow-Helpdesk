@@ -7,6 +7,7 @@ export const OUTBOX_EVENT_TYPES = {
   TICKET_STATUS_CHANGED: 'ticket.status_changed',
   TICKET_RESOLVED: 'ticket.resolved',
   TICKET_OVERDUE: 'ticket.overdue',
+  TICKET_SLA_ALERT: 'ticket.sla_alert',
   ASSET_ASSIGNED: 'asset.assigned',
   ASSET_RETURNED: 'asset.returned',
   LEAVE_REQUESTED: 'leave.requested',
@@ -23,6 +24,14 @@ export type OutboxEventType =
   (typeof OUTBOX_EVENT_TYPES)[keyof typeof OUTBOX_EVENT_TYPES];
 
 export type OutboxEventPayloadByType = {
+  [OUTBOX_EVENT_TYPES.TICKET_SLA_ALERT]: {
+    ticketId: number;
+    ticketTitle: string;
+    milestone: 'RESPONSE' | 'RESOLUTION';
+    kind: 'WARNING' | 'BREACHED' | 'ESCALATED';
+    dueAt: string;
+    recipientIds: number[];
+  };
   [OUTBOX_EVENT_TYPES.TICKET_CREATED]: {
     ticketId: number;
   };

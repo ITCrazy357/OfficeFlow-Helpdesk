@@ -51,6 +51,7 @@ function getInitials(name: string) {
 }
 
 function getCurrentPageLabel(pathname: string) {
+  if (pathname === "/sla") return "Chính sách SLA";
   if (pathname.startsWith("/leave-requests/")) {
     return pathname.endsWith("/new")
       ? "Tạo đơn nghỉ phép"

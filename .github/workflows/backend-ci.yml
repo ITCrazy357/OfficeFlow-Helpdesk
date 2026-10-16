@@ -129,6 +129,29 @@ jobs:
           --gitleaks-ignore-path /repo/.gitleaksignore
       - name: Build backend image locally; do not push
         run: docker build -t officeflow-backend:ci officeflow-nest-server
+      - name: Verify migrations packaged in backend image
+        run: |
+          docker run --rm --network none --entrypoint node \
+            -v "$PWD/officeflow-nest-server/src/prisma/migrations:/expected-migrations:ro" \
+            officeflow-backend:ci -e '
+              const assert = require("node:assert/strict");
+              const fs = require("node:fs");
+              const path = require("node:path");
+              const expected = "/expected-migrations";
+              const actual = "/app/src/prisma/migrations";
+              const migrations = fs.readdirSync(expected, { withFileTypes: true })
+                .filter((entry) => entry.isDirectory());
+              assert.ok(migrations.length, "No source migrations found");
+              for (const migration of migrations) {
+                const file = path.join(migration.name, "migration.sql");
+                assert.deepEqual(
+                  fs.readFileSync(path.join(actual, file)),
+                  fs.readFileSync(path.join(expected, file)),
+                  "Missing or changed image migration: " + file,
+                );
+              }
+              console.log("Verified " + migrations.length + " packaged migrations");
+            '
       - name: Scan image OS and libraries
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
@@ -216,9 +239,11 @@ jobs:
 
               if [ "${deployed_commit}" = "${GITHUB_SHA}" ]; then
                 echo "Production is healthy on commit ${GITHUB_SHA}"
-                echo "### Backend production deployment" >> "${GITHUB_STEP_SUMMARY}"
-                echo "- Commit: \`${GITHUB_SHA}\`" >> "${GITHUB_STEP_SUMMARY}"
-                echo "- Database health check: passed" >> "${GITHUB_STEP_SUMMARY}"
+                {
+                  echo "### Backend production deployment"
+                  echo "- Commit: \`${GITHUB_SHA}\`"
+                  echo "- Database health check: passed"
+                } >> "${GITHUB_STEP_SUMMARY}"
                 exit 0
               fi
 

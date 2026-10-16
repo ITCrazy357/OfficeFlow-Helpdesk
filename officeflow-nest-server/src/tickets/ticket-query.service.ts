@@ -14,7 +14,6 @@ import {
 } from './dto/get-tickets-query.dto';
 import { TicketAccessPolicyService } from './ticket-access-policy.service';
 
-const SLA_DUE_SOON_HOURS = 24;
 const TERMINAL_TICKET_STATUSES = [
   TicketStatus.RESOLVED,
   TicketStatus.CLOSED,
@@ -67,9 +66,6 @@ export class TicketQueryService {
 
     if (query.slaState) {
       const now = new Date();
-      const dueSoonAt = new Date(
-        now.getTime() + SLA_DUE_SOON_HOURS * 60 * 60 * 1000,
-      );
 
       if (query.slaState === TicketSlaFilter.OVERDUE) {
         where.AND = {
@@ -98,8 +94,8 @@ export class TicketQueryService {
           },
           dueAt: {
             gt: now,
-            lte: dueSoonAt,
           },
+          resolutionWarningAt: { lte: now },
         };
       }
 
@@ -110,8 +106,12 @@ export class TicketQueryService {
             notIn: TERMINAL_TICKET_STATUSES,
           },
           dueAt: {
-            gt: dueSoonAt,
+            gt: now,
           },
+          OR: [
+            { resolutionWarningAt: null },
+            { resolutionWarningAt: { gt: now } },
+          ],
         };
       }
     } else if (typeof query.isOverdue === 'boolean') {
@@ -119,6 +119,16 @@ export class TicketQueryService {
     }
 
     if (query.keyword) {
+      // Preserve manager escalation scope when search adds its own OR clause.
+      if (where.OR)
+        where.AND = [
+          ...(Array.isArray(where.AND)
+            ? where.AND
+            : where.AND
+              ? [where.AND]
+              : []),
+          { OR: where.OR },
+        ];
       where.OR = [
         {
           title: {
@@ -150,6 +160,10 @@ export class TicketQueryService {
           dueAt: true,
           resolveAt: true,
           isOverdue: true,
+          firstResponseDueAt: true,
+          firstRespondedAt: true,
+          firstResponseOverdue: true,
+          resolutionWarningAt: true,
           createdAt: true,
           updatedAt: true,
           createdBy: {
@@ -279,6 +293,10 @@ export class TicketQueryService {
         dueAt: true,
         resolveAt: true,
         isOverdue: true,
+        firstResponseDueAt: true,
+        firstRespondedAt: true,
+        firstResponseOverdue: true,
+        resolutionWarningAt: true,
         createdById: true,
         createdAt: true,
         updatedAt: true,
@@ -331,12 +349,17 @@ export class TicketQueryService {
       dueAt: ticket.dueAt,
       resolveAt: ticket.resolveAt,
       isOverdue: ticket.isOverdue,
+      firstResponseDueAt: ticket.firstResponseDueAt,
+      firstRespondedAt: ticket.firstRespondedAt,
+      firstResponseOverdue: ticket.firstResponseOverdue,
+      resolutionWarningAt: ticket.resolutionWarningAt,
       createdAt: ticket.createdAt,
       updatedAt: ticket.updatedAt,
       createdBy: {
         id: ticket.createdBy.id,
         name: ticket.createdBy.name,
         email: ticket.createdBy.email,
+        departmentId: ticket.createdBy.departmentId,
       },
       assignedTo: ticket.assignedTo,
       category: ticket.category,

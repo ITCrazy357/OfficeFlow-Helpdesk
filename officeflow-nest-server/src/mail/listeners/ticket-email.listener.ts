@@ -12,6 +12,8 @@ import { ticketAssignedEmailTemplate } from '../templates/ticket-assigned-email.
 import { ticketCreatedEmailTemplate } from '../templates/ticket-created-email.template';
 import { ticketOverdueEmailTemplate } from '../templates/ticket-overdue-email.template';
 import { ticketResolvedEmailTemplate } from '../templates/ticket-resolved-email.template';
+import type { TicketSlaAlertEvent } from '../../notifications/events/ticket-sla-alert.event';
+import { ticketSlaAlertEmailTemplate } from '../templates/ticket-sla-alert-email.template';
 
 @Injectable()
 export class TicketEmailListener {
@@ -21,6 +23,35 @@ export class TicketEmailListener {
     private readonly prisma: PrismaService,
     private readonly mailService: MailService,
   ) {}
+
+  @OnEvent('ticket.sla_alert', { suppressErrors: false })
+  async handleTicketSlaAlert(event: TicketSlaAlertEvent) {
+    if (!this.mailService.isEnabled()) return;
+    const recipients = await this.prisma.user.findMany({
+      where: {
+        id: { in: [...new Set(event.recipientIds)] },
+        isActive: true,
+        isLocked: false,
+      },
+      select: { id: true, name: true, email: true },
+    });
+    const failures: number[] = [];
+    for (const recipient of recipients) {
+      const email = ticketSlaAlertEmailTemplate(
+        event,
+        recipient.name,
+        this.getFrontendUrl(`/tickets/${event.ticketId}`),
+      );
+      try {
+        await this.mailService.sendEmail({ to: recipient.email, ...email });
+      } catch (error) {
+        this.logError(`ticket-sla recipient ${recipient.id}`, error);
+        failures.push(recipient.id);
+      }
+    }
+    if (failures.length)
+      throw new Error(`SLA email failed for recipients ${failures.join(',')}`);
+  }
 
   @OnEvent('ticket.created', {
     suppressErrors: false,

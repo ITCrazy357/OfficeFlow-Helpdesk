@@ -11,9 +11,10 @@ import { TicketQueryService } from './ticket-query.service';
 import { TicketWorkflowService } from './ticket-workflow.service';
 import { TicketAttachmentService } from './ticket-attachment.service';
 import { TicketCommentService } from './ticket-comment.service';
+import { SlaModule } from '../sla/sla.module';
 
 @Module({
-  imports: [AuthModule, CloudinaryModule, AuditLogsModule],
+  imports: [AuthModule, CloudinaryModule, AuditLogsModule, SlaModule],
   controllers: [TicketsController],
   providers: [
     TicketsService,

@@ -44,6 +44,9 @@ enum NotificationType {
   TICKET_COMMENTED
   TICKET_STATUS_CHANGED
   TICKET_OVERDUE
+  TICKET_SLA_WARNING
+  TICKET_RESPONSE_OVERDUE
+  TICKET_SLA_ESCALATED
   KNOWLEDGE_PUBLISHED
   ASSET_ASSIGNED
   ASSET_RETURNED
@@ -80,6 +83,7 @@ enum AuditLogEntity {
   KNOWLEDGE_ARTICLE
   ASSET
   LEAVE_REQUEST
+  SLA_POLICY
 }
 
 enum AuditLogAction {
@@ -264,6 +268,14 @@ model Ticket {
   resolveAt DateTime? // Thòi điểm xủ lý xong
   isOverdue Boolean   @default(false) // Đã quá hạn hay chưa
 
+  slaPolicy            Json?
+  firstResponseDueAt   DateTime?
+  firstRespondedAt     DateTime?
+  firstResponseOverdue Boolean    @default(false)
+  responseWarningAt    DateTime?
+  resolutionWarningAt  DateTime?
+  slaAlerts            SlaAlert[]
+
   createdById Int
   createdBy   User @relation("TicketCreator", fields: [createdById], references: [id])
 
@@ -294,7 +306,33 @@ model Ticket {
   @@index([createdById])
   @@index([categoryId])
   @@index([assetId])
+  @@index([status, isOverdue, dueAt])
+  @@index([status, firstRespondedAt, firstResponseDueAt])
+  @@index([status, responseWarningAt])
+  @@index([status, resolutionWarningAt])
   @@map("Tickets")
+}
+
+model SlaPolicy {
+  id        Int      @id @default(1)
+  config    Json
+  version   Int      @default(1)
+  updatedAt DateTime @updatedAt
+
+  @@map("Sla_policies")
+}
+
+model SlaAlert {
+  id        Int      @id @default(autoincrement())
+  ticketId  Int
+  ticket    Ticket   @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  milestone String   @db.VarChar(16)
+  kind      String   @db.VarChar(16)
+  managerId Int?
+  createdAt DateTime @default(now())
+
+  @@unique([ticketId, milestone, kind])
+  @@map("Sla_alerts")
 }
 
 model TicketComment {

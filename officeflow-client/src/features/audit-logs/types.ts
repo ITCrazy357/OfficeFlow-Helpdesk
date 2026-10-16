@@ -7,7 +7,8 @@ export type AuditLogEntity =
   | "TICKET"
   | "KNOWLEDGE_ARTICLE"
   | "ASSET"
-  | "LEAVE_REQUEST";
+  | "LEAVE_REQUEST"
+  | "SLA_POLICY";
 
 export type AuditLogAction =
   | "CREATE"

@@ -33,10 +33,7 @@ export function TicketStatusBadge({ status }: { status: TicketStatus }) {
   const meta = getStatusMeta(status);
 
   return (
-    <Badge
-      variant="outline"
-      className={cn("motion-badge", meta?.className)}
-    >
+    <Badge variant="outline" className={cn("motion-badge", meta?.className)}>
       {meta?.label ?? status}
     </Badge>
   );
@@ -50,10 +47,7 @@ export function TicketPriorityBadge({
   const meta = getPriorityMeta(priority);
 
   return (
-    <Badge
-      variant="outline"
-      className={cn("motion-badge", meta?.className)}
-    >
+    <Badge variant="outline" className={cn("motion-badge", meta?.className)}>
       {meta?.label ?? priority}
     </Badge>
   );
@@ -63,18 +57,19 @@ export function TicketSlaBadge({
   ticket,
   state,
 }: {
-  ticket?: Pick<Ticket, "status" | "dueAt" | "dueDate" | "isOverdue">;
+  ticket?: Pick<
+    Ticket,
+    "status" | "dueAt" | "dueDate" | "isOverdue" | "resolutionWarningAt"
+  >;
   state?: TicketSlaState;
 }) {
-  const slaState = state ?? (ticket ? getTicketSlaState(ticket) : "NO_DEADLINE");
+  const slaState =
+    state ?? (ticket ? getTicketSlaState(ticket) : "NO_DEADLINE");
   const meta = getSlaMeta(slaState);
   const Icon = slaIcons[slaState];
 
   return (
-    <Badge
-      variant="outline"
-      className={cn("motion-badge", meta.className)}
-    >
+    <Badge variant="outline" className={cn("motion-badge", meta.className)}>
       <Icon className="size-3.5" />
       {meta.label}
     </Badge>

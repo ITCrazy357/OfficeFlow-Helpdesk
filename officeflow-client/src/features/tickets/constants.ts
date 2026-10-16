@@ -95,7 +95,10 @@ export function isTicketTerminal(status: TicketStatus) {
 }
 
 export function getTicketSlaState(
-  ticket: Pick<Ticket, "status" | "dueAt" | "dueDate" | "isOverdue">,
+  ticket: Pick<
+    Ticket,
+    "status" | "dueAt" | "dueDate" | "isOverdue" | "resolutionWarningAt"
+  >,
   now = new Date(),
 ): TicketSlaState {
   if (ticket.isOverdue) {
@@ -124,7 +127,12 @@ export function getTicketSlaState(
     return "OVERDUE";
   }
 
-  if (remainingMs <= SLA_SOON_THRESHOLD_MS) {
+  if (
+    ticket.resolutionWarningAt
+      ? new Date(ticket.resolutionWarningAt).getTime() <= now.getTime()
+      : ticket.resolutionWarningAt === undefined &&
+        remainingMs <= SLA_SOON_THRESHOLD_MS
+  ) {
     return "DUE_SOON";
   }
 
@@ -149,7 +157,7 @@ export function getSlaMeta(state: TicketSlaState) {
     DUE_SOON: {
       label: "Sắp quá hạn",
       className: "border-amber-200 bg-amber-50 text-amber-800",
-      description: "Ticket sắp chạm hạn SLA trong 24 giờ.",
+      description: "Ticket đã đến thời điểm cảnh báo trước hạn SLA.",
     },
     OVERDUE: {
       label: "Đã quá hạn",

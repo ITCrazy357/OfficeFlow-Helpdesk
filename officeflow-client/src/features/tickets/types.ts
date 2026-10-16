@@ -28,6 +28,7 @@ export type TicketUser = {
   name: string;
   email: string;
   role?: string;
+  departmentId?: number | null;
 };
 
 export type Ticket = {
@@ -40,6 +41,10 @@ export type Ticket = {
   dueDate?: string | null;
   resolveAt?: string | null;
   isOverdue?: boolean;
+  firstResponseDueAt?: string | null;
+  firstRespondedAt?: string | null;
+  firstResponseOverdue?: boolean;
+  resolutionWarningAt?: string | null;
   createdAt: string;
   updatedAt: string;
   createdBy?: TicketUser;

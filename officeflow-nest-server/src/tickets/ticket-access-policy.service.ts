@@ -11,6 +11,13 @@ import type { CurrentUserPayload } from '../common/decorators/current-user.decor
 export class TicketAccessPolicyService {
   constructor(private readonly prisma: PrismaService) {}
 
+  private escalatedScope(managerId: number): Prisma.TicketWhereInput {
+    return {
+      assignedTo: { managerId },
+      slaAlerts: { some: { kind: 'ESCALATED', managerId } },
+    };
+  }
+
   async getScope(
     currentUser: CurrentUserPayload,
   ): Promise<Prisma.TicketWhereInput> {
@@ -27,11 +34,15 @@ export class TicketAccessPolicyService {
       });
 
       if (!manager?.departmentId) {
-        where.createdById = currentUser.userId;
+        where.OR = [
+          { createdById: currentUser.userId },
+          this.escalatedScope(currentUser.userId),
+        ];
       } else {
-        where.createdBy = {
-          departmentId: manager.departmentId,
-        };
+        where.OR = [
+          { createdBy: { departmentId: manager.departmentId } },
+          this.escalatedScope(currentUser.userId),
+        ];
       }
     }
 
@@ -39,7 +50,11 @@ export class TicketAccessPolicyService {
   }
 
   async assertCanView(
-    ticket: { createdById: number; createdBy: { departmentId: number | null } },
+    ticket: {
+      id?: number;
+      createdById: number;
+      createdBy: { departmentId: number | null };
+    },
     currentUser: CurrentUserPayload,
   ): Promise<void> {
     if (
@@ -59,6 +74,16 @@ export class TicketAccessPolicyService {
         !manager?.departmentId ||
         ticket.createdBy.departmentId !== manager.departmentId
       ) {
+        if (
+          ticket.id &&
+          (await this.prisma.ticket.count({
+            where: {
+              id: ticket.id,
+              ...this.escalatedScope(currentUser.userId),
+            },
+          }))
+        )
+          return;
         throw new ForbiddenException('Forbidden');
       }
     }
@@ -102,11 +127,16 @@ export class TicketAccessPolicyService {
         select: { departmentId: true },
       });
 
-      if (!manager?.departmentId) {
-        throw new ForbiddenException('Forbidden');
-      }
-
-      if (ticket.createdBy.departmentId !== manager.departmentId) {
+      if (
+        !manager?.departmentId ||
+        ticket.createdBy.departmentId !== manager.departmentId
+      ) {
+        if (
+          await this.prisma.ticket.count({
+            where: { id: ticketId, ...this.escalatedScope(currentUser.userId) },
+          })
+        )
+          return ticket;
         throw new ForbiddenException('Forbidden');
       }
       return ticket;

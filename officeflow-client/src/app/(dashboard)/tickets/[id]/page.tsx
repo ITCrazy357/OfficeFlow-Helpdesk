@@ -47,6 +47,7 @@ import { useMe } from "@/features/auth/hooks";
 import type { AuthUser } from "@/features/auth/types";
 import { TicketAssetPanel } from "@/features/assets/components/ticket-asset-panel";
 import { useSuggestKnowledgeArticles } from "@/features/knowledge/hooks";
+import { TicketResponseSla } from "@/features/sla/components/ticket-response-sla";
 import {
   TicketPriorityBadge,
   TicketSlaBadge,
@@ -145,6 +146,13 @@ function canEditTicket(user: AuthUser | undefined, ticket: Ticket) {
 
   if (user.role === "IT_STAFF") {
     return !ticket.assignedTo || ticket.assignedTo.id === user.id;
+  }
+
+  if (user.role === "MANAGER") {
+    const departmentId = user.departmentId ?? user.department?.id;
+    return Boolean(
+      departmentId && ticket.createdBy?.departmentId === departmentId,
+    );
   }
 
   return true;
@@ -657,6 +665,7 @@ export default function TicketDetailPage() {
 
       <div className="grid gap-6 lg:grid-cols-[1fr_360px]">
         <div className="grid gap-6">
+          <TicketResponseSla ticket={ticket} />
           <Card className="shadow-sm motion-panel">
             <CardHeader className="border-b">
               <CardTitle>Mô tả yêu cầu</CardTitle>
