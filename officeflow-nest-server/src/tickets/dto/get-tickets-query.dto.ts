@@ -18,7 +18,34 @@ export enum TicketSlaFilter {
   OVERDUE = 'OVERDUE',
 }
 
+export enum TicketQueue {
+  MINE = 'MINE',
+  UNASSIGNED = 'UNASSIGNED',
+}
+
 export class GetTicketsQueryDto {
+  @ApiPropertyOptional({ enum: TicketQueue })
+  @IsOptional()
+  @IsEnum(TicketQueue)
+  queue?: TicketQueue;
+
+  @ApiPropertyOptional({ description: 'Filter by assigned user' })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  assignedToId?: number;
+
+  @ApiPropertyOptional({ description: 'Only OPEN and IN_PROGRESS tickets' })
+  @IsOptional()
+  @Transform(({ value }: { value: unknown }) => {
+    if (value === true || value === 'true') return true;
+    if (value === false || value === 'false') return false;
+    return value;
+  })
+  @IsBoolean()
+  activeOnly?: boolean;
+
   @ApiPropertyOptional({
     example: 1,
     description: 'Current page',

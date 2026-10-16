@@ -48,6 +48,7 @@ import { Roles } from '../common/decorators/roles.decorator';
 import { RolesGuard } from '../common/guards/roles.guard';
 
 import { AssignTicketDto } from './dto/assign-ticket.dto';
+import { BulkAssignTicketsDto } from './dto/bulk-assign-tickets.dto';
 import { CreateTicketCommentDto } from './dto/create-ticket-comment.dto';
 import { CreateTicketDto } from './dto/create-ticket.dto';
 import {
@@ -69,6 +70,27 @@ const MAX_ATTACHMENT_SIZE_IN_BYTES = 10 * 1024 * 1024;
 @Controller('tickets')
 export class TicketsController {
   constructor(private readonly ticketsService: TicketsService) {}
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.IT_STAFF)
+  @Get('workload')
+  @Message('Get ticket workload successfully')
+  @ApiOperation({ summary: 'Get active ticket counts for IT staff and admins' })
+  getWorkload(@CurrentUser() currentUser: CurrentUserPayload) {
+    return this.ticketsService.getWorkload(currentUser);
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.IT_STAFF)
+  @Patch('bulk-assign')
+  @Message('Assign tickets successfully')
+  @ApiOperation({ summary: 'Assign up to 10 active tickets atomically' })
+  bulkAssign(
+    @Body() dto: BulkAssignTicketsDto,
+    @CurrentUser() currentUser: CurrentUserPayload,
+  ) {
+    return this.ticketsService.bulkAssign(dto, currentUser);
+  }
 
   // Lấy ticket và các param
   @UseGuards(JwtAuthGuard)

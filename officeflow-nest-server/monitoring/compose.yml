@@ -19,6 +19,7 @@ services:
     ports: ['127.0.0.1:9093:9093']
     volumes:
       - ./secrets/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+      - ./secrets/gmail_app_password:/run/secrets/gmail_app_password:ro
       - alertmanager-data:/alertmanager
     command: ['--config.file=/etc/alertmanager/alertmanager.yml']
 volumes:

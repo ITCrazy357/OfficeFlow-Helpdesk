@@ -23,6 +23,7 @@ import { PrismaService } from '../prisma/prisma.service';
 const mockTransaction = {
   user: { findUnique: jest.fn() },
   ticket: {
+    findMany: jest.fn(),
     update: jest.fn(),
     delete: jest.fn(),
     findUnique: jest.fn(),
@@ -648,6 +649,91 @@ describe('TicketsService', () => {
       mockTransaction,
       expect.objectContaining({ type: 'ticket.assigned' }),
     );
+  });
+
+  it('bulk assigns changed tickets and skips tickets already assigned to the target', async () => {
+    mockTransaction.ticket.findMany.mockResolvedValue([
+      { id: 5, title: 'VPN', assignedToId: null, status: TicketStatus.OPEN },
+      {
+        id: 6,
+        title: 'Printer',
+        assignedToId: 3,
+        status: TicketStatus.IN_PROGRESS,
+      },
+    ]);
+    const result = await service.bulkAssign(
+      { ticketIds: [5, 6], assignedToId: 3 },
+      { userId: 1, role: UserRole.IT_STAFF },
+    );
+    expect(result).toEqual({ assignedCount: 1, unchangedCount: 1 });
+    expect(mockTransaction.ticket.update).toHaveBeenCalledTimes(1);
+    expect(mockTransaction.ticketHistory.create).toHaveBeenCalledTimes(1);
+    expect(mockAuditLogsService.create).toHaveBeenCalledTimes(1);
+    expect(mockOutboxService.enqueue).toHaveBeenCalledTimes(1);
+    expect(mockPrismaService.$transaction).toHaveBeenCalledWith(
+      expect.any(Function),
+      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+    );
+  });
+
+  it.each([TicketStatus.RESOLVED, TicketStatus.CLOSED, TicketStatus.CANCELLED])(
+    'rejects a batch containing a %s ticket before any writes',
+    async (status) => {
+      mockTransaction.ticket.findMany.mockResolvedValue([
+        { id: 5, title: 'VPN', assignedToId: null, status: TicketStatus.OPEN },
+        { id: 6, title: 'Done', assignedToId: null, status },
+      ]);
+      await expect(
+        service.bulkAssign(
+          { ticketIds: [5, 6], assignedToId: 3 },
+          { userId: 1, role: UserRole.ADMIN },
+        ),
+      ).rejects.toThrow('Only OPEN');
+      expect(mockTransaction.ticket.update).not.toHaveBeenCalled();
+      expect(mockOutboxService.enqueue).not.toHaveBeenCalled();
+    },
+  );
+
+  it('rejects a batch with a missing ticket before any writes', async () => {
+    mockTransaction.ticket.findMany.mockResolvedValue([]);
+    await expect(
+      service.bulkAssign(
+        { ticketIds: [5], assignedToId: 3 },
+        { userId: 1, role: UserRole.ADMIN },
+      ),
+    ).rejects.toThrow('no longer exist');
+    expect(mockTransaction.ticket.update).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    { isActive: false, isLocked: false, role: UserRole.IT_STAFF },
+    { isActive: true, isLocked: true, role: UserRole.IT_STAFF },
+    { isActive: true, isLocked: false, role: UserRole.EMPLOYEE },
+  ])(
+    'rejects a bulk assignment to an unavailable or ineligible user: %j',
+    async (state) => {
+      mockTransaction.ticket.findMany.mockResolvedValue([
+        { id: 5, title: 'VPN', assignedToId: null, status: TicketStatus.OPEN },
+      ]);
+      mockTransaction.user.findUnique.mockResolvedValue({ id: 3, ...state });
+      await expect(
+        service.bulkAssign(
+          { ticketIds: [5], assignedToId: 3 },
+          { userId: 1, role: UserRole.ADMIN },
+        ),
+      ).rejects.toThrow();
+      expect(mockTransaction.ticket.update).not.toHaveBeenCalled();
+    },
+  );
+
+  it('denies bulk assignment to employees', async () => {
+    await expect(
+      service.bulkAssign(
+        { ticketIds: [5], assignedToId: 3 },
+        { userId: 1, role: UserRole.EMPLOYEE },
+      ),
+    ).rejects.toThrow('Forbidden');
+    expect(mockPrismaService.$transaction).not.toHaveBeenCalled();
   });
 
   it('should create a comment and bounded history in one transaction', async () => {

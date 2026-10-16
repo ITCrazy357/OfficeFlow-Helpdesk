@@ -597,3 +597,62 @@ test("handoff form requires explicit selection and confirmation, blocks duplicat
     "changing selection requires fresh confirmation",
   );
 });
+
+test("ticket queue API preserves filters and sends one bulk assignment request", async () => {
+  const calls = [];
+  const workload = { items: [], unassignedTickets: 3 };
+  const result = { assignedCount: 2, unchangedCount: 0 };
+  const load = createSourceLoader({
+    "@/lib/axios": {
+      api: {
+        get: async (url, options) => {
+          calls.push(["get", url, options]);
+          return { data: { data: url.endsWith("workload") ? workload : { items: [], pagination: {} } } };
+        },
+        patch: async (url, body) => {
+          calls.push(["patch", url, body]);
+          return { data: { data: result } };
+        },
+      },
+    },
+  });
+  const api = load("features/tickets/api.ts");
+  const params = { queue: "UNASSIGNED", activeOnly: true, slaState: "DUE_SOON", page: 2 };
+  await api.getTicketsApi(params);
+  assert.deepEqual(await api.getTicketWorkloadApi(), workload);
+  const input = { ticketIds: [1, 2], assignedToId: 3 };
+  assert.deepEqual(await api.bulkAssignTicketsApi(input), result);
+  assert.deepEqual(calls, [
+    ["get", "/tickets", { params }],
+    ["get", "/tickets/workload", undefined],
+    ["patch", "/tickets/bulk-assign", input],
+  ]);
+});
+
+test("ticket mutations refresh workload and bulk assignment refreshes ticket data after failures too", async () => {
+  const invalidated = [];
+  const load = createSourceLoader({
+    "@tanstack/react-query": {
+      useMutation: (options) => options,
+      useQueryClient: () => ({
+        invalidateQueries: async ({ queryKey }) => invalidated.push(queryKey),
+        setQueryData() {},
+      }),
+    },
+    "@/features/assets/hooks": { assetsQueryKeys: { all: ["assets"] } },
+    "./api": {},
+  });
+  const hooks = load("features/tickets/hooks.ts");
+  for (const name of ["useCreateTicket", "useAssignTicket", "useUpdateTicketStatus", "useDeleteTicket"]) {
+    invalidated.length = 0;
+    hooks[name]().onSuccess({ id: 5 }, { id: 5 });
+    assert(invalidated.some((key) => JSON.stringify(key) === '["tickets","workload"]'), name);
+  }
+  const mutation = hooks.useBulkAssignTickets();
+  assert.equal(mutation.onMutate, undefined);
+  for (const error of [null, new Error("Conflict")]) {
+    invalidated.length = 0;
+    await mutation.onSettled(undefined, error);
+    assert.deepEqual(invalidated, [["tickets"]]);
+  }
+});

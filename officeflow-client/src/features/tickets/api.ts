@@ -1,6 +1,9 @@
 import { api } from "@/lib/axios";
 import type { ApiResponse, Pagination } from "@/types/api";
 import type {
+  BulkAssignTicketsInput,
+  BulkAssignTicketsResult,
+  TicketWorkload,
   CreateTicketCommentInput,
   CreateTicketInput,
   DeleteTicketAttachmentResponse,
@@ -22,6 +25,19 @@ type BackendTicketsData = {
   items?: Ticket[];
   pagination: Pagination;
 };
+
+export async function getTicketWorkloadApi() {
+  const res = await api.get<ApiResponse<TicketWorkload>>("/tickets/workload");
+  return res.data.data;
+}
+
+export async function bulkAssignTicketsApi(input: BulkAssignTicketsInput) {
+  const res = await api.patch<ApiResponse<BulkAssignTicketsResult>>(
+    "/tickets/bulk-assign",
+    input,
+  );
+  return res.data.data;
+}
 
 export async function getTicketsApi(params: GetTicketsParams = {}) {
   const res = await api.get<ApiResponse<BackendTicketsData>>("/tickets", {

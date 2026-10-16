@@ -18,6 +18,14 @@ export class TicketsService {
     return this.query.getTickets(...args);
   }
 
+  getWorkload(...args: Parameters<TicketQueryService['getWorkload']>) {
+    return this.query.getWorkload(...args);
+  }
+
+  bulkAssign(...args: Parameters<TicketWorkflowService['bulkAssign']>) {
+    return this.workflow.bulkAssign(...args);
+  }
+
   canGetById(...args: Parameters<TicketQueryService['canGetById']>) {
     return this.query.canGetById(...args);
   }

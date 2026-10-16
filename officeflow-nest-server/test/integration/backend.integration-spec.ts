@@ -154,6 +154,86 @@ describe('Real MySQL/Redis integration (disposable containers only)', () => {
     expect(await prisma.ticketHistory.count()).toBe(historyCount);
   });
 
+  it('bulk assignment commits once per changed ticket and updates queue/workload counts', async () => {
+    const first = await createTicket();
+    const second = await createTicket();
+    const before = await tickets.getWorkload(admin);
+    const input = {
+      ticketIds: [first.id, second.id],
+      assignedToId: admin.userId,
+    };
+    expect(await tickets.bulkAssign(input, admin)).toEqual({
+      assignedCount: 2,
+      unchangedCount: 0,
+    });
+    expect(await tickets.bulkAssign(input, admin)).toEqual({
+      assignedCount: 0,
+      unchangedCount: 2,
+    });
+    expect(
+      await prisma.ticketHistory.count({
+        where: { ticketId: { in: input.ticketIds }, action: 'ASSIGNED' },
+      }),
+    ).toBe(2);
+    const after = await tickets.getWorkload(admin);
+    expect(after.unassignedTickets).toBe(before.unassignedTickets - 2);
+    const activeCount = (data: typeof before) =>
+      data.items.find((item) => item.id === admin.userId)?.totalTickets ?? 0;
+    expect(activeCount(after)).toBe(activeCount(before) + 2);
+    const mine = await tickets.getTickets(admin, {
+      assignedToId: admin.userId,
+      activeOnly: true,
+    });
+    expect(mine.items.map((ticket) => ticket.id)).toEqual(
+      expect.arrayContaining(input.ticketIds),
+    );
+    const privateList = await tickets.getTickets(outsider, {
+      assignedToId: admin.userId,
+    });
+    expect(privateList.items.map((ticket) => ticket.id)).not.toEqual(
+      expect.arrayContaining(input.ticketIds),
+    );
+  });
+
+  it('rolls back the whole bulk assignment when the second event cannot be persisted', async () => {
+    const first = await createTicket();
+    const second = await createTicket();
+    const ids = [first.id, second.id];
+    const realOutbox = new OutboxService();
+    jest
+      .spyOn(outbox, 'enqueue')
+      .mockImplementationOnce((client, params) =>
+        realOutbox.enqueue(client, params),
+      )
+      .mockRejectedValueOnce(new Error('forced batch failure'));
+    await expect(
+      tickets.bulkAssign({ ticketIds: ids, assignedToId: admin.userId }, admin),
+    ).rejects.toThrow('forced batch failure');
+    expect(
+      await prisma.ticket.count({
+        where: { id: { in: ids }, assignedToId: null },
+      }),
+    ).toBe(2);
+    expect(
+      await prisma.ticketHistory.count({
+        where: { ticketId: { in: ids }, action: 'ASSIGNED' },
+      }),
+    ).toBe(0);
+    expect(
+      await prisma.auditLog.count({
+        where: { entity: 'TICKET', entityId: { in: ids }, action: 'ASSIGNED' },
+      }),
+    ).toBe(0);
+    expect(
+      await prisma.outboxEvent.count({
+        where: {
+          type: 'ticket.assigned',
+          payload: { path: '$.ticketId', equals: first.id },
+        },
+      }),
+    ).toBe(0);
+  });
+
   it('rolls back comments and history if event persistence fails', async () => {
     const ticket = await createTicket();
     jest

@@ -70,3 +70,11 @@ groups:
         for: 5m
         labels: { severity: warning }
         annotations: { summary: 'HTTP 5xx rate exceeds 5 percent' }
+      - alert: OfficeFlowTestAlert
+        expr: vector(1) == 0
+        for: 1m
+        labels:
+          severity: warning
+          environment: local-test
+        annotations:
+          summary: 'Thu gui canh bao OfficeFlow qua Gmail'
