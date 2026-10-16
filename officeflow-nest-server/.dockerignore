@@ -12,3 +12,5 @@ src/**/*.spec.ts
 .backups
 monitoring
 **/*.sql
+# Prisma needs migration SQL at runtime for start:deploy.
+!src/prisma/migrations/**/migration.sql

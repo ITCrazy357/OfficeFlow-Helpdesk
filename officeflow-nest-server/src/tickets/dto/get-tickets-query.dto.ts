@@ -119,7 +119,7 @@ export class GetTicketsQueryDto {
     enum: TicketSlaFilter,
     example: TicketSlaFilter.DUE_SOON,
     description:
-      'Filter active tickets by SLA state. DUE_SOON means due within 24 hours.',
+      'Filter tickets by SLA state. DUE_SOON uses the warning time saved with the ticket.',
   })
   @IsOptional()
   @IsEnum(TicketSlaFilter)

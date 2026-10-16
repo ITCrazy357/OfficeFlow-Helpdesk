@@ -238,6 +238,9 @@ export function useAddTicketComment() {
       input: CreateTicketCommentInput;
     }) => addTicketCommentApi(id, input),
     onSuccess: (comment, variables) => {
+      queryClient.invalidateQueries({
+        queryKey: ticketsQueryKeys.detail(variables.id),
+      });
       queryClient.setQueryData<TicketComment[]>(
         ticketsQueryKeys.comments(variables.id),
         (current) => (current ? [...current, comment] : [comment]),

@@ -4,7 +4,7 @@ import type { PrismaService } from '../prisma/prisma.service';
 
 describe('TicketAccessPolicyService', () => {
   const prisma = {
-    ticket: { findUnique: jest.fn() },
+    ticket: { findUnique: jest.fn(), count: jest.fn() },
     user: { findUnique: jest.fn() },
   };
   const service = new TicketAccessPolicyService(
@@ -15,6 +15,7 @@ describe('TicketAccessPolicyService', () => {
     jest.resetAllMocks();
     prisma.ticket.findUnique.mockResolvedValue(ticket);
     prisma.user.findUnique.mockResolvedValue({ departmentId: 7 });
+    prisma.ticket.count.mockResolvedValue(0);
   });
   it.each([UserRole.ADMIN, UserRole.IT_STAFF])(
     'allows %s to access a ticket without a department lookup',
@@ -60,6 +61,29 @@ describe('TicketAccessPolicyService', () => {
     prisma.user.findUnique.mockResolvedValue({ departmentId: null });
     await expect(
       service.getScope({ userId: 3, role: UserRole.MANAGER }),
-    ).resolves.toEqual({ createdById: 3 });
+    ).resolves.toEqual({
+      OR: [
+        { createdById: 3 },
+        {
+          assignedTo: { managerId: 3 },
+          slaAlerts: { some: { kind: 'ESCALATED', managerId: 3 } },
+        },
+      ],
+    });
+  });
+
+  it('allows an assigned staff manager to read an explicitly escalated ticket only', async () => {
+    prisma.user.findUnique.mockResolvedValue({ departmentId: 8 });
+    prisma.ticket.count.mockResolvedValue(1);
+    await expect(
+      service.canAccessTicket(1, { userId: 3, role: UserRole.MANAGER }),
+    ).resolves.toEqual(ticket);
+    expect(prisma.ticket.count).toHaveBeenCalledWith({
+      where: {
+        id: 1,
+        assignedTo: { managerId: 3 },
+        slaAlerts: { some: { kind: 'ESCALATED', managerId: 3 } },
+      },
+    });
   });
 });

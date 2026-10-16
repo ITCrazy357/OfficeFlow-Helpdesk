@@ -31,7 +31,8 @@ import { CreateTicketDto } from './dto/create-ticket.dto';
 import { UpdateTicketDto } from './dto/update-ticket.dto';
 import { UpdateTicketStatusDto } from './dto/update-ticket-status.dto';
 import { LinkTicketAssetDto } from './dto/link-ticket-asset.dto';
-import { calculateDueAt } from './ticket-sla.util';
+import { SlaPolicyService } from '../sla/sla-policy.service';
+import { calculateTicketDeadlines } from '../sla/sla-calendar';
 import { assertTicketStatusTransition } from './ticket-status.policy';
 import { TicketQueryService } from './ticket-query.service';
 import { createTicketHistory } from './ticket-history.util';
@@ -49,6 +50,10 @@ const ticketStatusSelect = {
   dueAt: true,
   resolveAt: true,
   isOverdue: true,
+  firstResponseDueAt: true,
+  firstRespondedAt: true,
+  firstResponseOverdue: true,
+  resolutionWarningAt: true,
   createdAt: true,
   updatedAt: true,
   createdBy: {
@@ -56,6 +61,7 @@ const ticketStatusSelect = {
       id: true,
       name: true,
       email: true,
+      departmentId: true,
     },
   },
   assignedTo: {
@@ -81,6 +87,7 @@ export class TicketWorkflowService {
     private readonly auditLogsService: AuditLogsService,
     private readonly outboxService: OutboxService,
     private readonly query: TicketQueryService,
+    private readonly slaPolicies: SlaPolicyService,
   ) {}
   private async ensureCategoryExists(categoryId?: number) {
     if (categoryId === undefined) {
@@ -107,7 +114,13 @@ export class TicketWorkflowService {
   ) {
     await this.ensureCategoryExists(createTicketDto.categoryId);
 
-    const dueAt = calculateDueAt(createTicketDto.priority);
+    const { config: slaPolicy } = await this.slaPolicies.get();
+    const createdAt = new Date();
+    const deadlines = calculateTicketDeadlines(
+      createdAt,
+      createTicketDto.priority ?? 'MEDIUM',
+      slaPolicy,
+    );
 
     const ticket = await this.prisma.$transaction(async (transaction) => {
       const ticket = await transaction.ticket.create({
@@ -117,25 +130,11 @@ export class TicketWorkflowService {
           priority: createTicketDto.priority,
           categoryId: createTicketDto.categoryId,
           createdById: currentUser.userId,
-          dueAt,
+          ...deadlines,
+          createdAt,
+          slaPolicy,
         },
-        select: {
-          id: true,
-          title: true,
-          description: true,
-          status: true,
-          priority: true,
-          dueAt: true,
-          resolveAt: true,
-          isOverdue: true,
-          createdAt: true,
-          category: {
-            select: {
-              id: true,
-              name: true,
-            },
-          },
-        },
+        select: ticketStatusSelect,
       });
 
       await createTicketHistory(transaction, {
@@ -260,38 +259,7 @@ export class TicketWorkflowService {
             priority: updateTicketDto.priority,
             categoryId: updateTicketDto.categoryId,
           },
-          select: {
-            id: true,
-            title: true,
-            description: true,
-            status: true,
-            priority: true,
-            dueAt: true,
-            resolveAt: true,
-            isOverdue: true,
-            createdAt: true,
-            updatedAt: true,
-            createdBy: {
-              select: {
-                id: true,
-                name: true,
-                email: true,
-              },
-            },
-            assignedTo: {
-              select: {
-                id: true,
-                name: true,
-                email: true,
-              },
-            },
-            category: {
-              select: {
-                id: true,
-                name: true,
-              },
-            },
-          },
+          select: ticketStatusSelect,
         });
 
         await createTicketHistory(transaction, {
@@ -414,6 +382,21 @@ export class TicketWorkflowService {
           data: {
             status: nextStatus,
             resolveAt,
+            // A resolution after the deadline is a breach even if the polling
+            // worker has not run yet. Reopening keeps the original commitment.
+            ...(resolveAt &&
+            !currentTicket.isOverdue &&
+            currentTicket.dueAt &&
+            resolveAt > currentTicket.dueAt
+              ? { isOverdue: true }
+              : {}),
+            ...(resolveAt &&
+            !currentTicket.firstResponseOverdue &&
+            !currentTicket.firstRespondedAt &&
+            currentTicket.firstResponseDueAt &&
+            resolveAt > currentTicket.firstResponseDueAt
+              ? { firstResponseOverdue: true }
+              : {}),
           },
         });
 
@@ -629,38 +612,7 @@ export class TicketWorkflowService {
       data: {
         assignedToId,
       },
-      select: {
-        id: true,
-        title: true,
-        description: true,
-        status: true,
-        priority: true,
-        dueAt: true,
-        resolveAt: true,
-        isOverdue: true,
-        createdAt: true,
-        updatedAt: true,
-        createdBy: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-          },
-        },
-        assignedTo: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-          },
-        },
-        category: {
-          select: {
-            id: true,
-            name: true,
-          },
-        },
-      },
+      select: ticketStatusSelect,
     });
 
     await createTicketHistory(transaction, {

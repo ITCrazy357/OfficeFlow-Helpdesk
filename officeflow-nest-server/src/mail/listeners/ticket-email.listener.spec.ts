@@ -122,6 +122,34 @@ describe('TicketEmailListener', () => {
     );
   });
 
+  it('continues SLA delivery to other recipients and reports a failed email for retry', async () => {
+    mockUserModel.findMany.mockResolvedValue([
+      { id: 10, name: 'Admin', email: 'admin@test.invalid' },
+      { id: 20, name: 'Manager', email: 'manager@test.invalid' },
+    ]);
+    mockMailService.sendEmail.mockRejectedValueOnce(new Error('smtp failed'));
+    await expect(
+      listener.handleTicketSlaAlert({
+        ticketId: 15,
+        ticketTitle: '<script>unsafe</script>',
+        dueAt: '2026-10-19T08:00:00Z',
+        milestone: 'RESPONSE',
+        kind: 'ESCALATED',
+        recipientIds: [10, 10, 20],
+      }),
+    ).rejects.toThrow('10');
+    expect(mockMailService.sendEmail).toHaveBeenCalledTimes(2);
+    expect(mockUserModel.findMany).toHaveBeenCalledWith({
+      where: { id: { in: [10, 20] }, isActive: true, isLocked: false },
+      select: { id: true, name: true, email: true },
+    });
+    const calls = mockMailService.sendEmail.mock.calls as Array<
+      [{ html: string; text: string }]
+    >;
+    expect(calls[0][0].html).not.toContain('<script>');
+    expect(calls[0][0].text).toContain('15:00');
+  });
+
   it('should de-duplicate overdue recipients before sending email', async () => {
     mockUserModel.findMany.mockResolvedValue([
       {

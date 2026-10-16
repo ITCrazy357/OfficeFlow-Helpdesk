@@ -66,7 +66,16 @@ describe('Ticket queue queries', () => {
       { queue: TicketQueue.UNASSIGNED },
     );
     expect(prisma.ticket.count).toHaveBeenCalledWith({
-      where: { createdBy: { departmentId: 4 }, assignedToId: null },
+      where: {
+        OR: [
+          { createdBy: { departmentId: 4 } },
+          {
+            assignedTo: { managerId: 8 },
+            slaAlerts: { some: { kind: 'ESCALATED', managerId: 8 } },
+          },
+        ],
+        assignedToId: null,
+      },
     });
   });
 

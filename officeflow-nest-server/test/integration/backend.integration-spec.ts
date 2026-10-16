@@ -17,6 +17,12 @@ import { TicketQueryService } from '../../src/tickets/ticket-query.service';
 import { TicketWorkflowService } from '../../src/tickets/ticket-workflow.service';
 import { TicketAttachmentService } from '../../src/tickets/ticket-attachment.service';
 import { TicketCommentService } from '../../src/tickets/ticket-comment.service';
+import { SlaPolicyService } from '../../src/sla/sla-policy.service';
+import { SlaService } from '../../src/sla/sla.service';
+import { DEFAULT_SLA_POLICY } from '../../src/sla/sla-policy';
+import { NotificationsService } from '../../src/notifications/notifications.service';
+import { NotificationsListener } from '../../src/notifications/notifications.listener';
+import type { TicketSlaAlertEvent } from '../../src/notifications/events/ticket-sla-alert.event';
 
 describe('Real MySQL/Redis integration (disposable containers only)', () => {
   const prisma = new PrismaService(
@@ -70,6 +76,7 @@ describe('Real MySQL/Redis integration (disposable containers only)', () => {
         TicketWorkflowService,
         TicketAttachmentService,
         TicketCommentService,
+        SlaPolicyService,
         { provide: PrismaService, useValue: prisma },
         { provide: AuditLogsService, useValue: audit },
         { provide: OutboxService, useValue: outbox },
@@ -473,5 +480,286 @@ describe('Real MySQL/Redis integration (disposable containers only)', () => {
     expect(
       await prisma.ticket.findUnique({ where: { id: ticket.id } }),
     ).toMatchObject({ status: 'IN_PROGRESS' });
+  });
+
+  it('snapshots the SLA policy and leaves existing deadlines unchanged after a policy/priority edit', async () => {
+    const policies = new SlaPolicyService(prisma, audit);
+    const before = await policies.get();
+    const first = await createTicket();
+    const stored = await prisma.ticket.findUniqueOrThrow({
+      where: { id: first.id },
+    });
+    await policies.update(
+      {
+        version: before.version,
+        config: { ...DEFAULT_SLA_POLICY, warningMinutes: 30 },
+      },
+      admin,
+    );
+    await tickets.update(first.id, { priority: TicketPriority.URGENT }, admin);
+    const after = await prisma.ticket.findUniqueOrThrow({
+      where: { id: first.id },
+    });
+    expect(after.slaPolicy).toEqual(stored.slaPolicy);
+    expect(after.dueAt).toEqual(stored.dueAt);
+    const second = await createTicket();
+    expect(
+      await prisma.ticket.findUniqueOrThrow({ where: { id: second.id } }),
+    ).toMatchObject({ slaPolicy: { warningMinutes: 30 } });
+    await expect(
+      policies.update(
+        { version: before.version, config: DEFAULT_SLA_POLICY },
+        admin,
+      ),
+    ).rejects.toThrow('changed');
+  });
+
+  it('keeps policy changes atomic with their audit record', async () => {
+    const policies = new SlaPolicyService(prisma, audit);
+    const before = await policies.get();
+    jest
+      .spyOn(audit, 'create')
+      .mockRejectedValueOnce(new Error('forced policy audit failure'));
+    await expect(
+      policies.update(
+        {
+          version: before.version,
+          config: { ...before.config, warningMinutes: 15 },
+        },
+        admin,
+      ),
+    ).rejects.toThrow('forced policy audit failure');
+    expect(await policies.get()).toEqual(before);
+  });
+
+  it('records only the first staff reply and retains a late response breach', async () => {
+    const ticket = await createTicket();
+    await prisma.ticket.update({
+      where: { id: ticket.id },
+      data: { firstResponseDueAt: new Date(Date.now() - 60_000) },
+    });
+    await tickets.addComment(
+      ticket.id,
+      { content: 'Requester adds more information' },
+      employee,
+    );
+    expect(
+      (await prisma.ticket.findUniqueOrThrow({ where: { id: ticket.id } }))
+        .firstRespondedAt,
+    ).toBeNull();
+    await tickets.addComment(
+      ticket.id,
+      { content: 'IT is investigating the issue' },
+      admin,
+    );
+    const first = await prisma.ticket.findUniqueOrThrow({
+      where: { id: ticket.id },
+    });
+    expect(first.firstRespondedAt).not.toBeNull();
+    expect(first.firstResponseOverdue).toBe(true);
+    await tickets.addComment(
+      ticket.id,
+      { content: 'IT provides a follow-up update' },
+      admin,
+    );
+    expect(
+      (await prisma.ticket.findUniqueOrThrow({ where: { id: ticket.id } }))
+        .firstRespondedAt,
+    ).toEqual(first.firstRespondedAt);
+  });
+
+  it('rolls back first-response tracking when persisting the comment event fails', async () => {
+    const ticket = await createTicket();
+    jest
+      .spyOn(outbox, 'enqueue')
+      .mockRejectedValueOnce(new Error('forced response failure'));
+    await expect(
+      tickets.addComment(
+        ticket.id,
+        { content: 'IT initial response must roll back' },
+        admin,
+      ),
+    ).rejects.toThrow('forced response failure');
+    expect(
+      (await prisma.ticket.findUniqueOrThrow({ where: { id: ticket.id } }))
+        .firstRespondedAt,
+    ).toBeNull();
+    expect(
+      await prisma.ticketComment.count({ where: { ticketId: ticket.id } }),
+    ).toBe(0);
+  });
+
+  it('detects a late resolution before the SLA worker has run', async () => {
+    const ticket = await createTicket();
+    await prisma.ticket.update({
+      where: { id: ticket.id },
+      data: {
+        status: 'IN_PROGRESS',
+        dueAt: new Date(Date.now() - 60_000),
+        firstResponseDueAt: new Date(Date.now() - 120_000),
+      },
+    });
+    const resolved = await tickets.updateStatus(
+      ticket.id,
+      { status: 'RESOLVED' },
+      admin,
+    );
+    expect(resolved).toMatchObject({
+      isOverdue: true,
+      firstResponseOverdue: true,
+    });
+  });
+
+  it('deduplicates concurrent warnings even after processed outbox records are removed', async () => {
+    const ticket = await createTicket();
+    await prisma.ticket.update({
+      where: { id: ticket.id },
+      data: {
+        dueAt: new Date(Date.now() + 3_600_000),
+        resolutionWarningAt: new Date(Date.now() - 60_000),
+      },
+    });
+    const first = new SlaService(prisma, new EventEmitter2(), outbox);
+    const second = new SlaService(prisma, new EventEmitter2(), outbox);
+    await Promise.all([
+      first.markOverdueTickets(),
+      second.markOverdueTickets(),
+    ]);
+    const key = `ticket-sla:${ticket.id}:RESOLUTION:WARNING`;
+    expect(
+      await prisma.outboxEvent.count({ where: { deduplicationKey: key } }),
+    ).toBe(1);
+    await prisma.outboxEvent.deleteMany({ where: { deduplicationKey: key } });
+    await first.markOverdueTickets();
+    expect(
+      await prisma.outboxEvent.count({ where: { deduplicationKey: key } }),
+    ).toBe(0);
+    expect(
+      await prisma.slaAlert.count({
+        where: { ticketId: ticket.id, kind: 'WARNING' },
+      }),
+    ).toBe(1);
+  });
+
+  it('escalates without reassigning, grants only the notified manager access, and preserves scope during search', async () => {
+    const department = await prisma.department.create({
+      data: { name: randomUUID() },
+    });
+    const managerUser = await prisma.user.create({
+      data: {
+        name: 'IT manager',
+        email: `${randomUUID()}@test.invalid`,
+        passwordHash: 'test-only',
+        role: 'MANAGER',
+        departmentId: department.id,
+      },
+    });
+    const manager = { userId: managerUser.id, role: UserRole.MANAGER };
+    const staff = await prisma.user.create({
+      data: {
+        name: 'IT staff',
+        email: `${randomUUID()}@test.invalid`,
+        passwordHash: 'test-only',
+        role: 'IT_STAFF',
+        managerId: manager.userId,
+      },
+    });
+    const ticket = await createTicket();
+    const privateTicket = await createTicket();
+    await tickets.assign(ticket.id, { assignedToId: staff.id }, admin);
+    await expect(tickets.canGetById(ticket.id, manager)).rejects.toThrow(
+      'Forbidden',
+    );
+    await prisma.ticket.update({
+      where: { id: ticket.id },
+      data: { dueAt: new Date(Date.now() - 60_000), resolutionWarningAt: null },
+    });
+    await new SlaService(
+      prisma,
+      new EventEmitter2(),
+      outbox,
+    ).markOverdueTickets();
+    expect(
+      await prisma.ticket.findUniqueOrThrow({ where: { id: ticket.id } }),
+    ).toMatchObject({ assignedToId: staff.id, isOverdue: true });
+    await expect(tickets.canGetById(ticket.id, manager)).resolves.toMatchObject(
+      { id: ticket.id },
+    );
+    const listed = await tickets.getTickets(manager, {
+      keyword: 'Integration',
+    });
+    expect(listed.items.map((item) => item.id)).toContain(ticket.id);
+    expect(listed.items.map((item) => item.id)).not.toContain(privateTicket.id);
+    await expect(tickets.canGetById(privateTicket.id, manager)).rejects.toThrow(
+      'Forbidden',
+    );
+    const event = await prisma.outboxEvent.findUniqueOrThrow({
+      where: {
+        deduplicationKey: `ticket-sla:${ticket.id}:RESOLUTION:ESCALATED`,
+      },
+    });
+    const payload = event.payload as unknown as TicketSlaAlertEvent;
+    expect(payload.recipientIds).toEqual(
+      expect.arrayContaining([admin.userId, manager.userId]),
+    );
+    const listener = new NotificationsListener(
+      new NotificationsService(prisma),
+    );
+    await listener.handleTicketSlaAlert({
+      ...payload,
+      outboxEventId: event.id,
+    });
+    await listener.handleTicketSlaAlert({
+      ...payload,
+      outboxEventId: event.id,
+    });
+    expect(
+      await prisma.notification.count({
+        where: { sourceEventId: event.id, type: 'TICKET_SLA_ESCALATED' },
+      }),
+    ).toBe(payload.recipientIds.length);
+    await tickets.assign(privateTicket.id, { assignedToId: staff.id }, admin);
+    await prisma.ticket.update({
+      where: { id: privateTicket.id },
+      data: {
+        slaPolicy: { ...DEFAULT_SLA_POLICY, escalation: 'ADMINS' },
+        dueAt: new Date(Date.now() - 60_000),
+      },
+    });
+    await new SlaService(
+      prisma,
+      new EventEmitter2(),
+      outbox,
+    ).markOverdueTickets();
+    await expect(tickets.canGetById(privateTicket.id, manager)).rejects.toThrow(
+      'Forbidden',
+    );
+  });
+
+  it('rolls back a warning marker when its outbox event cannot be persisted', async () => {
+    const ticket = await createTicket();
+    await prisma.ticket.update({
+      where: { id: ticket.id },
+      data: {
+        dueAt: new Date(Date.now() + 3_600_000),
+        resolutionWarningAt: new Date(Date.now() - 60_000),
+      },
+    });
+    jest
+      .spyOn(outbox, 'enqueue')
+      .mockRejectedValueOnce(new Error('forced warning failure'));
+    const worker = new SlaService(prisma, new EventEmitter2(), outbox);
+    await expect(worker.markOverdueTickets()).rejects.toThrow(
+      'forced warning failure',
+    );
+    expect(
+      await prisma.slaAlert.count({ where: { ticketId: ticket.id } }),
+    ).toBe(0);
+    await worker.markOverdueTickets();
+    expect(
+      await prisma.slaAlert.count({
+        where: { ticketId: ticket.id, kind: 'WARNING' },
+      }),
+    ).toBe(1);
   });
 });

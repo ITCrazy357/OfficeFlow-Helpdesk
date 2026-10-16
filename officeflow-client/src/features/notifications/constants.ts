@@ -22,6 +22,24 @@ type NotificationMeta = {
 };
 
 export const notificationMeta: Record<NotificationType, NotificationMeta> = {
+  TICKET_SLA_WARNING: {
+    label: "Sắp quá hạn SLA",
+    icon: AlertTriangle,
+    tone: "border-amber-200 bg-amber-50 text-amber-800",
+    iconTone: "bg-amber-50 text-amber-700 ring-amber-100",
+  },
+  TICKET_RESPONSE_OVERDUE: {
+    label: "Quá hạn phản hồi",
+    icon: AlertTriangle,
+    tone: "border-red-200 bg-red-50 text-red-800",
+    iconTone: "bg-red-50 text-red-700 ring-red-100",
+  },
+  TICKET_SLA_ESCALATED: {
+    label: "Cần quản lý hỗ trợ",
+    icon: AlertTriangle,
+    tone: "border-red-200 bg-red-50 text-red-800",
+    iconTone: "bg-red-50 text-red-700 ring-red-100",
+  },
   TICKET_ASSIGNED: {
     label: "Ticket được gán",
     icon: TicketCheck,

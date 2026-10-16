@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { TicketHistoryAction } from '@prisma/client';
+import { TicketHistoryAction, UserRole } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { OutboxService } from '../outbox/outbox.service';
 import { OUTBOX_EVENT_TYPES } from '../outbox/outbox.constants';
@@ -58,8 +58,25 @@ export class TicketCommentService {
           title: true,
           createdById: true,
           assignedToId: true,
+          firstResponseDueAt: true,
         },
       });
+      if (
+        (currentUser.role === UserRole.ADMIN ||
+          currentUser.role === UserRole.IT_STAFF) &&
+        ticket.createdById !== currentUser.userId
+      ) {
+        await transaction.ticket.updateMany({
+          where: { id: ticketId, firstRespondedAt: null },
+          data: {
+            firstRespondedAt: createdComment.createdAt,
+            ...(ticket.firstResponseDueAt &&
+            createdComment.createdAt > ticket.firstResponseDueAt
+              ? { firstResponseOverdue: true }
+              : {}),
+          },
+        });
+      }
       const recipientIds = [ticket.createdById, ticket.assignedToId].filter(
         (id): id is number => Boolean(id),
       );

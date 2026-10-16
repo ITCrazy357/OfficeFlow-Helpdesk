@@ -10,6 +10,7 @@ export const auditLogEntityOptions: Array<{
   { value: "KNOWLEDGE_ARTICLE", label: "Bài viết Knowledge" },
   { value: "ASSET", label: "Tài sản" },
   { value: "LEAVE_REQUEST", label: "Đơn nghỉ phép" },
+  { value: "SLA_POLICY", label: "Chính sách SLA" },
 ];
 
 export const auditLogActionOptions: Array<{
