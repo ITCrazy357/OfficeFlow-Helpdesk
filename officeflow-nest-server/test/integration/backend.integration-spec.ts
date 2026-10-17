@@ -1161,6 +1161,84 @@ describe('Real MySQL/Redis integration (disposable containers only)', () => {
     };
   }
 
+  it('saves an allowance even when the transaction exceeds the old five-second timeout', async () => {
+    const { actor } = await leaveFixture();
+    const readBalance = planning.balance.bind(
+      planning,
+    ) as typeof planning.balance;
+    const delayedBalance = jest
+      .spyOn(planning, 'balance')
+      .mockImplementationOnce(async (...args) => {
+        const balance = await readBalance(...args);
+        // Reproduce hosted-database latency after reads have started the transaction.
+        await new Promise((resolve) => setTimeout(resolve, 5500));
+        return balance;
+      });
+    const saved = await planning.setEntitlement(
+      actor.userId,
+      2035,
+      { days: 10, version: 0 },
+      admin,
+    );
+    delayedBalance.mockRestore();
+    expect(saved).toMatchObject({ allowance: 10, remaining: 10, version: 1 });
+    expect(
+      await prisma.leaveEntitlement.findUnique({
+        where: { userId_year: { userId: actor.userId, year: 2035 } },
+      }),
+    ).toMatchObject({ halfDays: 20, version: 1 });
+    expect(await planning.getBalance({ year: 2035 }, actor)).toEqual(saved);
+  });
+
+  it('keeps allowance version checks and audit rollback atomic after extending the latency budget', async () => {
+    const { actor } = await leaveFixture();
+    const auditFailure = jest
+      .spyOn(audit, 'create')
+      .mockRejectedValueOnce(new Error('forced allowance audit failure'));
+    await expect(
+      planning.setEntitlement(
+        actor.userId,
+        2035,
+        { days: 10, version: 0 },
+        admin,
+      ),
+    ).rejects.toThrow('forced allowance audit');
+    auditFailure.mockRestore();
+    expect(
+      await prisma.leaveEntitlement.findUnique({
+        where: { userId_year: { userId: actor.userId, year: 2035 } },
+      }),
+    ).toBeNull();
+    const results = await Promise.allSettled([
+      planning.setEntitlement(
+        actor.userId,
+        2035,
+        { days: 10, version: 0 },
+        admin,
+      ),
+      planning.setEntitlement(
+        actor.userId,
+        2035,
+        { days: 12.5, version: 0 },
+        admin,
+      ),
+    ]);
+    expect(
+      results.filter((result) => result.status === 'fulfilled'),
+    ).toHaveLength(1);
+    const balance = await planning.getBalance({ year: 2035 }, actor);
+    expect([10, 12.5]).toContain(balance.allowance);
+    expect(balance.version).toBe(1);
+    await expect(
+      planning.setEntitlement(
+        actor.userId,
+        2035,
+        { days: 20, version: 0 },
+        admin,
+      ),
+    ).rejects.toThrow('changed');
+  });
+
   it('reserves annual leave atomically, releases cancellations and keeps approval from charging twice', async () => {
     const { actor, manager } = await leaveFixture();
     const base = {

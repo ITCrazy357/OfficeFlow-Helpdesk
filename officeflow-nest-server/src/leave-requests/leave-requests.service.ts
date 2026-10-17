@@ -24,6 +24,7 @@ import { OutboxService } from '../outbox/outbox.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { parseDateOnly } from '../utils/formatDate';
 import { LeavePlanningService } from './leave-planning.service';
+import { LEAVE_TRANSACTION_TIMING } from './leave-transaction.options';
 
 import { CreateLeaveRequestDto } from './dto/create-leave-request.dto';
 import {
@@ -236,6 +237,7 @@ export class LeaveRequestService {
             return leaveRequest;
           },
           {
+            ...LEAVE_TRANSACTION_TIMING,
             isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
           },
         );
@@ -479,7 +481,7 @@ export class LeaveRequestService {
         where: { id: leaveRequestId },
         select: leaveRequestDetailSelect,
       });
-    });
+    }, LEAVE_TRANSACTION_TIMING);
   }
 
   async approve(leaveRequestId: number, actor: CurrentUserPayload) {
@@ -568,7 +570,7 @@ export class LeaveRequestService {
         where: { id: leaveRequestId },
         select: leaveRequestDetailSelect,
       });
-    });
+    }, LEAVE_TRANSACTION_TIMING);
 
     return leaveRequest;
   }

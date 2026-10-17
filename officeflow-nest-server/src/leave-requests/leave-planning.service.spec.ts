@@ -24,7 +24,13 @@ describe('Leave planning', () => {
         [Prisma.LeaveRequestFindManyArgs]
       >(),
     },
-    $transaction: jest.fn(),
+    $transaction: jest.fn<
+      Promise<unknown>,
+      [
+        unknown,
+        { isolationLevel?: string; maxWait?: number; timeout?: number }?,
+      ]
+    >(),
   };
   const tx = db as unknown as Prisma.TransactionClient;
   const policies = { get: jest.fn() };
@@ -43,6 +49,7 @@ describe('Leave planning', () => {
     );
     db.user.findUnique.mockResolvedValue({ id: 3, departmentId: 8 });
     db.leaveEntitlement.findUnique.mockResolvedValue(null);
+    db.leaveEntitlement.upsert.mockResolvedValue({ halfDays: 25, version: 1 });
     db.leaveDay.findMany.mockResolvedValue([]);
     db.leaveRequest.count.mockResolvedValue(0);
     db.leaveRequest.findMany.mockResolvedValue([]);
@@ -157,6 +164,53 @@ describe('Leave planning', () => {
     await expect(
       service.setEntitlement(3, 2026, { days: 12.5, version: 0 }, admin),
     ).rejects.toThrow('audit unavailable');
+  });
+  it('returns the saved balance without querying usage twice and keeps used and reserved days', async () => {
+    db.leaveEntitlement.findUnique.mockResolvedValue({
+      halfDays: 24,
+      version: 2,
+    });
+    db.leaveEntitlement.upsert.mockResolvedValue({ halfDays: 25, version: 3 });
+    db.leaveDay.findMany.mockResolvedValue([
+      { halfDays: 2, request: { status: 'APPROVED' } },
+      { halfDays: 1, request: { status: 'PENDING' } },
+    ]);
+    db.leaveRequest.count.mockResolvedValue(1);
+    await expect(
+      service.setEntitlement(3, 2026, { days: 12.5, version: 2 }, admin),
+    ).resolves.toEqual({
+      userId: 3,
+      year: 2026,
+      allowance: 12.5,
+      used: 1,
+      reserved: 0.5,
+      remaining: 11,
+      version: 3,
+      legacyRequests: 1,
+    });
+    expect(db.leaveDay.findMany).toHaveBeenCalledTimes(1);
+    expect(db.leaveEntitlement.findUnique).toHaveBeenCalledTimes(1);
+    expect(db.leaveRequest.count).toHaveBeenCalledTimes(1);
+    expect(db.$transaction).toHaveBeenCalledWith(expect.any(Function), {
+      isolationLevel: 'Serializable',
+      maxWait: 10_000,
+      timeout: 30_000,
+    });
+  });
+  it('gives read-only balance and preview transactions the hosted-database latency budget', async () => {
+    await service.getBalance({ year: 2026 }, employee);
+    await service.preview(
+      { startDate: '2035-01-08', endDate: '2035-01-08' },
+      employee,
+    );
+    expect(db.$transaction).toHaveBeenCalledTimes(2);
+    for (const call of db.$transaction.mock.calls) {
+      expect(call[1]).toEqual({
+        isolationLevel: 'RepeatableRead',
+        maxWait: 10_000,
+        timeout: 30_000,
+      });
+    }
   });
   it('scopes team calendars to the department and omits private reasons and types', async () => {
     await expect(
