@@ -9,6 +9,9 @@ describe('Database schema readiness', () => {
     ticket: { findFirst: jest.fn() },
     slaPolicy: { findFirst: jest.fn() },
     slaAlert: { findFirst: jest.fn() },
+    asset: { findFirst: jest.fn() },
+    assetMaintenance: { findFirst: jest.fn() },
+    assetWarrantyReminder: { findFirst: jest.fn() },
   };
   const client = database as unknown as Parameters<
     typeof assertDatabaseSchemaReady
@@ -44,6 +47,9 @@ describe('Database schema readiness', () => {
     ['ticket', 'P2022'],
     ['slaPolicy', 'P2021'],
     ['slaAlert', 'P2021'],
+    ['asset', 'P2022'],
+    ['assetMaintenance', 'P2021'],
+    ['assetWarrantyReminder', 'P2021'],
   ] as const)(
     'explains missing schema for %s without leaking DB details',
     async (model, code) => {

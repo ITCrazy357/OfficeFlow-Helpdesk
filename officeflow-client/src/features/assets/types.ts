@@ -46,6 +46,8 @@ export type Asset = {
   serialNumber?: string | null;
   purchaseDate?: string | null;
   warrantyUntil?: string | null;
+  supplierName?: string | null;
+  supplierContact?: string | null;
   notes?: string | null;
   assignedToId?: number | null;
   assignedTo?: AssetUser | null;
@@ -73,6 +75,7 @@ export type AssetAssignment = {
 export type AssetsList = PaginatedData<Asset>;
 
 export type GetAssetsParams = {
+  warranty?: "EXPIRING" | "EXPIRED";
   page?: number;
   limit?: number;
   type?: AssetType;
@@ -90,16 +93,94 @@ export type CreateAssetInput = {
   serialNumber?: string;
   purchaseDate?: string;
   warrantyUntil?: string;
+  supplierName?: string;
+  supplierContact?: string;
   notes?: string;
 };
 
 export type UpdateAssetInput = Partial<
-  Omit<CreateAssetInput, "brand" | "model" | "serialNumber" | "notes">
+  Omit<
+    CreateAssetInput,
+    | "brand"
+    | "model"
+    | "serialNumber"
+    | "notes"
+    | "supplierName"
+    | "supplierContact"
+  >
 > & {
   brand?: string | null;
   model?: string | null;
   serialNumber?: string | null;
   notes?: string | null;
+  supplierName?: string | null;
+  supplierContact?: string | null;
+};
+
+export type MaintenanceKind = "MAINTENANCE" | "REPAIR" | "WARRANTY";
+export type MaintenanceStatus = "PLANNED" | "COMPLETED" | "CANCELLED";
+export type AssetMaintenance = {
+  id: number;
+  assetId: number;
+  title: string;
+  kind: MaintenanceKind;
+  status: MaintenanceStatus;
+  scheduledFor: string;
+  performedOn: string | null;
+  vendor: string | null;
+  cost: string | null;
+  notes: string | null;
+  version: number;
+  createdById: number;
+  completedById: number | null;
+  completedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+export type MaintenanceParams = {
+  page?: number;
+  limit?: number;
+  status?: MaintenanceStatus;
+};
+export type MaintenanceInput = {
+  title: string;
+  kind: MaintenanceKind;
+  scheduledFor: string;
+  vendor?: string | null;
+  notes?: string | null;
+};
+export type MaintenanceCommand =
+  | { action: "create"; input: MaintenanceInput }
+  | {
+      action: "update";
+      id: number;
+      input: MaintenanceInput & { version: number };
+    }
+  | {
+      action: "complete";
+      id: number;
+      input: {
+        version: number;
+        performedOn: string;
+        cost: string | null;
+        vendor: string | null;
+        notes: string | null;
+      };
+    }
+  | { action: "cancel"; id: number; input: { version: number } };
+export type MaintenanceList = PaginatedData<AssetMaintenance>;
+export type AssetCareOverview = {
+  today: string;
+  reminderDays: number;
+  warrantySoon: number;
+  warrantyExpired: number;
+  maintenanceDue: number;
+  warrantyAssets: Array<
+    Pick<Asset, "id" | "assetTag" | "name" | "warrantyUntil" | "supplierName">
+  >;
+  maintenances: Array<
+    AssetMaintenance & { asset: Pick<Asset, "id" | "assetTag" | "name"> }
+  >;
 };
 
 export type AssignAssetInput = {

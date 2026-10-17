@@ -22,35 +22,47 @@ type NotificationMeta = {
 };
 
 export const notificationMeta: Record<NotificationType, NotificationMeta> = {
+  ASSET_WARRANTY_EXPIRING: {
+    label: "Sắp hết bảo hành",
+    icon: AlertTriangle,
+    tone: "border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-400/25 dark:bg-amber-400/10 dark:text-amber-200",
+    iconTone:
+      "bg-amber-50 text-amber-700 dark:bg-amber-400/10 dark:text-amber-200",
+  },
   TICKET_SLA_WARNING: {
     label: "Sắp quá hạn SLA",
     icon: AlertTriangle,
     tone: "border-amber-200 dark:border-amber-400/25 bg-amber-50 dark:bg-amber-400/10 text-amber-800 dark:text-amber-200",
-    iconTone: "bg-amber-50 dark:bg-amber-400/10 text-amber-700 dark:text-amber-200 ring-amber-100",
+    iconTone:
+      "bg-amber-50 dark:bg-amber-400/10 text-amber-700 dark:text-amber-200 ring-amber-100",
   },
   TICKET_RESPONSE_OVERDUE: {
     label: "Quá hạn phản hồi",
     icon: AlertTriangle,
     tone: "border-red-200 dark:border-red-400/25 bg-red-50 dark:bg-red-400/10 text-red-800 dark:text-red-200",
-    iconTone: "bg-red-50 dark:bg-red-400/10 text-red-700 dark:text-red-200 ring-red-100",
+    iconTone:
+      "bg-red-50 dark:bg-red-400/10 text-red-700 dark:text-red-200 ring-red-100",
   },
   TICKET_SLA_ESCALATED: {
     label: "Cần quản lý hỗ trợ",
     icon: AlertTriangle,
     tone: "border-red-200 dark:border-red-400/25 bg-red-50 dark:bg-red-400/10 text-red-800 dark:text-red-200",
-    iconTone: "bg-red-50 dark:bg-red-400/10 text-red-700 dark:text-red-200 ring-red-100",
+    iconTone:
+      "bg-red-50 dark:bg-red-400/10 text-red-700 dark:text-red-200 ring-red-100",
   },
   TICKET_ASSIGNED: {
     label: "Ticket được gán",
     icon: TicketCheck,
     tone: "border-sky-200 dark:border-sky-400/25 bg-sky-50 dark:bg-sky-400/10 text-sky-800 dark:text-sky-200",
-    iconTone: "bg-sky-50 dark:bg-sky-400/10 text-sky-700 dark:text-sky-200 ring-sky-100",
+    iconTone:
+      "bg-sky-50 dark:bg-sky-400/10 text-sky-700 dark:text-sky-200 ring-sky-100",
   },
   TICKET_COMMENTED: {
     label: "Bình luận mới",
     icon: MessageSquareText,
     tone: "border-teal-200 dark:border-teal-400/25 bg-teal-50 dark:bg-teal-400/10 text-teal-800 dark:text-teal-200",
-    iconTone: "bg-teal-50 dark:bg-teal-400/10 text-teal-800 dark:text-teal-200 ring-teal-100",
+    iconTone:
+      "bg-teal-50 dark:bg-teal-400/10 text-teal-800 dark:text-teal-200 ring-teal-100",
   },
   TICKET_STATUS_CHANGED: {
     label: "Đổi trạng thái",
@@ -62,25 +74,29 @@ export const notificationMeta: Record<NotificationType, NotificationMeta> = {
     label: "Quá hạn SLA",
     icon: AlertTriangle,
     tone: "border-red-200 dark:border-red-400/25 bg-red-50 dark:bg-red-400/10 text-red-800 dark:text-red-200",
-    iconTone: "bg-red-50 dark:bg-red-400/10 text-red-700 dark:text-red-200 ring-red-100",
+    iconTone:
+      "bg-red-50 dark:bg-red-400/10 text-red-700 dark:text-red-200 ring-red-100",
   },
   KNOWLEDGE_PUBLISHED: {
     label: "Knowledge Base",
     icon: BookOpenText,
     tone: "border-emerald-200 dark:border-emerald-400/25 bg-emerald-50 dark:bg-emerald-400/10 text-emerald-800 dark:text-emerald-200",
-    iconTone: "bg-emerald-50 dark:bg-emerald-400/10 text-emerald-700 dark:text-emerald-200 ring-emerald-100",
+    iconTone:
+      "bg-emerald-50 dark:bg-emerald-400/10 text-emerald-700 dark:text-emerald-200 ring-emerald-100",
   },
   ASSET_ASSIGNED: {
     label: "Tài sản được cấp",
     icon: PackageCheck,
     tone: "border-sky-200 dark:border-sky-400/25 bg-sky-50 dark:bg-sky-400/10 text-sky-800 dark:text-sky-200",
-    iconTone: "bg-sky-50 dark:bg-sky-400/10 text-sky-700 dark:text-sky-200 ring-sky-100",
+    iconTone:
+      "bg-sky-50 dark:bg-sky-400/10 text-sky-700 dark:text-sky-200 ring-sky-100",
   },
   ASSET_RETURNED: {
     label: "Tài sản đã thu hồi",
     icon: PackageMinus,
     tone: "border-amber-200 dark:border-amber-400/25 bg-amber-50 dark:bg-amber-400/10 text-amber-800 dark:text-amber-200",
-    iconTone: "bg-amber-50 dark:bg-amber-400/10 text-amber-700 dark:text-amber-200 ring-amber-100",
+    iconTone:
+      "bg-amber-50 dark:bg-amber-400/10 text-amber-700 dark:text-amber-200 ring-amber-100",
   },
   LEAVE_REQUESTED: {
     label: "Đơn nghỉ phép mới",
@@ -92,19 +108,22 @@ export const notificationMeta: Record<NotificationType, NotificationMeta> = {
     label: "Nghỉ phép được duyệt",
     icon: CalendarCheck,
     tone: "border-emerald-200 dark:border-emerald-400/25 bg-emerald-50 dark:bg-emerald-400/10 text-emerald-800 dark:text-emerald-200",
-    iconTone: "bg-emerald-50 dark:bg-emerald-400/10 text-emerald-700 dark:text-emerald-200 ring-emerald-100",
+    iconTone:
+      "bg-emerald-50 dark:bg-emerald-400/10 text-emerald-700 dark:text-emerald-200 ring-emerald-100",
   },
   LEAVE_REJECTED: {
     label: "Nghỉ phép bị từ chối",
     icon: CalendarX,
     tone: "border-red-200 dark:border-red-400/25 bg-red-50 dark:bg-red-400/10 text-red-800 dark:text-red-200",
-    iconTone: "bg-red-50 dark:bg-red-400/10 text-red-700 dark:text-red-200 ring-red-100",
+    iconTone:
+      "bg-red-50 dark:bg-red-400/10 text-red-700 dark:text-red-200 ring-red-100",
   },
   LEAVE_CANCELLED: {
     label: "Đơn nghỉ phép đã hủy",
     icon: CalendarMinus,
     tone: "border-slate-200 dark:border-slate-400/25 bg-slate-50 dark:bg-slate-400/10 text-slate-800 dark:text-slate-200",
-    iconTone: "bg-slate-50 dark:bg-slate-400/10 text-slate-700 dark:text-slate-200 ring-slate-100",
+    iconTone:
+      "bg-slate-50 dark:bg-slate-400/10 text-slate-700 dark:text-slate-200 ring-slate-100",
   },
 };
 

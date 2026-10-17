@@ -46,6 +46,8 @@ import {
   AssetTypeBadge,
 } from "@/features/assets/components/asset-badges";
 import { AssetToast } from "@/features/assets/components/asset-toast";
+import AssetMaintenancePanel from "@/features/assets/components/asset-maintenance-panel";
+import { careWarrantyDate } from "@/features/assets/care-utils";
 import {
   formatAssetDate,
   getAssetModelLabel,
@@ -380,13 +382,23 @@ export default function AssetDetailPage() {
               />
               <DetailItem
                 label="Bảo hành đến"
-                value={formatAssetDate(asset.warrantyUntil)}
+                value={careWarrantyDate(asset.warrantyUntil) || "Chưa ghi nhận"}
                 icon={Wrench}
               />
               <DetailItem
                 label="Ngày tạo"
                 value={formatAssetDate(asset.createdAt, true)}
                 icon={CalendarDays}
+              />
+              <DetailItem
+                label="Nhà cung cấp"
+                value={asset.supplierName || "Chưa ghi nhận"}
+                icon={Wrench}
+              />
+              <DetailItem
+                label="Liên hệ nhà cung cấp"
+                value={asset.supplierContact || "Chưa ghi nhận"}
+                icon={UserRound}
               />
               <DetailItem
                 label="Số lần cấp phát"
@@ -401,6 +413,16 @@ export default function AssetDetailPage() {
               />
             </CardContent>
           </Card>
+
+          {allowManagement && (
+            <AssetMaintenancePanel
+              assetId={assetId}
+              supplierName={asset.supplierName}
+              canSchedule={
+                asset.status !== "RETIRED" && asset.status !== "LOST"
+              }
+            />
+          )}
 
           <Card className="shadow-sm motion-panel">
             <CardHeader className="border-b">
@@ -641,7 +663,9 @@ export default function AssetDetailPage() {
                   <>
                     <div className="relative">
                       <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-                      <Input type="search" aria-label="Tìm tên, email, phòng ban"
+                      <Input
+                        type="search"
+                        aria-label="Tìm tên, email, phòng ban"
                         value={userSearch}
                         onChange={(event) => setUserSearch(event.target.value)}
                         className="pl-9"

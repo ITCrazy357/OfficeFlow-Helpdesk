@@ -51,12 +51,9 @@ import {
   AssetStatusBadge,
   AssetTypeBadge,
 } from "@/features/assets/components/asset-badges";
-import type {
-  Asset,
-  AssetStatus,
-  AssetType,
-} from "@/features/assets/types";
+import type { Asset, AssetStatus, AssetType } from "@/features/assets/types";
 import { useMe } from "@/features/auth/hooks";
+import AssetCareOverview from "@/features/assets/components/asset-care-overview";
 import { useUsers } from "@/features/users/hooks";
 import { getApiErrorMessage } from "@/lib/axios";
 
@@ -79,13 +76,7 @@ function matchesAssetSearch(asset: Asset, keyword: string) {
   }
 
   return normalizeSearch(
-    [
-      asset.assetTag,
-      asset.name,
-      asset.brand,
-      asset.model,
-      asset.serialNumber,
-    ]
+    [asset.assetTag, asset.name, asset.brand, asset.model, asset.serialNumber]
       .filter(Boolean)
       .join(" "),
   ).includes(keyword);
@@ -95,22 +86,13 @@ function AssetListSkeleton() {
   return (
     <div className="grid gap-3">
       {Array.from({ length: 7 }).map((_, index) => (
-        <div
-          key={index}
-          className="h-16 rounded-lg bg-muted motion-shimmer"
-        />
+        <div key={index} className="h-16 rounded-lg bg-muted motion-shimmer" />
       ))}
     </div>
   );
 }
 
-function AssetMobileCard({
-  asset,
-  index,
-}: {
-  asset: Asset;
-  index: number;
-}) {
+function AssetMobileCard({ asset, index }: { asset: Asset; index: number }) {
   return (
     <Link
       href={`/assets/${asset.id}`}
@@ -128,9 +110,7 @@ function AssetMobileCard({
       </div>
       <div className="mt-4 flex flex-wrap gap-2">
         <AssetTypeBadge type={asset.type} />
-        <Badge variant="outline">
-          {asset._count?.tickets ?? 0} ticket
-        </Badge>
+        <Badge variant="outline">{asset._count?.tickets ?? 0} ticket</Badge>
       </div>
       <div className="mt-4 grid gap-2 text-sm">
         <div className="flex items-center justify-between gap-3">
@@ -158,6 +138,9 @@ export default function AssetsPage() {
   const [type, setType] = useState<AssetType | "ALL">("ALL");
   const [status, setStatus] = useState<AssetStatus | "ALL">("ALL");
   const [assignedToId, setAssignedToId] = useState<string>("ALL");
+  const [warranty, setWarranty] = useState<"ALL" | "EXPIRING" | "EXPIRED">(
+    "ALL",
+  );
   const deferredKeyword = useDeferredValue(keyword.trim());
   const normalizedKeyword = normalizeSearch(deferredKeyword);
 
@@ -168,8 +151,8 @@ export default function AssetsPage() {
       keyword: deferredKeyword || undefined,
       type: type === "ALL" ? undefined : type,
       status: status === "ALL" ? undefined : status,
-      assignedToId:
-        assignedToId === "ALL" ? undefined : Number(assignedToId),
+      warranty: warranty === "ALL" ? undefined : warranty,
+      assignedToId: assignedToId === "ALL" ? undefined : Number(assignedToId),
     },
     Boolean(user && allowManagement),
   );
@@ -193,9 +176,7 @@ export default function AssetsPage() {
     (page - 1) * PAGE_SIZE,
     page * PAGE_SIZE,
   );
-  const assets = allowManagement
-    ? (assetsQuery.data?.items ?? [])
-    : myAssets;
+  const assets = allowManagement ? (assetsQuery.data?.items ?? []) : myAssets;
   const pagination = allowManagement
     ? assetsQuery.data?.pagination
     : {
@@ -204,31 +185,27 @@ export default function AssetsPage() {
         totalItems: filteredMyAssets.length,
         totalPages: myTotalPages,
       };
-  const activeUsers = (usersQuery.data ?? []).filter(
-    (item) => item.isActive,
-  );
+  const activeUsers = (usersQuery.data ?? []).filter((item) => item.isActive);
   const isLoading = !user
     ? true
     : allowManagement
       ? assetsQuery.isLoading
       : myAssetsQuery.isLoading;
-  const isError = allowManagement
-    ? assetsQuery.isError
-    : myAssetsQuery.isError;
-  const queryError = allowManagement
-    ? assetsQuery.error
-    : myAssetsQuery.error;
+  const isError = allowManagement ? assetsQuery.isError : myAssetsQuery.isError;
+  const queryError = allowManagement ? assetsQuery.error : myAssetsQuery.error;
   const hasFilters =
     keyword.trim().length > 0 ||
     type !== "ALL" ||
     status !== "ALL" ||
-    assignedToId !== "ALL";
+    assignedToId !== "ALL" ||
+    warranty !== "ALL";
 
   function resetFilters() {
     setKeyword("");
     setType("ALL");
     setStatus("ALL");
     setAssignedToId("ALL");
+    setWarranty("ALL");
     setPage(1);
   }
 
@@ -264,6 +241,8 @@ export default function AssetsPage() {
         ) : null}
       </div>
 
+      {allowManagement && <AssetCareOverview />}
+
       <Card className="shadow-sm motion-panel">
         <CardHeader className="border-b">
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
@@ -284,7 +263,8 @@ export default function AssetsPage() {
         <CardContent className="grid gap-3 pt-0 sm:grid-cols-2 xl:grid-cols-4">
           <div className="relative sm:col-span-2 xl:col-span-1">
             <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-            <Input type="search"
+            <Input
+              type="search"
               value={keyword}
               onChange={(event) => {
                 setKeyword(event.target.value);
@@ -333,6 +313,24 @@ export default function AssetsPage() {
               ))}
             </SelectContent>
           </Select>
+          {allowManagement ? (
+            <Select
+              value={warranty}
+              onValueChange={(value) => {
+                setWarranty(value as typeof warranty);
+                setPage(1);
+              }}
+            >
+              <SelectTrigger className="w-full" aria-label="Lọc bảo hành">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ALL">Tất cả hạn bảo hành</SelectItem>
+                <SelectItem value="EXPIRING">Sắp hết trong 30 ngày</SelectItem>
+                <SelectItem value="EXPIRED">Đã hết bảo hành</SelectItem>
+              </SelectContent>
+            </Select>
+          ) : null}
           {allowManagement ? (
             <Select
               value={assignedToId}
@@ -400,11 +398,7 @@ export default function AssetsPage() {
             <>
               <div className="grid gap-3 md:hidden">
                 {assets.map((asset, index) => (
-                  <AssetMobileCard
-                    key={asset.id}
-                    asset={asset}
-                    index={index}
-                  />
+                  <AssetMobileCard key={asset.id} asset={asset} index={index} />
                 ))}
               </div>
 
@@ -521,10 +515,7 @@ export default function AssetsPage() {
             </div>
           )}
 
-          {!isLoading &&
-          !isError &&
-          pagination &&
-          pagination.totalPages > 1 ? (
+          {!isLoading && !isError && pagination && pagination.totalPages > 1 ? (
             <div className="mt-5 flex flex-col gap-3 border-t pt-4 sm:flex-row sm:items-center sm:justify-between">
               <p className="text-sm text-muted-foreground">
                 Trang {pagination.page} / {pagination.totalPages}

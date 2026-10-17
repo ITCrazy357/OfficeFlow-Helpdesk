@@ -34,13 +34,83 @@ import { CreateAssetDto } from './dto/create-asset.dto';
 import { GetAssetsQueryDto } from './dto/get-assets-query.dto';
 import { ReturnAssetDto } from './dto/return-asset.dto';
 import { UpdateAssetDto } from './dto/update-asset.dto';
+import { AssetMaintenanceService } from './asset-maintenance.service';
+import {
+  CompleteMaintenanceDto,
+  CreateMaintenanceDto,
+  MaintenanceQueryDto,
+  MaintenanceVersionDto,
+  UpdateMaintenanceDto,
+} from './dto/asset-maintenance.dto';
 
 @ApiTags('Assets')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Controller('assets')
 export class AssetsController {
-  constructor(private readonly assetsService: AssetsService) {}
+  constructor(
+    private readonly assetsService: AssetsService,
+    private readonly maintenance: AssetMaintenanceService,
+  ) {}
+
+  @Get('care-overview')
+  @Roles(UserRole.ADMIN, UserRole.IT_STAFF)
+  careOverview(@CurrentUser() actor: CurrentUserPayload) {
+    return this.maintenance.overview(actor);
+  }
+
+  @Get(':id/maintenance')
+  @Roles(UserRole.ADMIN, UserRole.IT_STAFF)
+  listMaintenance(
+    @Param('id', ParseIntPipe) id: number,
+    @Query() query: MaintenanceQueryDto,
+    @CurrentUser() actor: CurrentUserPayload,
+  ) {
+    return this.maintenance.list(id, query, actor);
+  }
+
+  @Post(':id/maintenance')
+  @Roles(UserRole.ADMIN, UserRole.IT_STAFF)
+  createMaintenance(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: CreateMaintenanceDto,
+    @CurrentUser() actor: CurrentUserPayload,
+  ) {
+    return this.maintenance.create(id, dto, actor);
+  }
+
+  @Patch(':id/maintenance/:recordId')
+  @Roles(UserRole.ADMIN, UserRole.IT_STAFF)
+  updateMaintenance(
+    @Param('id', ParseIntPipe) id: number,
+    @Param('recordId', ParseIntPipe) recordId: number,
+    @Body() dto: UpdateMaintenanceDto,
+    @CurrentUser() actor: CurrentUserPayload,
+  ) {
+    return this.maintenance.update(id, recordId, dto, actor);
+  }
+
+  @Patch(':id/maintenance/:recordId/complete')
+  @Roles(UserRole.ADMIN, UserRole.IT_STAFF)
+  completeMaintenance(
+    @Param('id', ParseIntPipe) id: number,
+    @Param('recordId', ParseIntPipe) recordId: number,
+    @Body() dto: CompleteMaintenanceDto,
+    @CurrentUser() actor: CurrentUserPayload,
+  ) {
+    return this.maintenance.complete(id, recordId, dto, actor);
+  }
+
+  @Patch(':id/maintenance/:recordId/cancel')
+  @Roles(UserRole.ADMIN, UserRole.IT_STAFF)
+  cancelMaintenance(
+    @Param('id', ParseIntPipe) id: number,
+    @Param('recordId', ParseIntPipe) recordId: number,
+    @Body() dto: MaintenanceVersionDto,
+    @CurrentUser() actor: CurrentUserPayload,
+  ) {
+    return this.maintenance.cancel(id, recordId, dto, actor);
+  }
 
   @Post()
   @Roles(UserRole.ADMIN, UserRole.IT_STAFF)

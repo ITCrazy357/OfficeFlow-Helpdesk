@@ -26,6 +26,11 @@ describe('Prisma startup readiness', () => {
       .mockResolvedValue(null);
     jest.spyOn(service.ticket, 'findFirst').mockResolvedValue(null);
     jest.spyOn(service.slaPolicy, 'findFirst').mockResolvedValue(null);
+    jest.spyOn(service.asset, 'findFirst').mockResolvedValue(null);
+    jest.spyOn(service.assetMaintenance, 'findFirst').mockResolvedValue(null);
+    jest
+      .spyOn(service.assetWarrantyReminder, 'findFirst')
+      .mockResolvedValue(null);
     slaAlertReadSpy = jest
       .spyOn(service.slaAlert, 'findFirst')
       .mockResolvedValue(null);
@@ -55,6 +60,14 @@ describe('Prisma startup readiness', () => {
     const error = new Error('SLA schema unavailable');
     slaAlertReadSpy.mockRejectedValue(error);
 
+    await expect(service.onModuleInit()).rejects.toBe(error);
+    expect(disconnectSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it('fails startup and closes the pool when the asset care schema is unavailable', async () => {
+    jest.spyOn(service, '$queryRaw').mockResolvedValue([{ ok: 1 }]);
+    const error = new Error('Asset care schema unavailable');
+    jest.spyOn(service.assetMaintenance, 'findFirst').mockRejectedValue(error);
     await expect(service.onModuleInit()).rejects.toBe(error);
     expect(disconnectSpy).toHaveBeenCalledTimes(1);
   });

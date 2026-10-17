@@ -54,6 +54,8 @@ export function AssetForm({
       serialNumber: defaultValues?.serialNumber ?? "",
       purchaseDate: defaultValues?.purchaseDate ?? "",
       warrantyUntil: defaultValues?.warrantyUntil ?? "",
+      supplierName: defaultValues?.supplierName ?? "",
+      supplierContact: defaultValues?.supplierContact ?? "",
       notes: defaultValues?.notes ?? "",
     },
   });
@@ -189,6 +191,31 @@ export function AssetForm({
             />
           </div>
           <FieldError message={form.formState.errors.warrantyUntil?.message} />
+        </div>
+      </div>
+
+      <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid min-w-0 content-start gap-2">
+          <Label htmlFor="asset-supplier-name">Nhà cung cấp</Label>
+          <Input
+            id="asset-supplier-name"
+            maxLength={150}
+            disabled={isSubmitting}
+            {...form.register("supplierName")}
+          />
+          <FieldError message={form.formState.errors.supplierName?.message} />
+        </div>
+        <div className="grid min-w-0 content-start gap-2">
+          <Label htmlFor="asset-supplier-contact">Liên hệ nhà cung cấp</Label>
+          <Input
+            id="asset-supplier-contact"
+            maxLength={250}
+            disabled={isSubmitting}
+            {...form.register("supplierContact")}
+          />
+          <FieldError
+            message={form.formState.errors.supplierContact?.message}
+          />
         </div>
       </div>
 

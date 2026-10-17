@@ -26,6 +26,7 @@ import { CreateAssetDto } from './dto/create-asset.dto';
 import { GetAssetsQueryDto } from './dto/get-assets-query.dto';
 import { ReturnAssetDto } from './dto/return-asset.dto';
 import { UpdateAssetDto } from './dto/update-asset.dto';
+import { warrantyWindow } from './asset-care.util';
 
 @Injectable()
 export class AssetsService {
@@ -106,6 +107,8 @@ export class AssetsService {
       const serialNumberExists = await this.prisma.asset.findUnique({
         where: {
           serialNumber: createAssetDto.serialNumber,
+          supplierName: createAssetDto.supplierName,
+          supplierContact: createAssetDto.supplierContact,
         },
         select: {
           id: true,
@@ -165,6 +168,14 @@ export class AssetsService {
     const skip = (page - 1) * limit;
 
     const where: Prisma.AssetWhereInput = {};
+    if (query.warranty) {
+      const { start, end } = warrantyWindow();
+      where.warrantyUntil =
+        query.warranty === 'EXPIRING' ? { gte: start, lt: end } : { lt: start };
+      where.AND = [
+        { status: { notIn: [AssetStatus.RETIRED, AssetStatus.LOST] } },
+      ];
+    }
 
     if (query.type) {
       where.type = query.type;
@@ -350,6 +361,8 @@ export class AssetsService {
       const duplicate = await this.prisma.asset.findFirst({
         where: {
           serialNumber: updateAssetDto.serialNumber,
+          supplierName: updateAssetDto.supplierName,
+          supplierContact: updateAssetDto.supplierContact,
           id: {
             not: id,
           },
@@ -398,6 +411,8 @@ export class AssetsService {
             brand: asset.brand,
             model: asset.model,
             serialNumber: asset.serialNumber,
+            supplierName: asset.supplierName,
+            supplierContact: asset.supplierContact,
             purchaseDate: asset.purchaseDate?.toISOString() ?? null,
             warrantyUntil: asset.warrantyUntil?.toISOString() ?? null,
             notes: asset.notes,
@@ -409,6 +424,8 @@ export class AssetsService {
             brand: updatedAsset.brand,
             model: updatedAsset.model,
             serialNumber: updatedAsset.serialNumber,
+            supplierName: updatedAsset.supplierName,
+            supplierContact: updatedAsset.supplierContact,
             purchaseDate: updatedAsset.purchaseDate?.toISOString() ?? null,
             warrantyUntil: updatedAsset.warrantyUntil?.toISOString() ?? null,
             notes: updatedAsset.notes,

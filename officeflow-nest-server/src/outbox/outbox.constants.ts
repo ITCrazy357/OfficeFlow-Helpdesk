@@ -10,6 +10,7 @@ export const OUTBOX_EVENT_TYPES = {
   TICKET_SLA_ALERT: 'ticket.sla_alert',
   ASSET_ASSIGNED: 'asset.assigned',
   ASSET_RETURNED: 'asset.returned',
+  ASSET_WARRANTY_EXPIRING: 'asset.warranty_expiring',
   LEAVE_REQUESTED: 'leave.requested',
   LEAVE_APPROVED: 'leave.approved',
   LEAVE_REJECTED: 'leave.rejected',
@@ -24,6 +25,13 @@ export type OutboxEventType =
   (typeof OUTBOX_EVENT_TYPES)[keyof typeof OUTBOX_EVENT_TYPES];
 
 export type OutboxEventPayloadByType = {
+  [OUTBOX_EVENT_TYPES.ASSET_WARRANTY_EXPIRING]: {
+    assetId: number;
+    assetTag: string;
+    assetName: string;
+    warrantyDate: string;
+    recipientIds: number[];
+  };
   [OUTBOX_EVENT_TYPES.TICKET_SLA_ALERT]: {
     ticketId: number;
     ticketTitle: string;

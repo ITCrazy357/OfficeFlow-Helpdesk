@@ -18,6 +18,7 @@ import { MailService } from '../src/mail/mail.service';
 import { OutboxProcessor } from '../src/outbox/outbox.processor';
 import { OutboxMetricsCollector } from '../src/outbox/outbox-metrics.collector';
 import { SlaService } from '../src/sla/sla.service';
+import { AssetWarrantyReminderService } from '../src/assets/asset-warranty-reminder.service';
 import { RefreshTokenCleanupService } from '../src/auth/refresh-token-cleanup.service';
 import { MetricsService } from '../src/metrics/metrics.service';
 
@@ -77,6 +78,8 @@ describe('AppController (e2e)', () => {
       .overrideProvider(OutboxMetricsCollector)
       .useValue({})
       .overrideProvider(SlaService)
+      .useValue({})
+      .overrideProvider(AssetWarrantyReminderService)
       .useValue({})
       .overrideProvider(RefreshTokenCleanupService)
       .useValue({})
@@ -254,6 +257,76 @@ describe('AppController (e2e)', () => {
 
   it('/api/dashboard/performance requires authentication', () => {
     return request(httpServer).get('/api/dashboard/performance').expect(401);
+  });
+
+  it('protects asset care costs and validates maintenance actions through real HTTP guards', async () => {
+    const session = {
+      userId: 41,
+      usedAt: null,
+      revokedAt: null,
+      expiresAt: new Date(Date.now() + 60_000),
+      user: {
+        role: 'EMPLOYEE',
+        isActive: true,
+        isLocked: false,
+        mustChangePassword: false,
+      },
+    };
+    mockPrismaService.refreshToken.findUnique.mockResolvedValue(session);
+    const token = app.get(JwtService).sign(
+      { sub: 41, sid: 'care-session' },
+      {
+        issuer: 'officeflow-api',
+        audience: 'officeflow-web',
+        expiresIn: '5m',
+      },
+    );
+    for (const role of ['EMPLOYEE', 'MANAGER']) {
+      session.user.role = role;
+      await request(httpServer)
+        .get('/api/assets/care-overview')
+        .auth(token, { type: 'bearer' })
+        .expect(403);
+      await request(httpServer)
+        .get('/api/assets/1/maintenance')
+        .auth(token, { type: 'bearer' })
+        .expect(403);
+      await request(httpServer)
+        .post('/api/assets/1/maintenance')
+        .auth(token, { type: 'bearer' })
+        .send({})
+        .expect(403);
+      await request(httpServer)
+        .patch('/api/assets/1/maintenance/2/complete')
+        .auth(token, { type: 'bearer' })
+        .send({})
+        .expect(403);
+    }
+    session.user.role = 'ADMIN';
+    await request(httpServer)
+      .get('/api/assets/1/maintenance?limit=101')
+      .auth(token, { type: 'bearer' })
+      .expect(400);
+    await request(httpServer)
+      .post('/api/assets/1/maintenance')
+      .auth(token, { type: 'bearer' })
+      .send({ title: 'Fix', kind: 'REPAIR', scheduledFor: '2026-02-30' })
+      .expect(400);
+    await request(httpServer)
+      .patch('/api/assets/1/maintenance/2')
+      .auth(token, { type: 'bearer' })
+      .send({ version: 0, kind: null })
+      .expect(400);
+    await request(httpServer)
+      .patch('/api/assets/1/maintenance/2/complete')
+      .auth(token, { type: 'bearer' })
+      .send({ version: 0, performedOn: '2026-01-01', cost: '0.5' })
+      .expect(400);
+    await request(httpServer)
+      .patch('/api/assets/1/maintenance/2/cancel')
+      .auth(token, { type: 'bearer' })
+      .send({ version: -1 })
+      .expect(400);
   });
 
   it('/api/dashboard/performance validates query dates and returns the scoped report through real JWT auth', async () => {
