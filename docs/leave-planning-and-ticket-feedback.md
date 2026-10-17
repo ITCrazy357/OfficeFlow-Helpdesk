@@ -27,6 +27,8 @@ API mới, đều yêu cầu đăng nhập:
 
 `POST /api/leave-request` thêm `type: ANNUAL|UNPAID|SICK` và `period: FULL_DAY|MORNING|AFTERNOON`. Bỏ hai trường dùng ANNUAL/FULL_DAY cho đơn mới. Giữ chỗ, đơn, audit và outbox ghi trong cùng transaction Serializable có retry; từ chối/hủy giải phóng giữ chỗ theo trạng thái, không ghi sổ trừ/cộng lặp.
 
+Các transaction tương tác của luồng nghỉ phép có giới hạn thực thi 30 giây và chờ lấy connection tối đa 10 giây, phù hợp hơn với database qua mạng so với mặc định 5 giây. Khi lưu hạn mức, API trả số dư từ dữ liệu đã kiểm tra và bản ghi vừa lưu trong cùng snapshot; không truy vấn toàn bộ số dư lần nữa. Xung đột P2034 vẫn được retry có giới hạn; lỗi hết thời gian P2028 không tự retry. Thay đổi này không cần migration hoặc biến môi trường mới.
+
 ## Chức năng 7: kết quả ticket
 
 Khi ticket RESOLVED, người tạo có thể **Xác nhận đã giải quyết** để chuyển CLOSED hoặc **Yêu cầu xử lý tiếp** kèm lý do 5–2.000 ký tự để chuyển IN_PROGRESS. ADMIN/IT_STAFF chuyển sang RESOLVED; việc đóng ticket mới cần người tạo xác nhận, kể cả khi người gọi là ADMIN. Không tự đóng theo thời gian. Ticket CLOSED/CANCELLED vẫn là trạng thái cuối.
@@ -60,3 +62,9 @@ Các kết quả kiểm tra local và Docker dùng dữ liệu/container tạm, 
 - Frontend: lint, build production kèm TypeScript, 38 kiểm thử hồi quy và toàn bộ 38 kiểm thử trình duyệt đạt. Sáu luồng mới kiểm tra cả sáng/tối và các chiều rộng 320/390/768/1440px; các kiểm thử form/dashboard/tài sản trước đó tiếp tục đạt.
 - Image chạy bằng CMD mặc định `start:deploy` với database/Redis riêng: migration, `/health`, `/db-health`, Prisma schema diff không có khác biệt; HTTP thật kiểm tra đăng nhập, hạn mức hợp lệ, nửa ngày, duyệt/số dư, lịch không lộ lý do, lỗi trùng 409, chặn staff xác nhận 403, phiên bản cũ 409, đánh giá một lần và thông báo qua outbox.
 - Không sửa lockfile, không thêm dependency/biến môi trường, không chạy migration trên database làm việc hoặc production. Chưa push/deploy và chưa có kết quả CI từ xa; không coi các kiểm tra local là xác nhận quét bảo mật từ xa.
+
+## Sửa lỗi lưu hạn mức P2028 ngày 18/10/2026
+
+Log Render ghi `transactionFailure: expired`, giới hạn 5000 ms và thời gian thực thi 6508 ms. Bản sửa bỏ lần đọc số dư thứ hai khi lưu và dùng ngân sách transaction nghỉ phép 30000 ms / maxWait 10000 ms như mô tả ở trên. Không thay đổi quyền, kiểm tra phiên bản, giới hạn số dư hoặc tính nguyên tử của audit.
+
+Đã kiểm chứng local: lint, build Nest/Docker, 728 unit test đạt coverage gate, 31 HTTP E2E và 34 integration test MySQL/Redis. Test hồi quy chèn độ trễ 5,5 giây sau khi đọc số dư trong transaction rồi xác nhận hạn mức được commit và đọc lại đúng. Test riêng xác nhận rollback khi audit lỗi và chỉ một lần ghi thành công khi hai yêu cầu dùng chung phiên bản. Image mới chạy CMD deploy, health/schema diff và lưu hạn mức qua HTTP thật thành công trên database tạm. Cần deploy lại backend để áp dụng trên Render; không cần migration hoặc biến môi trường mới cho bản sửa này. Chưa xác nhận lại trên production hoặc CI từ xa.

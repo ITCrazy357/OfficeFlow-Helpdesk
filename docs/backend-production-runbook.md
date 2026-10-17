@@ -241,6 +241,19 @@ tested backup-restore procedure instead of improvising SQL on production.
   migration. If connection creation still times out, investigate connectivity
   from Render to the database; longer timeouts cannot repair a blocked route.
 
+- **Prisma P2028 / `transactionFailure: expired` when saving leave allowance:**
+  interactive transactions previously used Prisma's 5000 ms default. Database
+  round trips can exceed that budget even when the database remains reachable.
+  Leave operations now use a bounded 30000 ms execution budget and 10000 ms
+  connection-acquisition wait; saving an allowance also reuses the validated
+  balance instead of querying it twice. Serializable isolation, version checks,
+  and audit rollback remain enforced. P2028 is not automatically retried.
+  Deploy the updated backend; no migration or environment change is needed.
+  After deployment, save an allowance and verify the returned version/balance.
+  If expiry persists, check query timings, lock waits and network latency before
+  changing timeouts again. Connection URL `connectTimeout`/`acquireTimeout` are
+  separate from the interactive transaction execution timeout.
+
 - **Verify Backend failed:** no deployment was triggered; fix the code or
   migration and push again.
 - **Render hook failed:** confirm the hook secret has not expired or been

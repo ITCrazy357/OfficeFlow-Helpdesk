@@ -166,6 +166,8 @@ describe('LeaveRequestService', () => {
       expect.any(Function),
       {
         isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+        maxWait: 10_000,
+        timeout: 30_000,
       },
     );
     expect(mockTransaction.user.findUnique).toHaveBeenCalledWith(

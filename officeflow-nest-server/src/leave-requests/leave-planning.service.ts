@@ -32,6 +32,7 @@ import {
   LeavePreviewDto,
   SetLeaveEntitlementDto,
 } from './dto/leave-planning.dto';
+import { LEAVE_TRANSACTION_TIMING } from './leave-transaction.options';
 
 @Injectable()
 export class LeavePlanningService {
@@ -140,7 +141,10 @@ export class LeavePlanningService {
       throw new ForbiddenException('Forbidden');
     return this.prisma.$transaction(
       (tx) => this.balance(tx, userId, query.year),
-      { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead },
+      {
+        ...LEAVE_TRANSACTION_TIMING,
+        isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead,
+      },
     );
   }
 
@@ -152,42 +156,53 @@ export class LeavePlanningService {
   ) {
     if (actor.role !== UserRole.ADMIN)
       throw new ForbiddenException('Forbidden');
-    return runSerializableTransaction(this.prisma, async (tx) => {
-      const user = await tx.user.findUnique({
-        where: { id: userId },
-        select: { id: true },
-      });
-      if (!user) throw new NotFoundException('User not found');
-      const previous = await this.balance(tx, userId, year);
-      if (previous.version !== dto.version)
-        throw new ConflictException(
-          'Leave allowance changed. Reload before saving',
+    return runSerializableTransaction(
+      this.prisma,
+      async (tx) => {
+        const user = await tx.user.findUnique({
+          where: { id: userId },
+          select: { id: true },
+        });
+        if (!user) throw new NotFoundException('User not found');
+        const previous = await this.balance(tx, userId, year);
+        if (previous.version !== dto.version)
+          throw new ConflictException(
+            'Leave allowance changed. Reload before saving',
+          );
+        if (dto.days < previous.used + previous.reserved)
+          throw new ConflictException(
+            'Allowance cannot be lower than used and reserved leave',
+          );
+        const saved = await tx.leaveEntitlement.upsert({
+          where: { userId_year: { userId, year } },
+          create: { userId, year, halfDays: dto.days * 2 },
+          update: { halfDays: dto.days * 2, version: { increment: 1 } },
+        });
+        await this.audit.create(
+          {
+            actorId: actor.userId,
+            entity: AuditLogEntity.LEAVE_REQUEST,
+            entityId: null,
+            action: AuditLogAction.UPDATE,
+            description: `Updated annual leave allowance for user ${userId}, year ${year}.`,
+            oldValues: { userId, year, days: previous.allowance },
+            newValues: { userId, year, days: dto.days },
+            ipAddress: actor.ipAddress,
+            userAgent: actor.userAgent,
+          },
+          tx,
         );
-      if (dto.days < previous.used + previous.reserved)
-        throw new ConflictException(
-          'Allowance cannot be lower than used and reserved leave',
-        );
-      await tx.leaveEntitlement.upsert({
-        where: { userId_year: { userId, year } },
-        create: { userId, year, halfDays: dto.days * 2 },
-        update: { halfDays: dto.days * 2, version: { increment: 1 } },
-      });
-      await this.audit.create(
-        {
-          actorId: actor.userId,
-          entity: AuditLogEntity.LEAVE_REQUEST,
-          entityId: null,
-          action: AuditLogAction.UPDATE,
-          description: `Updated annual leave allowance for user ${userId}, year ${year}.`,
-          oldValues: { userId, year, days: previous.allowance },
-          newValues: { userId, year, days: dto.days },
-          ipAddress: actor.ipAddress,
-          userAgent: actor.userAgent,
-        },
-        tx,
-      );
-      return this.balance(tx, userId, year);
-    }).catch((error: unknown) => {
+        // Usage cannot change inside this Serializable snapshot. Reuse it instead
+        // of reading the full balance again before the transaction can commit.
+        return {
+          ...previous,
+          allowance: saved.halfDays / 2,
+          remaining: saved.halfDays / 2 - previous.used - previous.reserved,
+          version: saved.version,
+        };
+      },
+      LEAVE_TRANSACTION_TIMING,
+    ).catch((error: unknown) => {
       if (
         error instanceof Prisma.PrismaClientKnownRequestError &&
         error.code === 'P2002'
@@ -215,7 +230,10 @@ export class LeavePlanningService {
           balances,
         };
       },
-      { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead },
+      {
+        ...LEAVE_TRANSACTION_TIMING,
+        isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead,
+      },
     );
   }
 

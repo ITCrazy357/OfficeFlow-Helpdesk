@@ -48,6 +48,23 @@ describe('runSerializableTransaction', () => {
     expect($transaction).toHaveBeenCalledTimes(3);
   });
 
+  it('accepts a bounded latency budget without changing isolation', async () => {
+    const $transaction = jest.fn().mockResolvedValue('saved');
+    const work = jest.fn();
+    await expect(
+      runSerializableTransaction(
+        { $transaction } as unknown as PrismaService,
+        work,
+        { maxWait: 10_000, timeout: 30_000 },
+      ),
+    ).resolves.toBe('saved');
+    expect($transaction).toHaveBeenCalledWith(work, {
+      isolationLevel: 'Serializable',
+      maxWait: 10_000,
+      timeout: 30_000,
+    });
+  });
+
   it.each([
     new ConflictException('Handoff required'),
     new Error('Database unavailable'),
