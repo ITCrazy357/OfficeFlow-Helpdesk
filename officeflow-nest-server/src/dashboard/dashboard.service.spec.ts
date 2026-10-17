@@ -46,6 +46,52 @@ describe('DashboardService Redis cache', () => {
     );
   });
 
+  it('separates performance caches by date range and employee scope', async () => {
+    mockRedis.isReady.mockReturnValue(true);
+    mockRedis.getDashboardVersion.mockResolvedValue(7);
+    mockRedis.getJson.mockResolvedValue({ cohort: { total: 2 } });
+    await service.getPerformance(
+      { userId: 42, role: UserRole.EMPLOYEE },
+      { from: '2026-01-01', to: '2026-01-31' },
+    );
+    expect(mockRedis.getJson).toHaveBeenCalledWith(
+      'officeflow:test:dashboard:report-v1:data-v7:performance-v1:2026-01-01:2026-01-31:employee:42',
+    );
+    await service.getPerformance(
+      { userId: 43, role: UserRole.EMPLOYEE },
+      { from: '2026-02-01', to: '2026-02-28' },
+    );
+    expect(mockRedis.getJson).toHaveBeenLastCalledWith(
+      'officeflow:test:dashboard:report-v1:data-v7:performance-v1:2026-02-01:2026-02-28:employee:43',
+    );
+  });
+
+  it('checks live manager scope before reading the performance cache', async () => {
+    mockRedis.isReady.mockReturnValue(true);
+    mockRedis.getDashboardVersion.mockResolvedValue(1);
+    mockRedis.getJson.mockResolvedValue({ cohort: { total: 2 } });
+    mockPrisma.user.findUnique.mockResolvedValue({ departmentId: 5 });
+    await service.getPerformance(
+      { userId: 9, role: UserRole.MANAGER },
+      { from: '2026-01-01', to: '2026-01-31' },
+    );
+    expect(mockRedis.getJson).toHaveBeenLastCalledWith(
+      expect.stringContaining('department:5'),
+    );
+    mockPrisma.user.findUnique.mockResolvedValue({ departmentId: 6 });
+    await service.getPerformance(
+      { userId: 9, role: UserRole.MANAGER },
+      { from: '2026-01-01', to: '2026-01-31' },
+    );
+    expect(mockRedis.getJson).toHaveBeenLastCalledWith(
+      expect.stringContaining('department:6'),
+    );
+    mockPrisma.user.findUnique.mockResolvedValue({ departmentId: null });
+    await expect(
+      service.getPerformance({ userId: 9, role: UserRole.MANAGER }, {}),
+    ).rejects.toThrow('Manager has no department');
+  });
+
   it('returns a versioned, role-scoped cache hit without querying tickets', async () => {
     const cached = {
       totalTickets: 8,

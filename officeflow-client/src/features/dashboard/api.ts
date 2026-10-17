@@ -7,7 +7,23 @@ import type {
   DashboardSlaOverview,
   DashboardStatusReportItem,
   DashboardSummary,
+  DashboardPerformance,
+  PerformanceDates,
 } from "./types";
+
+export async function getDashboardPerformanceApi(
+  dates: PerformanceDates,
+  signal?: AbortSignal,
+) {
+  const response = await api.get<ApiResponse<DashboardPerformance>>(
+    "/dashboard/performance",
+    {
+      params: dates,
+      signal,
+    },
+  );
+  return response.data.data;
+}
 
 function keepValidRows<T extends { total: number }>(rows: Array<T | null>) {
   return rows.filter(

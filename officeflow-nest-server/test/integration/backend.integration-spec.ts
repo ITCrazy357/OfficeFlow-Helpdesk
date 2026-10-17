@@ -21,6 +21,8 @@ import { SlaPolicyService } from '../../src/sla/sla-policy.service';
 import { SlaService } from '../../src/sla/sla.service';
 import { KnowledgeService } from '../../src/knowledge/knowledge.service';
 import { DEFAULT_SLA_POLICY } from '../../src/sla/sla-policy';
+import { DateTime } from 'luxon';
+import { DashboardService } from '../../src/dashboard/dashboard.service';
 import { NotificationsService } from '../../src/notifications/notifications.service';
 import { NotificationsListener } from '../../src/notifications/notifications.listener';
 import type { TicketSlaAlertEvent } from '../../src/notifications/events/ticket-sla-alert.event';
@@ -116,6 +118,108 @@ describe('Real MySQL/Redis integration (disposable containers only)', () => {
       },
       employee,
     );
+
+  it('reports saved SLA calendars, repeated reopenings and scoped backlog against real MySQL', async () => {
+    const department = await prisma.department.create({
+      data: { name: randomUUID() },
+    });
+    const creator = await prisma.user.create({
+      data: {
+        name: 'Report owner',
+        email: `${randomUUID()}@test.invalid`,
+        passwordHash: 'test-only',
+        departmentId: department.id,
+      },
+    });
+    const manager = await prisma.user.create({
+      data: {
+        name: 'Report manager',
+        email: `${randomUUID()}@test.invalid`,
+        passwordHash: 'test-only',
+        role: 'MANAGER',
+        departmentId: department.id,
+      },
+    });
+    const monday = DateTime.now()
+      .setZone('Asia/Ho_Chi_Minh')
+      .startOf('week')
+      .minus({ weeks: 1 });
+    const friday = monday.plus({ days: 4 });
+    const createdAt = friday.set({ hour: 11 }).toJSDate();
+    const answeredAt = friday.set({ hour: 14 }).toJSDate();
+    const make = (data: Record<string, unknown> = {}) =>
+      prisma.ticket.create({
+        data: {
+          title: 'Report fixture',
+          description: 'Integration',
+          createdById: creator.id,
+          createdAt,
+          slaPolicy: DEFAULT_SLA_POLICY,
+          ...data,
+        },
+      });
+    await make({
+      status: 'RESOLVED',
+      firstRespondedAt: answeredAt,
+      resolveAt: answeredAt,
+    });
+    await make({
+      status: 'CLOSED',
+      resolveAt: answeredAt,
+      slaPolicy: { ...DEFAULT_SLA_POLICY, holidays: [friday.toISODate()!] },
+    });
+    const reopened = await make({ status: 'IN_PROGRESS' });
+    await prisma.ticketHistory.createMany({
+      data: [
+        { oldValue: 'IN_PROGRESS', newValue: 'RESOLVED' },
+        { oldValue: 'RESOLVED', newValue: 'IN_PROGRESS' },
+        { oldValue: 'IN_PROGRESS', newValue: 'RESOLVED' },
+        { oldValue: 'RESOLVED', newValue: 'IN_PROGRESS' },
+      ].map((change) => ({
+        ...change,
+        action: 'STATUS_CHANGED',
+        ticketId: reopened.id,
+        userId: admin.userId,
+        createdAt: answeredAt,
+      })),
+    });
+    await make({
+      createdAt: monday.minus({ days: 40 }).toJSDate(),
+      slaPolicy: undefined,
+    });
+    const dashboard = new DashboardService(prisma, redis, new MetricsService());
+    const range = { from: friday.toISODate()!, to: friday.toISODate()! };
+    const report = await dashboard.getPerformance(
+      { userId: creator.id, role: 'EMPLOYEE' },
+      range,
+    );
+    expect(report.cohort).toMatchObject({
+      total: 3,
+      completed: 2,
+      everCompleted: 3,
+      reopened: 1,
+      reopenRate: 33.33,
+      firstResponse: { minutes: 120, samples: 1 },
+      resolution: { minutes: 60, samples: 2 },
+    });
+    expect(report.daily).toEqual([
+      { date: range.from, created: 3, completed: 2 },
+    ]);
+    expect(report.backlog.reduce((sum, bucket) => sum + bucket.total, 0)).toBe(
+      2,
+    );
+    expect(report.backlog.at(-1)?.total).toBe(1);
+    const managerReport = await dashboard.getPerformance(
+      { userId: manager.id, role: 'MANAGER' },
+      range,
+    );
+    expect(managerReport.cohort).toEqual(report.cohort);
+    const privateReport = await dashboard.getPerformance(outsider, range);
+    expect(privateReport.cohort.total).toBe(0);
+    expect(privateReport.backlog.every((bucket) => bucket.total === 0)).toBe(
+      true,
+    );
+  });
 
   it('suggests published VPN guides and denies a guide after it becomes a draft', async () => {
     const knowledge = new KnowledgeService(prisma, audit);

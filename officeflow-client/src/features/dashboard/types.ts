@@ -37,3 +37,22 @@ export type DashboardSlaOverview = {
   resolvedTickets: number;
   overdueRate: number;
 };
+
+export type PerformanceDates = { from: string; to: string };
+
+export type DashboardPerformance = {
+  range: PerformanceDates & { timezone: string };
+  generatedAt: string;
+  cohort: {
+    total: number;
+    completed: number;
+    everCompleted: number;
+    reopened: number;
+    legacyCalendarTickets: number;
+    reopenRate: number | null;
+    firstResponse: { minutes: number | null; samples: number };
+    resolution: { minutes: number | null; samples: number };
+  };
+  daily: Array<{ date: string; created: number; completed: number }>;
+  backlog: Array<{ key: string; label: string; total: number }>;
+};

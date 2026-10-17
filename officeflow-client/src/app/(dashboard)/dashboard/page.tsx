@@ -52,6 +52,14 @@ import { useMe } from "@/features/auth/hooks";
 import type { TicketPriority, TicketStatus } from "@/features/tickets/types";
 import { getApiErrorMessage } from "@/lib/axios";
 
+const PerformanceReport = dynamic(
+  () => import("@/features/dashboard/components/performance-report"),
+  {
+    ssr: false,
+    loading: () => <p role="status">Đang tải báo cáo hiệu quả xử lý…</p>,
+  },
+);
+
 const AdminDashboardCharts = dynamic(
   () => import("@/features/dashboard/components/admin-dashboard-charts"),
   {
@@ -437,6 +445,16 @@ export default function DashboardPage() {
         </div>
       </section>
 
+      <PerformanceReport />
+
+      <div>
+        <h2 className="text-xl font-semibold tracking-tight">
+          Tổng quan toàn bộ ticket
+        </h2>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Các số liệu bên dưới bao gồm mọi ngày tạo trong phạm vi quyền của bạn.
+        </p>
+      </div>
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         {metricCards.slice(0, 4).map((card, index) => (
           <MetricCard

@@ -5,6 +5,11 @@ import { RedisService } from '../redis/redis.service';
 import { MetricsService } from '../metrics/metrics.service';
 import { observeSafely } from '../common/diagnostics/safe-observation';
 import { getSafeErrorDetails } from '../common/diagnostics/request-diagnostics';
+import {
+  getPerformanceRange,
+  loadPerformanceReport,
+} from './dashboard-performance';
+import type { PerformanceQueryDto } from './dto/performance-query.dto';
 
 const DEFAULT_DASHBOARD_CACHE_TTL_SECONDS = 60;
 
@@ -205,6 +210,15 @@ export class DashboardService {
         overdueTickets,
       };
     });
+  }
+
+  async getPerformance(currentUser: CurrentUser, query: PerformanceQueryDto) {
+    const range = getPerformanceRange(query);
+    return this.getCachedReport(
+      `performance-v1:${range.from}:${range.to}`,
+      currentUser,
+      (where) => loadPerformanceReport(this.prisma, where, range),
+    );
   }
 
   async getTicketsByStatus(currentUser: CurrentUser) {

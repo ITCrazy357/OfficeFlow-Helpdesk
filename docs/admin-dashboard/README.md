@@ -2,7 +2,12 @@
 
 The ADMIN view at `/dashboard` uses Recharts 3.10.1, composed to match OfficeFlow's
 existing shadcn/Radix controls and semantic light/dark tokens. No external dashboard
-template, demo dataset, or new backend endpoint is included in the application.
+template or demo dataset is included in the application.
+
+The dashboard now starts with the date-filtered [processing performance report](../processing-performance.md),
+available within each user's dashboard scope. That report uses its own `/dashboard/performance`
+endpoint and saved per-ticket SLA calendars. The panels described below remain all-time
+distributions and are labelled separately from the date-filtered report.
 
 References: [Recharts](https://github.com/recharts/recharts),
 [shadcn chart composition](https://ui.shadcn.com/docs/components/radix/chart).
@@ -20,8 +25,10 @@ this new panel is mounted only for ADMIN. EMPLOYEE, MANAGER, and IT_STAFF retain
 the existing dashboard and do not make the additional workload request here.
 
 SLA's remaining segment means no recorded breach, not proven on-time completion.
-Values are accumulated counts. The APIs do not supply daily history, so the view
-does not invent a time trend or change-from-last-period percentage.
+Values in these all-time panels are accumulated counts. Their APIs do not supply
+daily history, so these panels do not invent a time trend or change-from-last-period
+percentage. The separate performance chart groups current outcomes by creation date;
+it does not represent daily resolution throughput.
 
 Tooltips support inspection, ranking lists expand beyond six rows, and each chart
 has a native disclosure with a data table. Empty datasets show an empty state.
