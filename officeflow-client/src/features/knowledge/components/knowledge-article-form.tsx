@@ -61,7 +61,7 @@ export function KnowledgeArticleForm({
       onSubmit={form.handleSubmit(handleSubmit)}
       noValidate
     >
-      <div className="grid gap-2">
+      <div className="grid min-w-0 content-start gap-2">
         <Label htmlFor="knowledge-title">Tiêu đề</Label>
         <div className="relative">
           <BookOpen className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
@@ -81,7 +81,7 @@ export function KnowledgeArticleForm({
         ) : null}
       </div>
 
-      <div className="grid gap-2">
+      <div className="grid min-w-0 content-start gap-2">
         <Label htmlFor="knowledge-summary">Tóm tắt</Label>
         <Textarea
           id="knowledge-summary"
@@ -98,7 +98,7 @@ export function KnowledgeArticleForm({
         ) : null}
       </div>
 
-      <div className="grid gap-2">
+      <div className="grid min-w-0 content-start gap-2">
         <Label htmlFor="knowledge-content">Nội dung</Label>
         <Textarea
           id="knowledge-content"
@@ -116,7 +116,7 @@ export function KnowledgeArticleForm({
       </div>
 
       <div className="grid gap-4 sm:grid-cols-[1fr_180px]">
-        <div className="grid gap-2">
+        <div className="grid min-w-0 content-start gap-2">
           <Label htmlFor="knowledge-tags">Tags</Label>
           <div className="relative">
             <Tags className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
@@ -134,8 +134,10 @@ export function KnowledgeArticleForm({
           </p>
         </div>
 
-        <div className="grid gap-2">
-          <Label>Trạng thái</Label>
+        <div className="grid min-w-0 content-start gap-2">
+          <Label id="knowledge-published-label" htmlFor="knowledge-published">
+            Trạng thái
+          </Label>
           <Controller
             control={form.control}
             name="isPublished"
@@ -145,7 +147,13 @@ export function KnowledgeArticleForm({
                 onValueChange={(value) => field.onChange(value === "true")}
                 disabled={isSubmitting}
               >
-                <SelectTrigger className="w-full">
+                <SelectTrigger
+                  id="knowledge-published"
+                  aria-labelledby="knowledge-published-label"
+                  className="w-full"
+                  ref={field.ref}
+                  onBlur={field.onBlur}
+                >
                   <SelectValue placeholder="Chọn trạng thái" />
                 </SelectTrigger>
                 <SelectContent>

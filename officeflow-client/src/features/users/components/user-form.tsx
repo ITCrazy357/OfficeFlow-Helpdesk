@@ -77,7 +77,7 @@ export function UserForm({
       onSubmit={form.handleSubmit(handleSubmit)}
       noValidate
     >
-      <div className="grid gap-2">
+      <div className="grid min-w-0 content-start gap-2">
         <Label htmlFor={`${mode}-user-name`}>Họ tên</Label>
         <Input
           id={`${mode}-user-name`}
@@ -90,7 +90,7 @@ export function UserForm({
         <FieldError message={form.formState.errors.name?.message} />
       </div>
 
-      <div className="grid gap-2">
+      <div className="grid min-w-0 content-start gap-2">
         <Label htmlFor={`${mode}-user-email`}>Email</Label>
         <Input
           id={`${mode}-user-email`}
@@ -105,8 +105,10 @@ export function UserForm({
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-1">
-        <div className="grid gap-2">
-          <Label>Vai trò</Label>
+        <div className="grid min-w-0 content-start gap-2">
+          <Label id={`${mode}-user-role-label`} htmlFor={`${mode}-user-role`}>
+            Vai trò
+          </Label>
           <Controller
             control={form.control}
             name="role"
@@ -117,6 +119,10 @@ export function UserForm({
                 disabled={isSubmitting || Boolean(roleDisabledReason)}
               >
                 <SelectTrigger
+                  id={`${mode}-user-role`}
+                  aria-labelledby={`${mode}-user-role-label`}
+                  ref={field.ref}
+                  onBlur={field.onBlur}
                   className="w-full"
                   aria-invalid={Boolean(form.formState.errors.role)}
                 >
@@ -140,8 +146,13 @@ export function UserForm({
           ) : null}
         </div>
 
-        <div className="grid gap-2">
-          <Label>Phòng ban</Label>
+        <div className="grid min-w-0 content-start gap-2">
+          <Label
+            id={`${mode}-user-department-label`}
+            htmlFor={`${mode}-user-department`}
+          >
+            Phòng ban
+          </Label>
           <Controller
             control={form.control}
             name="departmentId"
@@ -152,6 +163,10 @@ export function UserForm({
                 disabled={isSubmitting || isLoadingDepartments}
               >
                 <SelectTrigger
+                  id={`${mode}-user-department`}
+                  aria-labelledby={`${mode}-user-department-label`}
+                  ref={field.ref}
+                  onBlur={field.onBlur}
                   className="w-full"
                   aria-invalid={Boolean(form.formState.errors.departmentId)}
                 >
@@ -181,7 +196,7 @@ export function UserForm({
       </div>
 
       {mode === "create" ? (
-        <div className="grid gap-2">
+        <div className="grid min-w-0 content-start gap-2">
           <Label htmlFor="create-user-password">Mật khẩu ban đầu</Label>
           <Input
             id="create-user-password"

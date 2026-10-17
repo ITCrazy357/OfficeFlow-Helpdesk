@@ -18,6 +18,10 @@ import { CreateKnowledgeArticleDto } from './dto/create-knowledge-article.dto';
 import { UpdateKnowledgeArticleDto } from './dto/update-knowledge-article.dto';
 import { GetKnowledgeQueryDto } from './dto/get-knowledge-query.dto';
 import { SuggestArticlesDto } from './dto/suggest-articles.dto';
+import {
+  extractKnowledgeKeywords,
+  scoreKnowledgeSuggestion,
+} from './knowledge-suggestions.util';
 
 @Injectable()
 export class KnowledgeService {
@@ -560,47 +564,48 @@ export class KnowledgeService {
     suggestDto: SuggestArticlesDto,
     currentUser: CurrentUserPayload,
   ) {
-    const text = `${suggestDto.title} ${suggestDto.description ?? ''}`;
-    const keywords = Array.from(
-      new Set(
-        text
-          .toLowerCase()
-          .replace(/[^\p{L}\p{N}\s]/gu, ' ')
-          .split(/\s+/)
-          .filter((keyword) => keyword.length > 3),
-      ),
-    ).slice(0, 8);
+    const keywords = extractKnowledgeKeywords(
+      `${suggestDto.title} ${suggestDto.description ?? ''}`,
+    );
 
     if (keywords.length === 0) {
       return [];
     }
 
-    return this.prisma.knowledgeArticle.findMany({
+    const candidates = await this.prisma.knowledgeArticle.findMany({
       where: {
-        ...this.buildReadScope(currentUser),
         isPublished: true,
-        OR: keywords.flatMap((keyword) => [
+        AND: [
+          this.buildReadScope(currentUser),
           {
-            title: {
-              contains: keyword,
-            },
+            OR: keywords.flatMap((keyword) => [
+              {
+                title: {
+                  contains: keyword,
+                },
+              },
+              {
+                summary: {
+                  contains: keyword,
+                },
+              },
+              {
+                content: {
+                  contains: keyword,
+                },
+              },
+              {
+                tags: {
+                  contains: keyword,
+                },
+              },
+            ]),
           },
-          {
-            content: {
-              contains: keyword,
-            },
-          },
-          {
-            tags: {
-              contains: keyword,
-            },
-          },
-        ]),
+        ],
       },
-      take: 5,
-      orderBy: {
-        updatedAt: 'desc',
-      },
+      // Rank a bounded set using metadata; do not load full article bodies.
+      take: 30,
+      orderBy: [{ updatedAt: 'desc' }, { id: 'desc' }],
       select: {
         id: true,
         title: true,
@@ -611,5 +616,14 @@ export class KnowledgeService {
         updatedAt: true,
       },
     });
+
+    return candidates
+      .map((article) => ({
+        article,
+        score: scoreKnowledgeSuggestion(article, keywords),
+      }))
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 5)
+      .map(({ article }) => article);
   }
 }

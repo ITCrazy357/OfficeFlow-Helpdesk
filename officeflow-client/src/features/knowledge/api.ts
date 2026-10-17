@@ -82,10 +82,12 @@ export async function deleteKnowledgeArticleApi(id: number) {
 
 export async function suggestKnowledgeArticlesApi(
   input: SuggestKnowledgeArticlesInput,
+  signal?: AbortSignal,
 ) {
   const res = await api.post<ApiResponse<KnowledgeSuggestion[]>>(
     "/knowledge/suggest-for-ticket",
     input,
+    { signal },
   );
 
   return res.data.data;

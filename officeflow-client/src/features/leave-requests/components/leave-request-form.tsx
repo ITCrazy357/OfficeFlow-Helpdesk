@@ -52,7 +52,7 @@ export function LeaveRequestForm({
       noValidate
     >
       <div className="grid gap-4 sm:grid-cols-2">
-        <div className="grid gap-2">
+        <div className="grid min-w-0 content-start gap-2">
           <Label htmlFor="leave-start-date">Ngày bắt đầu</Label>
           <Input
             id="leave-start-date"
@@ -76,7 +76,7 @@ export function LeaveRequestForm({
           ) : null}
         </div>
 
-        <div className="grid gap-2">
+        <div className="grid min-w-0 content-start gap-2">
           <Label htmlFor="leave-end-date">Ngày kết thúc</Label>
           <Input
             id="leave-end-date"
@@ -100,7 +100,7 @@ export function LeaveRequestForm({
         </div>
       </div>
 
-      <div className="grid gap-2">
+      <div className="grid min-w-0 content-start gap-2">
         <Label htmlFor="leave-reason">Lý do nghỉ</Label>
         <Textarea
           id="leave-reason"

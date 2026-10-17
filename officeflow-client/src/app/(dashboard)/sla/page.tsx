@@ -68,7 +68,7 @@ function PolicyForm({
           </CardHeader>
           <CardContent className="grid gap-5 pt-0">
             <div className="grid gap-4 sm:grid-cols-2">
-              <div className="grid gap-2">
+              <div className="grid min-w-0 content-start gap-2">
                 <Label htmlFor="sla-mode">Cách tính thời gian</Label>
                 <select
                   id="sla-mode"
@@ -85,7 +85,7 @@ function PolicyForm({
                   <option value="CALENDAR">Liên tục 24/7</option>
                 </select>
               </div>
-              <div className="grid gap-2">
+              <div className="grid min-w-0 content-start gap-2">
                 <Label htmlFor="sla-timezone">Múi giờ</Label>
                 <Input
                   id="sla-timezone"
@@ -210,7 +210,7 @@ function PolicyForm({
                     ít nhất 15 phút.
                   </p>
                 </div>
-                <div className="grid gap-2">
+                <div className="grid min-w-0 content-start gap-2">
                   <Label htmlFor="sla-holidays">Ngày nghỉ lễ/Tết</Label>
                   <Textarea
                     id="sla-holidays"
@@ -245,7 +245,7 @@ function PolicyForm({
                 <p className="self-center text-sm font-semibold">
                   {priority.label}
                 </p>
-                <div className="grid gap-2">
+                <div className="grid min-w-0 content-start gap-2">
                   <Label htmlFor={`sla-response-${priority.value}`}>
                     Phản hồi đầu tiên
                   </Label>
@@ -273,7 +273,7 @@ function PolicyForm({
                     }
                   />
                 </div>
-                <div className="grid gap-2">
+                <div className="grid min-w-0 content-start gap-2">
                   <Label htmlFor={`sla-resolution-${priority.value}`}>
                     Hoàn tất xử lý
                   </Label>
@@ -312,7 +312,7 @@ function PolicyForm({
             <CardTitle>Cảnh báo và chuyển cấp</CardTitle>
           </CardHeader>
           <CardContent className="grid gap-4 pt-0 sm:grid-cols-2">
-            <div className="grid gap-2">
+            <div className="grid min-w-0 content-start gap-2">
               <Label htmlFor="sla-warning">Cảnh báo trước hạn (phút)</Label>
               <Input
                 id="sla-warning"
@@ -332,7 +332,7 @@ function PolicyForm({
                 0 để tắt; thời gian cảnh báo cũng tính theo lịch SLA.
               </p>
             </div>
-            <div className="grid gap-2">
+            <div className="grid min-w-0 content-start gap-2">
               <Label htmlFor="sla-escalation">Khi quá hạn</Label>
               <select
                 id="sla-escalation"

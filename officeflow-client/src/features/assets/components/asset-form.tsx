@@ -18,10 +18,7 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 
 import { assetTypeOptions } from "../constants";
-import {
-  assetFormSchema,
-  type AssetFormValues,
-} from "../schemas";
+import { assetFormSchema, type AssetFormValues } from "../schemas";
 
 type AssetFormProps = {
   defaultValues?: Partial<AssetFormValues>;
@@ -72,7 +69,7 @@ export function AssetForm({
       noValidate
     >
       <div className="grid gap-4 sm:grid-cols-2">
-        <div className="grid gap-2">
+        <div className="grid min-w-0 content-start gap-2">
           <Label htmlFor="asset-tag">Mã tài sản</Label>
           <Input
             id="asset-tag"
@@ -84,8 +81,10 @@ export function AssetForm({
           <FieldError message={form.formState.errors.assetTag?.message} />
         </div>
 
-        <div className="grid gap-2">
-          <Label>Loại tài sản</Label>
+        <div className="grid min-w-0 content-start gap-2">
+          <Label id="asset-type-label" htmlFor="asset-type">
+            Loại tài sản
+          </Label>
           <Controller
             control={form.control}
             name="type"
@@ -95,7 +94,13 @@ export function AssetForm({
                 onValueChange={field.onChange}
                 disabled={isSubmitting}
               >
-                <SelectTrigger className="w-full">
+                <SelectTrigger
+                  id="asset-type"
+                  aria-labelledby="asset-type-label"
+                  className="w-full"
+                  ref={field.ref}
+                  onBlur={field.onBlur}
+                >
                   <SelectValue placeholder="Chọn loại tài sản" />
                 </SelectTrigger>
                 <SelectContent>
@@ -111,7 +116,7 @@ export function AssetForm({
         </div>
       </div>
 
-      <div className="grid gap-2">
+      <div className="grid min-w-0 content-start gap-2">
         <Label htmlFor="asset-name">Tên tài sản</Label>
         <Input
           id="asset-name"
@@ -124,7 +129,7 @@ export function AssetForm({
       </div>
 
       <div className="grid gap-4 sm:grid-cols-3">
-        <div className="grid gap-2">
+        <div className="grid min-w-0 content-start gap-2">
           <Label htmlFor="asset-brand">Thương hiệu</Label>
           <Input
             id="asset-brand"
@@ -134,7 +139,7 @@ export function AssetForm({
           />
           <FieldError message={form.formState.errors.brand?.message} />
         </div>
-        <div className="grid gap-2">
+        <div className="grid min-w-0 content-start gap-2">
           <Label htmlFor="asset-model">Model</Label>
           <Input
             id="asset-model"
@@ -144,7 +149,7 @@ export function AssetForm({
           />
           <FieldError message={form.formState.errors.model?.message} />
         </div>
-        <div className="grid gap-2">
+        <div className="grid min-w-0 content-start gap-2">
           <Label htmlFor="asset-serial">Số serial</Label>
           <Input
             id="asset-serial"
@@ -157,7 +162,7 @@ export function AssetForm({
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2">
-        <div className="grid gap-2">
+        <div className="grid min-w-0 content-start gap-2">
           <Label htmlFor="asset-purchase-date">Ngày mua</Label>
           <div className="relative">
             <CalendarDays className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
@@ -171,7 +176,7 @@ export function AssetForm({
           </div>
           <FieldError message={form.formState.errors.purchaseDate?.message} />
         </div>
-        <div className="grid gap-2">
+        <div className="grid min-w-0 content-start gap-2">
           <Label htmlFor="asset-warranty">Bảo hành đến</Label>
           <div className="relative">
             <CalendarDays className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
@@ -187,7 +192,7 @@ export function AssetForm({
         </div>
       </div>
 
-      <div className="grid gap-2">
+      <div className="grid min-w-0 content-start gap-2">
         <Label htmlFor="asset-notes">Ghi chú</Label>
         <Textarea
           id="asset-notes"

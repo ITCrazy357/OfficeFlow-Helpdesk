@@ -19,6 +19,7 @@ import { TicketAttachmentService } from '../../src/tickets/ticket-attachment.ser
 import { TicketCommentService } from '../../src/tickets/ticket-comment.service';
 import { SlaPolicyService } from '../../src/sla/sla-policy.service';
 import { SlaService } from '../../src/sla/sla.service';
+import { KnowledgeService } from '../../src/knowledge/knowledge.service';
 import { DEFAULT_SLA_POLICY } from '../../src/sla/sla-policy';
 import { NotificationsService } from '../../src/notifications/notifications.service';
 import { NotificationsListener } from '../../src/notifications/notifications.listener';
@@ -115,6 +116,66 @@ describe('Real MySQL/Redis integration (disposable containers only)', () => {
       },
       employee,
     );
+
+  it('suggests published VPN guides and denies a guide after it becomes a draft', async () => {
+    const knowledge = new KnowledgeService(prisma, audit);
+    const createArticle = (isPublished: boolean) =>
+      prisma.knowledgeArticle.create({
+        data: {
+          title: 'Hướng dẫn VPN',
+          slug: randomUUID(),
+          content: 'Mở VPN và kiểm tra tài khoản kết nối.',
+          tags: 'vpn,network',
+          isPublished,
+          createdById: admin.userId,
+        },
+      });
+    const published = await createArticle(true);
+    await createArticle(false);
+    for (const actor of [employee, admin]) {
+      const suggestions = await knowledge.suggestForTicket(
+        { title: 'Không kết nối được VPN' },
+        actor,
+      );
+      expect(suggestions.map((article) => article.id)).toEqual([published.id]);
+      expect(suggestions[0]).not.toHaveProperty('content');
+    }
+    await expect(
+      knowledge.getById(published.id, employee),
+    ).resolves.toMatchObject({ content: published.content, viewCount: 1 });
+    await prisma.knowledgeArticle.update({
+      where: { id: published.id },
+      data: { isPublished: false },
+    });
+    await expect(knowledge.getById(published.id, employee)).rejects.toThrow(
+      'Forbidden',
+    );
+    expect(
+      (
+        await prisma.knowledgeArticle.findUniqueOrThrow({
+          where: { id: published.id },
+        })
+      ).viewCount,
+    ).toBe(1);
+  });
+
+  it('finds accented Vietnamese knowledge using unaccented draft text', async () => {
+    const article = await prisma.knowledgeArticle.create({
+      data: {
+        title: 'Máy in bị kẹt giấy',
+        slug: randomUUID(),
+        content: 'Hướng dẫn gỡ giấy và kiểm tra máy in.',
+        isPublished: true,
+        createdById: admin.userId,
+      },
+    });
+    const knowledge = new KnowledgeService(prisma, audit);
+    const suggestions = await knowledge.suggestForTicket(
+      { title: 'may in' },
+      employee,
+    );
+    expect(suggestions[0].id).toBe(article.id);
+  });
 
   it('commits ticket/history/audit/outbox together and enforces read access', async () => {
     const ticket = await createTicket();
