@@ -75,6 +75,16 @@ export class CreateAssetDto {
   @IsDateString()
   warrantyUntil?: string;
 
+  @IsOptional()
+  @IsString()
+  @MaxLength(150)
+  supplierName?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(250)
+  supplierContact?: string;
+
   @ApiPropertyOptional({
     example: 'Purchased for Finance department.',
   })

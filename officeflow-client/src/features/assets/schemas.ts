@@ -40,6 +40,8 @@ export const assetFormSchema = z.object({
   serialNumber: optionalText(100, "Số serial tối đa 100 ký tự"),
   purchaseDate: optionalDate,
   warrantyUntil: optionalDate,
+  supplierName: optionalText(150, "Tên nhà cung cấp tối đa 150 ký tự"),
+  supplierContact: optionalText(250, "Liên hệ nhà cung cấp tối đa 250 ký tự"),
   notes: optionalText(1000, "Ghi chú tối đa 1.000 ký tự"),
 });
 
@@ -60,6 +62,8 @@ export function toAssetPayload(values: AssetFormValues): CreateAssetInput {
     serialNumber: optionalValue(values.serialNumber),
     purchaseDate: optionalValue(values.purchaseDate),
     warrantyUntil: optionalValue(values.warrantyUntil),
+    supplierName: optionalValue(values.supplierName),
+    supplierContact: optionalValue(values.supplierContact),
     notes: optionalValue(values.notes),
   };
 }
@@ -73,5 +77,7 @@ export function toAssetUpdatePayload(
     model: optionalValue(values.model) ?? null,
     serialNumber: optionalValue(values.serialNumber) ?? null,
     notes: optionalValue(values.notes) ?? null,
+    supplierName: optionalValue(values.supplierName) ?? null,
+    supplierContact: optionalValue(values.supplierContact) ?? null,
   };
 }

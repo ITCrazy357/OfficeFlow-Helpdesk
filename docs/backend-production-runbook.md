@@ -8,7 +8,7 @@ This runbook defines how OfficeFlow verifies, migrates, and rolls back the activ
 1. Turn **Auto-Deploy** off for the backend service. GitHub Actions is the only
    deployment gate, so Render must not deploy a push before CI passes.
 2. Set **Health Check Path** to `/api/db-health`. This endpoint checks both the
-   NestJS process, the production database connection, and required outbox/SLA
+   NestJS process, the production database connection, and required outbox/SLA/asset-care
    tables and columns. A missing schema must fail this check.
 3. Keep the service connected to the `main` branch and the repository that owns
    `.github/workflows/backend-ci.yml`.
@@ -63,7 +63,12 @@ A green deploy job therefore means:
 - CI passed;
 - Render accepted the exact commit;
 - that commit is serving production traffic;
-- the API can query the production database and required outbox/SLA schema.
+- the API can query the production database and required outbox/SLA/asset-care schema.
+
+Asset care adds migration `20261018120000_add_asset_care`. Review pending migrations
+and a database backup before deployment; the default image command applies them
+before Nest starts. See [asset care](asset-care.md) for the date, permissions, and
+notification rules. Missing asset care columns/tables fail startup and readiness.
 
 This does not replace an authenticated ticket-list smoke test or verification of
 other business workflows.

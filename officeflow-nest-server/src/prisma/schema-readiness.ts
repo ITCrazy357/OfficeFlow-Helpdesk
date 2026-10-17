@@ -2,7 +2,14 @@ import { Prisma } from '@prisma/client';
 
 type SchemaClient = Pick<
   Prisma.TransactionClient,
-  'outboxEvent' | 'notification' | 'ticket' | 'slaPolicy' | 'slaAlert'
+  | 'outboxEvent'
+  | 'notification'
+  | 'ticket'
+  | 'slaPolicy'
+  | 'slaAlert'
+  | 'asset'
+  | 'assetMaintenance'
+  | 'assetWarrantyReminder'
 >;
 
 export async function assertDatabaseSchemaReady(
@@ -51,6 +58,22 @@ export async function assertDatabaseSchemaReady(
         createdAt: true,
       },
     });
+    await database.asset.findFirst({
+      select: { supplierName: true, supplierContact: true },
+    });
+    await database.assetMaintenance.findFirst({
+      select: {
+        id: true,
+        assetId: true,
+        scheduledFor: true,
+        performedOn: true,
+        cost: true,
+        version: true,
+      },
+    });
+    await database.assetWarrantyReminder.findFirst({
+      select: { assetId: true, warrantyDate: true },
+    });
   } catch (error) {
     if (
       error instanceof Prisma.PrismaClientKnownRequestError &&
@@ -59,7 +82,7 @@ export async function assertDatabaseSchemaReady(
       // Retain the error code for safe startup diagnostics, without raw SQL,
       // connection details or adapter metadata from the original error.
       throw new Prisma.PrismaClientKnownRequestError(
-        `Database schema is not ready (${error.code}). Check migrations 20260906170000_add_transactional_outbox and 20261017120000_add_business_sla and the database target. Back up and review pending migrations before deploying them.`,
+        `Database schema is not ready (${error.code}). Check migrations 20260906170000_add_transactional_outbox, 20261017120000_add_business_sla, 20261018120000_add_asset_care and the database target. Back up and review pending migrations before deploying them.`,
         { code: error.code, clientVersion: error.clientVersion },
       );
     }

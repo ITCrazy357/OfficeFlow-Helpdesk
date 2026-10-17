@@ -50,6 +50,7 @@ enum NotificationType {
   KNOWLEDGE_PUBLISHED
   ASSET_ASSIGNED
   ASSET_RETURNED
+  ASSET_WARRANTY_EXPIRING
   LEAVE_REQUESTED
   LEAVE_APPROVED
   LEAVE_REJECTED
@@ -74,6 +75,18 @@ enum AssetStatus {
   MAINTENANCE
   RETIRED
   LOST
+}
+
+enum AssetMaintenanceKind {
+  MAINTENANCE
+  REPAIR
+  WARRANTY
+}
+
+enum AssetMaintenanceStatus {
+  PLANNED
+  COMPLETED
+  CANCELLED
 }
 
 enum AuditLogEntity {
@@ -169,7 +182,9 @@ model User {
 
   assetAssignmentsReceived AssetAssignment[] @relation("AssetAssignmentsReceived")
 
-  assetAssignmentsCreated AssetAssignment[] @relation("AssetAssignmentsCreated")
+  assetAssignmentsCreated   AssetAssignment[]  @relation("AssetAssignmentsCreated")
+  assetMaintenanceCreated   AssetMaintenance[] @relation("AssetMaintenanceCreator")
+  assetMaintenanceCompleted AssetMaintenance[] @relation("AssetMaintenanceCompleter")
 
   auditLogs AuditLog[] @relation("AuditLogActor")
 
@@ -476,15 +491,19 @@ model Asset {
   model        String?
   serialNumber String? @unique
 
-  purchaseDate  DateTime?
-  warrantyUntil DateTime?
-  notes         String?   @db.Text
+  purchaseDate    DateTime?
+  warrantyUntil   DateTime?
+  supplierName    String?   @db.VarChar(150)
+  supplierContact String?   @db.VarChar(250)
+  notes           String?   @db.Text
 
   assignedToId Int?
   assignedTo   User? @relation("CurrentAssetAssignee", fields: [assignedToId], references: [id], onDelete: SetNull)
 
-  assignments AssetAssignment[]
-  tickets     Ticket[]
+  assignments       AssetAssignment[]
+  tickets           Ticket[]
+  maintenances      AssetMaintenance[]
+  warrantyReminders AssetWarrantyReminder[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -493,7 +512,47 @@ model Asset {
   @@index([status])
   @@index([assignedToId])
   @@index([createdAt])
+  @@index([warrantyUntil, status])
   @@map("Assets")
+}
+
+model AssetMaintenance {
+  id            Int                    @id @default(autoincrement())
+  assetId       Int
+  asset         Asset                  @relation(fields: [assetId], references: [id], onDelete: Restrict)
+  title         String                 @db.VarChar(150)
+  kind          AssetMaintenanceKind   @default(MAINTENANCE)
+  status        AssetMaintenanceStatus @default(PLANNED)
+  scheduledFor  DateTime               @db.Date
+  performedOn   DateTime?              @db.Date
+  vendor        String?                @db.VarChar(150)
+  cost          Decimal?               @db.Decimal(12, 0)
+  notes         String?                @db.Text
+  version       Int                    @default(0)
+  createdById   Int
+  createdBy     User                   @relation("AssetMaintenanceCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  completedById Int?
+  completedBy   User?                  @relation("AssetMaintenanceCompleter", fields: [completedById], references: [id], onDelete: Restrict)
+  completedAt   DateTime?
+  createdAt     DateTime               @default(now())
+  updatedAt     DateTime               @updatedAt
+
+  @@index([assetId, scheduledFor, id])
+  @@index([status, scheduledFor])
+  @@index([createdById])
+  @@index([completedById])
+  @@map("Asset_maintenances")
+}
+
+// Durable deduplication survives outbox retention cleanup and multiple workers.
+model AssetWarrantyReminder {
+  assetId      Int
+  asset        Asset    @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  warrantyDate DateTime @db.Date
+  createdAt    DateTime @default(now())
+
+  @@id([assetId, warrantyDate])
+  @@map("Asset_warranty_reminders")
 }
 
 model AssetAssignment {

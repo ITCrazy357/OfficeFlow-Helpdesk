@@ -1,9 +1,21 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { AssetStatus, AssetType } from '@prisma/client';
 import { Transform } from 'class-transformer';
-import { IsEnum, IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
+import {
+  IsEnum,
+  IsIn,
+  IsInt,
+  IsOptional,
+  IsString,
+  Max,
+  Min,
+} from 'class-validator';
 
 export class GetAssetsQueryDto {
+  @ApiPropertyOptional({ enum: ['EXPIRING', 'EXPIRED'] })
+  @IsOptional()
+  @IsIn(['EXPIRING', 'EXPIRED'])
+  warranty?: 'EXPIRING' | 'EXPIRED';
   @ApiPropertyOptional({ example: 1, default: 1 })
   @IsOptional()
   @Transform(({ value }) => Number(value))

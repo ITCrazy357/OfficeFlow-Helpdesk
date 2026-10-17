@@ -1,4 +1,5 @@
 "use client";
+import { careWarrantyDate } from "@/features/assets/care-utils";
 
 import { AlertCircle, ArrowLeft, ShieldCheck } from "lucide-react";
 import Link from "next/link";
@@ -199,7 +200,9 @@ export default function EditAssetPage() {
               model: asset.model ?? "",
               serialNumber: asset.serialNumber ?? "",
               purchaseDate: toDateInputValue(asset.purchaseDate),
-              warrantyUntil: toDateInputValue(asset.warrantyUntil),
+              warrantyUntil: careWarrantyDate(asset.warrantyUntil),
+              supplierName: asset.supplierName ?? "",
+              supplierContact: asset.supplierContact ?? "",
               notes: asset.notes ?? "",
             }}
             submitLabel="Lưu thay đổi"

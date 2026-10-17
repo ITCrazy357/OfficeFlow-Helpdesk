@@ -23,6 +23,12 @@ import { KnowledgeService } from '../../src/knowledge/knowledge.service';
 import { DEFAULT_SLA_POLICY } from '../../src/sla/sla-policy';
 import { DateTime } from 'luxon';
 import { DashboardService } from '../../src/dashboard/dashboard.service';
+import { AssetMaintenanceService } from '../../src/assets/asset-maintenance.service';
+import {
+  AssetWarrantyReminderService,
+  AssetWarrantyNotificationListener,
+} from '../../src/assets/asset-warranty-reminder.service';
+import { assetCareDates } from '../../src/assets/asset-care.util';
 import { NotificationsService } from '../../src/notifications/notifications.service';
 import { NotificationsListener } from '../../src/notifications/notifications.listener';
 import type { TicketSlaAlertEvent } from '../../src/notifications/events/ticket-sla-alert.event';
@@ -118,6 +124,183 @@ describe('Real MySQL/Redis integration (disposable containers only)', () => {
       },
       employee,
     );
+
+  it('keeps maintenance history, exact VND and the asset assignment unchanged with concurrent completion', async () => {
+    const asset = await createAsset();
+    const care = new AssetMaintenanceService(prisma, audit);
+    const today = assetCareDates().today;
+    const record = await care.create(
+      asset.id,
+      {
+        title: 'Replace fan',
+        kind: 'REPAIR',
+        scheduledFor: today,
+        vendor: 'Vendor A',
+      },
+      admin,
+    );
+    await expect(care.list(asset.id, {}, employee)).rejects.toThrow(
+      'Forbidden',
+    );
+    await expect(
+      care.complete(
+        asset.id + 10000,
+        record.id,
+        { version: 0, performedOn: today, cost: '1200000' },
+        admin,
+      ),
+    ).rejects.toThrow('not found');
+    const auditFailure = jest
+      .spyOn(audit, 'create')
+      .mockRejectedValueOnce(new Error('test audit failure'));
+    await expect(
+      care.complete(
+        asset.id,
+        record.id,
+        { version: 0, performedOn: today, cost: '1200000' },
+        admin,
+      ),
+    ).rejects.toThrow('test audit failure');
+    expect(
+      await prisma.assetMaintenance.findUnique({ where: { id: record.id } }),
+    ).toMatchObject({ status: 'PLANNED', version: 0, cost: null });
+    auditFailure.mockRestore();
+    const results = await Promise.allSettled([
+      care.complete(
+        asset.id,
+        record.id,
+        { version: 0, performedOn: today, cost: '1200000' },
+        admin,
+      ),
+      care.complete(
+        asset.id,
+        record.id,
+        { version: 0, performedOn: today, cost: '1300000' },
+        admin,
+      ),
+    ]);
+    expect(
+      results.filter((result) => result.status === 'fulfilled'),
+    ).toHaveLength(1);
+    expect(
+      results.filter((result) => result.status === 'rejected'),
+    ).toHaveLength(1);
+    const saved = await prisma.assetMaintenance.findUniqueOrThrow({
+      where: { id: record.id },
+    });
+    expect(['1200000', '1300000']).toContain(saved.cost!.toString());
+    expect(saved).toMatchObject({
+      status: 'COMPLETED',
+      version: 1,
+      completedById: admin.userId,
+      vendor: 'Vendor A',
+    });
+    expect(
+      await prisma.asset.findUnique({ where: { id: asset.id } }),
+    ).toMatchObject({ status: 'AVAILABLE', assignedToId: null });
+    await expect(
+      care.update(
+        asset.id,
+        record.id,
+        { version: 1, title: 'rewrite history' },
+        admin,
+      ),
+    ).rejects.toThrow('finalized');
+    const cancelled = await care.create(
+      asset.id,
+      { title: 'Clean device', kind: 'MAINTENANCE', scheduledFor: today },
+      admin,
+    );
+    await care.cancel(asset.id, cancelled.id, { version: 0 }, admin);
+    const history = await care.list(
+      asset.id,
+      { status: 'CANCELLED', page: 1, limit: 1 },
+      admin,
+    );
+    expect(history.items).toHaveLength(1);
+    expect(history.items[0].id).toBe(cancelled.id);
+  });
+
+  it('deduplicates warranty reminders across workers and outbox cleanup, and rechecks delivery permissions', async () => {
+    const { start } = assetCareDates();
+    const date = (days: number) =>
+      new Date(start.getTime() + days * 86_400_000);
+    const eligible = await createAsset();
+    const outside = await createAsset();
+    const retired = await createAsset();
+    await prisma.asset.update({
+      where: { id: eligible.id },
+      data: { warrantyUntil: date(30) },
+    });
+    await prisma.asset.update({
+      where: { id: outside.id },
+      data: { warrantyUntil: new Date(date(30).getTime() + 18 * 3_600_000) },
+    });
+    await prisma.asset.update({
+      where: { id: retired.id },
+      data: { warrantyUntil: date(1), status: 'RETIRED' },
+    });
+    const first = new AssetWarrantyReminderService(prisma, outbox);
+    const second = new AssetWarrantyReminderService(prisma, outbox);
+    await Promise.all([
+      first.notifyExpiringWarranties(),
+      second.notifyExpiringWarranties(),
+    ]);
+    expect(
+      await prisma.assetWarrantyReminder.count({
+        where: { assetId: eligible.id },
+      }),
+    ).toBe(1);
+    expect(
+      await prisma.assetWarrantyReminder.count({
+        where: { assetId: { in: [outside.id, retired.id] } },
+      }),
+    ).toBe(0);
+    const key = `asset-warranty:${eligible.id}:${date(30).toISOString().slice(0, 10)}`;
+    const event = await prisma.outboxEvent.findUniqueOrThrow({
+      where: { deduplicationKey: key },
+    });
+    const payload = event.payload as unknown as {
+      assetId: number;
+      assetTag: string;
+      assetName: string;
+      warrantyDate: string;
+      recipientIds: number[];
+    };
+    expect(payload.recipientIds).toContain(admin.userId);
+    expect(payload.recipientIds).not.toContain(employee.userId);
+    const listener = new AssetWarrantyNotificationListener(
+      prisma,
+      new NotificationsService(prisma),
+    );
+    await listener.handle({ ...payload, outboxEventId: event.id });
+    await listener.handle({ ...payload, outboxEventId: event.id });
+    expect(
+      await prisma.notification.count({
+        where: { sourceEventId: event.id, userId: admin.userId },
+      }),
+    ).toBe(1);
+    await prisma.outboxEvent.delete({ where: { id: event.id } });
+    await first.notifyExpiringWarranties();
+    expect(
+      await prisma.outboxEvent.count({ where: { deduplicationKey: key } }),
+    ).toBe(0);
+    // A changed deadline gets its own reminder when it enters the window.
+    await prisma.asset.update({
+      where: { id: eligible.id },
+      data: { warrantyUntil: date(20) },
+    });
+    await first.notifyExpiringWarranties();
+    expect(
+      await prisma.assetWarrantyReminder.count({
+        where: { assetId: eligible.id },
+      }),
+    ).toBe(2);
+    const listed = await assets.findAll({ warranty: 'EXPIRING', limit: 100 });
+    expect(listed.items.map((item) => item.id)).toContain(eligible.id);
+    expect(listed.items.map((item) => item.id)).not.toContain(outside.id);
+    expect(listed.items.map((item) => item.id)).not.toContain(retired.id);
+  });
 
   it('reports saved SLA calendars, repeated reopenings and scoped backlog against real MySQL', async () => {
     const department = await prisma.department.create({
