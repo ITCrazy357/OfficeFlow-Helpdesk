@@ -13,6 +13,51 @@ function atMinute(day: DateTime, minute: number) {
       });
 }
 
+/** Elapsed SLA time, including partial minutes, using the ticket's saved calendar. */
+export function elapsedSlaMinutes(
+  start: Date,
+  end: Date,
+  policy: SlaPolicyConfig | null,
+): number {
+  if (end <= start) return 0;
+  // Tickets created before SLA snapshots were introduced retain the 24/7 clock.
+  if (!policy || policy.mode === 'CALENDAR')
+    return (end.getTime() - start.getTime()) / 60_000;
+
+  const holidays = new Set(policy.holidays);
+  const intervals = policy.workingHours.map(({ start, end }) => ({
+    start: parseClock(start),
+    end: parseClock(end),
+  }));
+  let day = DateTime.fromJSDate(start, { zone: policy.timezone }).startOf(
+    'day',
+  );
+  const lastDay = DateTime.fromJSDate(end, { zone: policy.timezone }).startOf(
+    'day',
+  );
+  let minutes = 0;
+  while (day <= lastDay) {
+    if (
+      policy.workingDays.includes(day.weekday) &&
+      !holidays.has(day.toISODate()!)
+    ) {
+      for (const interval of intervals) {
+        const open = Math.max(
+          start.getTime(),
+          atMinute(day, interval.start).toMillis(),
+        );
+        const close = Math.min(
+          end.getTime(),
+          atMinute(day, interval.end).toMillis(),
+        );
+        minutes += Math.max(0, close - open) / 60_000;
+      }
+    }
+    day = day.plus({ days: 1 });
+  }
+  return minutes;
+}
+
 export function addSlaMinutes(
   start: Date,
   minutes: number,

@@ -1,4 +1,8 @@
-import { addSlaMinutes, calculateTicketDeadlines } from './sla-calendar';
+import {
+  addSlaMinutes,
+  calculateTicketDeadlines,
+  elapsedSlaMinutes,
+} from './sla-calendar';
 import {
   DEFAULT_SLA_POLICY,
   type SlaPolicyConfig,
@@ -17,6 +21,41 @@ const business: SlaPolicyConfig = {
 };
 
 describe('SLA working calendar', () => {
+  it.each([
+    ['2026-10-16T11:00:00+07:00', '2026-10-16T14:00:00+07:00', 120],
+    ['2026-10-16T16:00:00+07:00', '2026-10-19T09:00:00+07:00', 120],
+    ['2026-10-16T12:00:00+07:00', '2026-10-16T13:00:00+07:00', 0],
+    ['2026-10-16T11:59:30+07:00', '2026-10-16T13:00:30+07:00', 1],
+  ])('measures elapsed working minutes %s to %s', (start, end, expected) => {
+    expect(elapsedSlaMinutes(new Date(start), new Date(end), business)).toBe(
+      expected,
+    );
+  });
+
+  it('measures holidays, legacy/calendar clocks, DST, midnight intervals and reversed spans', () => {
+    const start = new Date('2026-10-16T16:00:00+07:00');
+    const end = new Date('2026-10-19T09:00:00+07:00');
+    expect(
+      elapsedSlaMinutes(start, end, { ...business, holidays: ['2026-10-19'] }),
+    ).toBe(60);
+    expect(elapsedSlaMinutes(start, end, null)).toBe(3900);
+    expect(
+      elapsedSlaMinutes(start, end, { ...business, mode: 'CALENDAR' }),
+    ).toBe(3900);
+    expect(elapsedSlaMinutes(end, start, business)).toBe(0);
+    expect(
+      elapsedSlaMinutes(
+        new Date('2026-03-08T05:00:00Z'),
+        new Date('2026-03-09T04:00:00Z'),
+        {
+          ...business,
+          timezone: 'America/New_York',
+          workingDays: [7],
+          workingHours: [{ start: '00:00', end: '24:00' }],
+        },
+      ),
+    ).toBe(23 * 60);
+  });
   it.each([
     ['URGENT', '2026-10-19T12:00:00+07:00'],
     ['HIGH', '2026-10-19T17:00:00+07:00'],

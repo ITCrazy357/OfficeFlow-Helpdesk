@@ -1,6 +1,7 @@
 import { INestApplication, ValidationPipe } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { Reflector } from '@nestjs/core';
+import { JwtService } from '@nestjs/jwt';
 import { ThrottlerStorageService } from '@nestjs/throttler';
 import { Server } from 'node:http';
 import type { NextFunction, Request, Response } from 'express';
@@ -23,6 +24,13 @@ import { MetricsService } from '../src/metrics/metrics.service';
 const mockPrismaService = {
   $queryRaw: jest.fn().mockResolvedValue([{ connected: 1 }]),
   assertReady: jest.fn().mockResolvedValue(undefined),
+  refreshToken: { findUnique: jest.fn() },
+  ticket: {
+    findMany: jest.fn<Promise<unknown[]>, [{ where: { AND: unknown[] } }]>(),
+    count: jest.fn(),
+  },
+  ticketHistory: { groupBy: jest.fn() },
+  $transaction: jest.fn(),
   department: {
     findMany: jest.fn(),
   },
@@ -242,6 +250,70 @@ describe('AppController (e2e)', () => {
         expect(body.requestId).toMatch(/^[a-f0-9-]{36}$/);
         expect(res.headers['x-request-id']).toBe(body.requestId);
       });
+  });
+
+  it('/api/dashboard/performance requires authentication', () => {
+    return request(httpServer).get('/api/dashboard/performance').expect(401);
+  });
+
+  it('/api/dashboard/performance validates query dates and returns the scoped report through real JWT auth', async () => {
+    mockPrismaService.refreshToken.findUnique.mockResolvedValue({
+      userId: 41,
+      usedAt: null,
+      revokedAt: null,
+      expiresAt: new Date(Date.now() + 60_000),
+      user: {
+        role: 'EMPLOYEE',
+        isActive: true,
+        isLocked: false,
+        mustChangePassword: false,
+      },
+    });
+    mockPrismaService.ticket.findMany.mockResolvedValue([]);
+    mockPrismaService.ticket.count.mockResolvedValue(0);
+    mockPrismaService.$transaction.mockImplementation(
+      (callback: (tx: typeof mockPrismaService) => unknown) =>
+        callback(mockPrismaService),
+    );
+    const token = app.get(JwtService).sign(
+      { sub: 41, sid: 'report-session' },
+      {
+        issuer: 'officeflow-api',
+        audience: 'officeflow-web',
+        expiresIn: '5m',
+      },
+    );
+    const response = await request(httpServer)
+      .get('/api/dashboard/performance?from=2026-01-01&to=2026-01-31')
+      .auth(token, { type: 'bearer' })
+      .expect(200);
+    const body = response.body as {
+      data: {
+        cohort: { firstResponse: { minutes: number | null; samples: number } };
+        daily: unknown[];
+      };
+    };
+    expect(body.data.cohort.firstResponse).toEqual({
+      minutes: null,
+      samples: 0,
+    });
+    expect(body.data.daily).toHaveLength(31);
+    expect(
+      mockPrismaService.ticket.findMany.mock.calls.at(-1)?.[0].where.AND[0],
+    ).toEqual({ createdById: 41 });
+    for (const query of [
+      'from=2026-02-30&to=2026-03-01',
+      'from=2026-02-02&to=2026-02-01',
+      'from=2025-01-01&to=2026-01-31',
+      'from=2026-1-1&to=2026-01-31',
+      'from[]=2026-01-01&to=2026-01-31',
+      'from=2026-01-01&to=2026-01-31&createdById=42',
+    ]) {
+      await request(httpServer)
+        .get(`/api/dashboard/performance?${query}`)
+        .auth(token, { type: 'bearer' })
+        .expect(400);
+    }
   });
 
   it('/api/users/:id/lock-status should be registered and protected', () => {

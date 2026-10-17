@@ -1,4 +1,4 @@
-import { Controller, Get, UseGuards } from '@nestjs/common';
+import { Controller, Get, Query, UseGuards } from '@nestjs/common';
 import {
   ApiBearerAuth,
   ApiOperation,
@@ -13,6 +13,7 @@ import {
   type CurrentUserPayload,
 } from '../common/decorators/current-user.decorator';
 import { Message } from '../common/decorators/message.decorator';
+import { PerformanceQueryDto } from './dto/performance-query.dto';
 
 @ApiTags('Dashboard')
 @ApiBearerAuth()
@@ -20,6 +21,19 @@ import { Message } from '../common/decorators/message.decorator';
 @Controller('dashboard')
 export class DashboardController {
   constructor(private readonly dashboardService: DashboardService) {}
+
+  @Get('performance')
+  @Message('Get processing performance successfully')
+  @ApiOperation({
+    summary:
+      'Current outcomes of tickets created in a date range (max 366 days)',
+  })
+  getPerformance(
+    @CurrentUser() currentUser: CurrentUserPayload,
+    @Query() query: PerformanceQueryDto,
+  ) {
+    return this.dashboardService.getPerformance(currentUser, query);
+  }
 
   @Get('summary')
   @Message('Get dashboard summary successfully')
