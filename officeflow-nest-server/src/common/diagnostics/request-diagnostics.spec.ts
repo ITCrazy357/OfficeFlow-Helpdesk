@@ -85,4 +85,102 @@ describe('Request diagnostics', () => {
     );
     expect(details).not.toHaveProperty('transactionFailure');
   });
+
+  it.each([
+    [
+      'getaddrinfo ENOTFOUND private-host password=secret',
+      'ENOTFOUND',
+      'dns_not_found',
+    ],
+    [
+      { code: 'EAI_AGAIN', message: 'password=secret' },
+      'EAI_AGAIN',
+      'dns_temporary_failure',
+    ],
+    ['connect ECONNREFUSED private-host', 'ECONNREFUSED', 'connection_refused'],
+    ['connect ETIMEDOUT private-host', 'ETIMEDOUT', 'connection_timeout'],
+  ])(
+    'extracts the nested database network cause %# without leaking details',
+    (cause, networkCode, failure) => {
+      const details = getSafeErrorDetails(
+        new Prisma.PrismaClientKnownRequestError('SELECT private_data', {
+          code: 'P2010',
+          clientVersion: '7',
+          meta: { driverAdapterError: { cause: { code: 45028, cause } } },
+        }),
+      );
+      expect(details).toMatchObject({
+        code: 'P2010',
+        databaseNetworkCode: networkCode,
+        databaseFailure: failure,
+      });
+      expect(JSON.stringify(details)).not.toMatch(
+        /private-host|secret|private_data/,
+      );
+    },
+  );
+
+  it('reports pool acquisition failure without inventing a network cause', () => {
+    const details = getSafeErrorDetails(
+      new Prisma.PrismaClientKnownRequestError('Private query', {
+        code: 'P2010',
+        clientVersion: '7',
+        meta: {
+          driverAdapterError: {
+            cause: { originalCode: '45028', cause: 'private details' },
+          },
+        },
+      }),
+    );
+    expect(details).toMatchObject({
+      databaseFailure: 'connection_pool_unavailable',
+    });
+    expect(details).not.toHaveProperty('databaseNetworkCode');
+    expect(JSON.stringify(details)).not.toContain('private details');
+  });
+
+  it('identifies the RSA authentication failure hidden by the pool error', () => {
+    const details = getSafeErrorDetails(
+      new Prisma.PrismaClientKnownRequestError('Private SQL', {
+        code: 'P2010',
+        clientVersion: '7',
+        meta: {
+          driverAdapterError: {
+            cause: {
+              code: 45028,
+              cause:
+                '(conn:559, no: 45044, SQLState: 08S01) RSA public key is not available client side. password=secret',
+            },
+          },
+        },
+      }),
+    );
+    expect(details).toMatchObject({
+      databaseFailure: 'rsa_public_key_unavailable',
+      hint: 'enable_database_tls_with_trusted_ca',
+    });
+    expect(JSON.stringify(details)).not.toMatch(
+      /Private SQL|password=|secret|conn:559/,
+    );
+  });
+
+  it.each([
+    undefined,
+    null,
+    {},
+    { cause: { cause: 'query contains ENOTFOUND' } },
+  ])(
+    'does not mislabel an unrelated raw-query failure as a connection failure %#',
+    (driverAdapterError) => {
+      const details = getSafeErrorDetails(
+        new Prisma.PrismaClientKnownRequestError('Invalid SQL', {
+          code: 'P2010',
+          clientVersion: '7',
+          meta: { driverAdapterError },
+        }),
+      );
+      expect(details).not.toHaveProperty('databaseFailure');
+      expect(details).not.toHaveProperty('databaseNetworkCode');
+    },
+  );
 });

@@ -73,6 +73,43 @@ production. Production uses only:
 npm run migrate:deploy
 ```
 
+### Aiven MySQL TLS
+
+The runtime MariaDB adapter requires `ssl`, whereas the Aiven service URI uses
+`ssl-mode=REQUIRED`. Backend configuration enables TLS for Aiven hostnames and
+loads the project's tracked `officeflow-nest-server/certs/ca.pem`. It verifies
+both the CA chain and the database hostname. Prisma migration commands use the
+same CA through their own `sslcert` and `sslaccept=strict` URL options.
+
+If the Aiven project or CA changes, download its current CA certificate and set
+`DATABASE_SSL_CA_PATH` to the deployed file, for example
+`/etc/secrets/aiven-ca.pem`. Keep the user, password, host, port and database in
+`DATABASE_URL`; no credentials belong in the certificate file.
+
+Do not use `allowPublicKeyRetrieval=true` or disable certificate verification for
+the production Internet connection. The trusted-local Docker workaround does
+not apply to Render-to-Aiven traffic.
+
+### Native Node service on Render
+
+When the service uses Render's Node runtime, configure:
+
+```text
+Root Directory: officeflow-nest-server
+Build Command:  npm ci --include=dev && npm run build
+Start Command:  npm run start:deploy
+```
+
+The CLI and build tools are currently dev dependencies, so include them during
+installation. `start:deploy` applies reviewed pending migrations before starting
+Nest. `start:prod` starts Nest directly and does not apply migrations. For a paid
+service that already runs `npm run migrate:deploy` in its pre-deploy phase, keep
+`npm run start:prod` instead.
+
+Native logs normally reference `/opt/render/project/src`; this repository's
+Dockerfile uses `/app`. Check the actual service runtime and startup override
+when the logs differ from the intended Docker configuration.
+
 ### Render Free or Hobby service
 
 Keep the Docker default command:
@@ -134,6 +171,26 @@ caused destructive data loss, stop writes and follow the database provider's
 tested backup-restore procedure instead of improvising SQL on production.
 
 ## Failure interpretation
+
+- **MariaDB 45044 / RSA public key unavailable:** the connection has reached
+  MySQL but its full authentication path requires TLS or a trusted pinned RSA
+  key. Use the Aiven TLS configuration above. The surrounding `P2010` / `45028`
+  pool error is not evidence that increasing the pool size will help.
+
+- **`application_start_failed`:** startup errors are emitted as one JSON record
+  before the process exits with code 1. Check `code`, `databaseFailure`, and
+  `databaseNetworkCode`; the record omits raw SQL, credentials, and the minified
+  Prisma source dump. When copying Render logs, clear text filters and copy this
+  record instead of the library source line.
+- **`databaseNetworkCode: ENOTFOUND`:** the deployment could not resolve the
+  database hostname. Verify the service state and current hostname in Aiven,
+  then compare the hostname in Render's `DATABASE_URL`. A successful lookup or
+  TCP connection from a developer machine does not prove connectivity from
+  Render. Increasing pool size or connection timeouts does not fix a missing
+  DNS record. `EAI_AGAIN` indicates a temporary DNS lookup failure instead.
+- **`databaseFailure: connection_pool_unavailable`:** the MariaDB pool could not
+  acquire a connection, but no recognized network cause was available. Do not
+  assume pool exhaustion or a missing migration from `P2010` / `45028` alone.
 
 - **MariaDB 45012 / socket timeout after 1000ms:** the API now defaults to
   `connectTimeout=10000` and `acquireTimeout=20000` in the runtime adapter URL.

@@ -50,8 +50,69 @@ export function getSafeErrorDetails(error: unknown) {
     code,
     hint: code && Object.hasOwn(hints, code) ? hints[code] : undefined,
     ...getTransactionFailureDetails(error),
+    ...getDatabaseConnectionFailureDetails(error),
     stack,
   };
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
+
+function getDatabaseConnectionFailureDetails(error: unknown) {
+  if (
+    !(error instanceof Prisma.PrismaClientKnownRequestError) ||
+    error.code !== 'P2010'
+  ) {
+    return {};
+  }
+
+  const adapterError = error.meta?.driverAdapterError;
+  if (!isRecord(adapterError) || !isRecord(adapterError.cause)) return {};
+  const driverError = adapterError.cause;
+  const cause = driverError.cause;
+  // Read the adapter's nested cause; never emit its raw message, URL or SQL.
+  const networkCode =
+    isRecord(cause) && typeof cause.code === 'string'
+      ? cause.code
+      : typeof cause === 'string'
+        ? /^(?:getaddrinfo|connect|read|write) (ENOTFOUND|EAI_AGAIN|ECONNREFUSED|ETIMEDOUT|ECONNRESET|EHOSTUNREACH|ENETUNREACH)(?:\s|$)/.exec(
+            cause,
+          )?.[1]
+        : undefined;
+  const failures: Record<string, string> = {
+    ENOTFOUND: 'dns_not_found',
+    EAI_AGAIN: 'dns_temporary_failure',
+    ECONNREFUSED: 'connection_refused',
+    ETIMEDOUT: 'connection_timeout',
+    ECONNRESET: 'connection_reset',
+    EHOSTUNREACH: 'host_unreachable',
+    ENETUNREACH: 'network_unreachable',
+  };
+  if (networkCode && Object.hasOwn(failures, networkCode)) {
+    return {
+      databaseFailure: failures[networkCode],
+      databaseNetworkCode: networkCode,
+      hint: 'check_database_endpoint_and_network_from_deployment',
+    };
+  }
+  if (
+    typeof cause === 'string' &&
+    /\bno:\s*45044\b/.test(cause) &&
+    cause.includes('RSA public key is not available client side')
+  ) {
+    return {
+      databaseFailure: 'rsa_public_key_unavailable',
+      hint: 'enable_database_tls_with_trusted_ca',
+    };
+  }
+  if (driverError.code === 45028 || driverError.originalCode === '45028') {
+    return {
+      databaseFailure: 'connection_pool_unavailable',
+      hint: 'check_database_connectivity_and_driver_cause',
+    };
+  }
+  return {};
 }
 
 function getTransactionFailureDetails(error: unknown) {

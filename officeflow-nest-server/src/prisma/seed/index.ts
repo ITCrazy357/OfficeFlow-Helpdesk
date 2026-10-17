@@ -3,6 +3,7 @@ import 'dotenv/config';
 import { PrismaMariaDb } from '@prisma/adapter-mariadb';
 import { PrismaClient } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
+import { getDatabaseAdapterConfig } from '../database.config';
 
 import { seedAssets } from './assets.seed';
 import { seedAuditLogs } from './audit-logs.seed';
@@ -67,7 +68,9 @@ async function main() {
 
   const seedPassword = getSeedPassword();
   const prisma = new PrismaClient({
-    adapter: new PrismaMariaDb(databaseUrl),
+    adapter: new PrismaMariaDb(
+      getDatabaseAdapterConfig(databaseUrl, process.env.DATABASE_SSL_CA_PATH),
+    ),
   });
   const now = new Date();
 

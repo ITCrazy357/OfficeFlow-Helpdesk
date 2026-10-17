@@ -1,7 +1,7 @@
 import { Injectable, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
 import { PrismaClient } from '@prisma/client';
 import { PrismaMariaDb } from '@prisma/adapter-mariadb';
-import { getDatabaseUrl } from './database.config';
+import { getDatabaseAdapterConfig } from './database.config';
 import { assertOutboxSchemaReady } from './schema-readiness';
 import { ConfigService } from '@nestjs/config';
 
@@ -15,7 +15,10 @@ export class PrismaService
   constructor(config: ConfigService) {
     super({
       adapter: new PrismaMariaDb(
-        getDatabaseUrl(config.getOrThrow<string>('DATABASE_URL')),
+        getDatabaseAdapterConfig(
+          config.getOrThrow<string>('DATABASE_URL'),
+          config.get<string>('DATABASE_SSL_CA_PATH'),
+        ),
       ),
     });
   }
