@@ -719,7 +719,7 @@ export default function AssetDetailPage() {
                 </CardDescription>
               </CardHeader>
               <CardContent className="grid gap-3 pt-0">
-                <div className="grid gap-2">
+                <div className="grid min-w-0 content-start gap-2">
                   <Label htmlFor="return-notes">Ghi chú trả tài sản</Label>
                   <Textarea
                     id="return-notes"

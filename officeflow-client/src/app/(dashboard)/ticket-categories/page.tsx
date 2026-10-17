@@ -292,7 +292,7 @@ export default function TicketCategoriesPage() {
               onSubmit={form.handleSubmit(handleSubmit)}
               noValidate
             >
-              <div className="grid gap-2">
+              <div className="grid min-w-0 content-start gap-2">
                 <Label htmlFor="ticket-category-name">Tên danh mục</Label>
                 <Input
                   id="ticket-category-name"

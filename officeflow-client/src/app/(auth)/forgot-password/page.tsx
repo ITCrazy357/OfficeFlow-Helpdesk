@@ -98,7 +98,7 @@ export default function ForgotPasswordPage() {
               noValidate
               onSubmit={form.handleSubmit(onSubmit)}
             >
-              <div className="grid gap-2">
+              <div className="grid min-w-0 content-start gap-2">
                 <Label htmlFor="email">Email</Label>
                 <Input
                   id="email"

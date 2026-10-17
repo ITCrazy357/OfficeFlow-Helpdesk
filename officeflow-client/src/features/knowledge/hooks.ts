@@ -14,6 +14,7 @@ import type {
   SuggestKnowledgeArticlesInput,
   UpdateKnowledgeArticleInput,
 } from "./types";
+import { prepareKnowledgeSuggestionInput } from "./suggestions";
 
 export const knowledgeQueryKeys = {
   all: ["knowledge"] as const,
@@ -35,9 +36,7 @@ function invalidateKnowledgeConsumers(
   });
 }
 
-export function useKnowledgeArticles(
-  params: GetKnowledgeArticlesParams = {},
-) {
+export function useKnowledgeArticles(params: GetKnowledgeArticlesParams = {}) {
   return useQuery({
     queryKey: knowledgeQueryKeys.list(params),
     queryFn: () => getKnowledgeArticlesApi(params),
@@ -114,10 +113,17 @@ export function useSuggestKnowledgeArticles(
   input: SuggestKnowledgeArticlesInput,
   enabled = true,
 ) {
+  const request = prepareKnowledgeSuggestionInput(input);
   return useQuery({
-    queryKey: knowledgeQueryKeys.suggestions(input),
-    queryFn: () => suggestKnowledgeArticlesApi(input),
-    enabled,
+    queryKey: knowledgeQueryKeys.suggestions(request ?? { title: "" }),
+    queryFn: ({ signal }) =>
+      request
+        ? suggestKnowledgeArticlesApi(request, signal)
+        : Promise.resolve([]),
+    enabled: enabled && request !== null,
     retry: false,
+    staleTime: 60_000,
+    gcTime: 60_000,
+    refetchOnWindowFocus: false,
   });
 }

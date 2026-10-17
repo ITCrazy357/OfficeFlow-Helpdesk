@@ -550,7 +550,7 @@ export default function LeaveRequestDetailPage() {
               Ghi rõ lý do để người gửi hiểu quyết định và có thể điều chỉnh kế hoạch.
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <div className="grid gap-2">
+          <div className="grid min-w-0 content-start gap-2">
             <Label htmlFor="leave-review-note">Lý do từ chối</Label>
             <Textarea
               id="leave-review-note"

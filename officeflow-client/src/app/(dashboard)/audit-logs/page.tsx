@@ -323,7 +323,7 @@ export default function AuditLogsPage() {
           </CardHeader>
           <CardContent className="grid gap-4 pt-0">
             <div className="grid gap-4 lg:grid-cols-4">
-              <div className="grid gap-2 lg:col-span-2">
+              <div className="grid min-w-0 content-start gap-2 lg:col-span-2">
                 <Label htmlFor="audit-keyword">Tìm kiếm</Label>
                 <div className="relative">
                   <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
@@ -340,8 +340,8 @@ export default function AuditLogsPage() {
                 </div>
               </div>
 
-              <div className="grid gap-2">
-                <Label>Module</Label>
+              <div className="grid min-w-0 content-start gap-2">
+                <Label id="audit-module-label" htmlFor="audit-module">Module</Label>
                 <Select
                   value={entityFilter}
                   onValueChange={(value) => {
@@ -349,7 +349,7 @@ export default function AuditLogsPage() {
                     resetPage();
                   }}
                 >
-                  <SelectTrigger className="w-full">
+                  <SelectTrigger id="audit-module" aria-labelledby="audit-module-label" className="w-full">
                     <SelectValue placeholder="Chọn module" />
                   </SelectTrigger>
                   <SelectContent>
@@ -363,8 +363,8 @@ export default function AuditLogsPage() {
                 </Select>
               </div>
 
-              <div className="grid gap-2">
-                <Label>Hành động</Label>
+              <div className="grid min-w-0 content-start gap-2">
+                <Label id="audit-action-label" htmlFor="audit-action">Hành động</Label>
                 <Select
                   value={actionFilter}
                   onValueChange={(value) => {
@@ -372,7 +372,7 @@ export default function AuditLogsPage() {
                     resetPage();
                   }}
                 >
-                  <SelectTrigger className="w-full">
+                  <SelectTrigger id="audit-action" aria-labelledby="audit-action-label" className="w-full">
                     <SelectValue placeholder="Chọn hành động" />
                   </SelectTrigger>
                   <SelectContent>
@@ -386,8 +386,8 @@ export default function AuditLogsPage() {
                 </Select>
               </div>
 
-              <div className="grid gap-2">
-                <Label>Người thực hiện</Label>
+              <div className="grid min-w-0 content-start gap-2">
+                <Label id="audit-actor-label" htmlFor="audit-actor">Người thực hiện</Label>
                 <Select
                   value={actorFilter}
                   onValueChange={(value) => {
@@ -396,7 +396,7 @@ export default function AuditLogsPage() {
                   }}
                   disabled={usersQuery.isLoading || usersQuery.isError}
                 >
-                  <SelectTrigger className="w-full">
+                  <SelectTrigger id="audit-actor" aria-labelledby="audit-actor-label" className="w-full">
                     <SelectValue
                       placeholder={
                         usersQuery.isLoading
@@ -421,7 +421,7 @@ export default function AuditLogsPage() {
                 ) : null}
               </div>
 
-              <div className="grid gap-2">
+              <div className="grid min-w-0 content-start gap-2">
                 <Label htmlFor="audit-resource-id">ID tài nguyên</Label>
                 <Input
                   id="audit-resource-id"
@@ -437,7 +437,7 @@ export default function AuditLogsPage() {
                 />
               </div>
 
-              <div className="grid gap-2">
+              <div className="grid min-w-0 content-start gap-2">
                 <Label htmlFor="audit-from-date">Từ ngày</Label>
                 <Input
                   id="audit-from-date"
@@ -450,7 +450,7 @@ export default function AuditLogsPage() {
                 />
               </div>
 
-              <div className="grid gap-2">
+              <div className="grid min-w-0 content-start gap-2">
                 <Label htmlFor="audit-to-date">Đến ngày</Label>
                 <Input
                   id="audit-to-date"

@@ -101,4 +101,64 @@ describe('KnowledgeService', () => {
       .calls[0] as [Prisma.KnowledgeArticleFindUniqueArgs];
     expect(findUniqueArgs.select).toMatchObject({ content: true });
   });
+
+  it('does not query the database for empty or generic request wording', async () => {
+    await expect(
+      service.suggestForTicket(
+        { title: 'Không được cần lỗi' },
+        { userId: 10, role: UserRole.EMPLOYEE },
+      ),
+    ).resolves.toEqual([]);
+    expect(mockPrismaService.knowledgeArticle.findMany).not.toHaveBeenCalled();
+  });
+
+  it.each(Object.values(UserRole))(
+    'only suggests published articles for %s',
+    async (role) => {
+      mockPrismaService.knowledgeArticle.findMany.mockResolvedValue([]);
+      await service.suggestForTicket(
+        { title: 'Không kết nối VPN' },
+        { userId: 7, role },
+      );
+      const [args] = mockPrismaService.knowledgeArticle.findMany.mock
+        .calls[0] as [Prisma.KnowledgeArticleFindManyArgs];
+      expect(args.where).toMatchObject({ isPublished: true });
+      expect(args.take).toBe(30);
+      expect(args.select).not.toHaveProperty('content');
+      expect(JSON.stringify(args.where)).toContain('vpn');
+    },
+  );
+
+  it('ranks exact title/tag matches first and returns at most five without exposing scores', async () => {
+    const article = (
+      id: number,
+      title: string,
+      tags: string | null = null,
+    ) => ({ id, title, tags, summary: null });
+    mockPrismaService.knowledgeArticle.findMany.mockResolvedValue([
+      ...Array.from({ length: 5 }, (_, index) =>
+        article(index + 1, 'Laptop guide'),
+      ),
+      article(6, 'VPN guide', 'vpn'),
+    ]);
+    const result = await service.suggestForTicket(
+      { title: 'VPN' },
+      { userId: 10, role: UserRole.EMPLOYEE },
+    );
+    expect(result).toHaveLength(5);
+    expect(result[0]).toEqual(article(6, 'VPN guide', 'vpn'));
+    expect(result[0]).not.toHaveProperty('score');
+  });
+
+  it('rejects a draft article opened by an employee without increasing its views', async () => {
+    mockPrismaService.knowledgeArticle.findUnique.mockResolvedValue({
+      id: 5,
+      isPublished: false,
+      createdById: 7,
+    });
+    await expect(
+      service.getById(5, { userId: 10, role: UserRole.EMPLOYEE }),
+    ).rejects.toThrow('Forbidden');
+    expect(mockPrismaService.knowledgeArticle.update).not.toHaveBeenCalled();
+  });
 });

@@ -1,11 +1,6 @@
 "use client";
 
-import {
-  ArrowLeft,
-  CircleCheck,
-  MailCheck,
-  Sparkles,
-} from "lucide-react";
+import { ArrowLeft, CircleCheck, MailCheck, Sparkles } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { CSSProperties } from "react";
@@ -22,10 +17,7 @@ import {
 import { TicketForm } from "@/features/tickets/components/ticket-form";
 import { CreateTicketAssetSelector } from "@/features/assets/components/create-ticket-asset-selector";
 import { useMe } from "@/features/auth/hooks";
-import {
-  useCreateTicket,
-  useLinkTicketAsset,
-} from "@/features/tickets/hooks";
+import { useCreateTicket, useLinkTicketAsset } from "@/features/tickets/hooks";
 import {
   toTicketPayload,
   type TicketFormValues,
@@ -53,9 +45,7 @@ export default function NewTicketPage() {
             input: { assetId: Number(selectedAssetId) },
           });
         } catch {
-          router.push(
-            `/tickets/${ticket.id}?created=success&assetLink=failed`,
-          );
+          router.push(`/tickets/${ticket.id}?created=success&assetLink=failed`);
           return;
         }
       }
@@ -97,10 +87,9 @@ export default function NewTicketPage() {
           </CardHeader>
           <CardContent className="pt-0">
             <TicketForm
+              showKnowledgeSuggestions
               submitLabel="Tạo ticket"
-              isSubmitting={
-                createTicket.isPending || linkTicketAsset.isPending
-              }
+              isSubmitting={createTicket.isPending || linkTicketAsset.isPending}
               error={formError}
               onSubmit={handleSubmit}
             />

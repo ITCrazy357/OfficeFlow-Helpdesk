@@ -51,8 +51,10 @@ export function UserHandoffForm({
         nghỉ đang chờ duyệt của <strong>{user.name}</strong> sang người nhận.
         Không thay đổi đơn đã duyệt, quyền hay trạng thái tài khoản.
       </p>
-      <div className="grid gap-2">
-        <Label htmlFor="handoff-replacement">Người nhận bàn giao</Label>
+      <div className="grid min-w-0 content-start gap-2">
+        <Label id="handoff-replacement-label" htmlFor="handoff-replacement">
+          Người nhận bàn giao
+        </Label>
         <Select
           value={replacement ? replacementId : ""}
           onValueChange={(value) => {
@@ -61,7 +63,11 @@ export function UserHandoffForm({
           }}
           disabled={isSubmitting || candidates.length === 0}
         >
-          <SelectTrigger id="handoff-replacement" className="w-full">
+          <SelectTrigger
+            id="handoff-replacement"
+            aria-labelledby="handoff-replacement-label"
+            className="w-full"
+          >
             <SelectValue placeholder="Chọn MANAGER hoặc ADMIN" />
           </SelectTrigger>
           <SelectContent>

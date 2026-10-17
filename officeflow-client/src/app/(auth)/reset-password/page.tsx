@@ -165,7 +165,7 @@ export default function ResetPasswordPage() {
             noValidate
             onSubmit={form.handleSubmit(onSubmit)}
           >
-            <div className="grid gap-2">
+            <div className="grid min-w-0 content-start gap-2">
               <Label htmlFor="new-password">Mật khẩu mới</Label>
               <Input
                 id="new-password"
@@ -185,7 +185,7 @@ export default function ResetPasswordPage() {
               ) : null}
             </div>
 
-            <div className="grid gap-2">
+            <div className="grid min-w-0 content-start gap-2">
               <Label htmlFor="confirm-password">Xác nhận mật khẩu mới</Label>
               <Input
                 id="confirm-password"

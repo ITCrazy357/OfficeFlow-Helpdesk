@@ -50,7 +50,7 @@ export function ResetPasswordForm({
       onSubmit={form.handleSubmit(handleSubmit)}
       noValidate
     >
-      <div className="grid gap-2">
+      <div className="grid min-w-0 content-start gap-2">
         <Label htmlFor="reset-user-password">Mật khẩu mới</Label>
         <Input
           id="reset-user-password"
@@ -64,7 +64,7 @@ export function ResetPasswordForm({
         <FieldError message={form.formState.errors.password?.message} />
       </div>
 
-      <div className="grid gap-2">
+      <div className="grid min-w-0 content-start gap-2">
         <Label htmlFor="confirm-user-password">Xác nhận mật khẩu</Label>
         <Input
           id="confirm-user-password"

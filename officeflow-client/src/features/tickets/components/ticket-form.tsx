@@ -2,7 +2,8 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { AlertCircle, FolderKanban, Loader2, Save } from "lucide-react";
-import { Controller, useForm } from "react-hook-form";
+import { useState } from "react";
+import { Controller, useForm, useWatch } from "react-hook-form";
 import type { SubmitHandler } from "react-hook-form";
 
 import { Button } from "@/components/ui/button";
@@ -16,6 +17,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { TicketSelfService } from "@/features/knowledge/components/ticket-self-service";
 import { getTicketCategoryLabel } from "@/features/ticket-categories/constants";
 import { useTicketCategories } from "@/features/ticket-categories/hooks";
 import { ticketPriorityOptions } from "../constants";
@@ -25,6 +27,7 @@ type TicketFormProps = {
   defaultValues?: Partial<TicketFormValues>;
   submitLabel: string;
   isSubmitting?: boolean;
+  showKnowledgeSuggestions?: boolean;
   error?: string | null;
   onCancel?: () => void;
   onSubmit: (values: TicketFormValues) => Promise<void> | void;
@@ -34,6 +37,7 @@ export function TicketForm({
   defaultValues,
   submitLabel,
   isSubmitting = false,
+  showKnowledgeSuggestions = false,
   error,
   onCancel,
   onSubmit,
@@ -48,7 +52,24 @@ export function TicketForm({
     },
   });
 
+  const [title = "", description = ""] = useWatch({
+    control: form.control,
+    name: ["title", "description"],
+  });
+  const [resolution, setResolution] = useState<{
+    title: string;
+    description: string;
+    articleTitle: string;
+  } | null>(null);
+  // Editing the issue makes the previous self-resolution inapplicable.
+  const isResolved = Boolean(
+    showKnowledgeSuggestions &&
+    resolution?.title === title &&
+    resolution?.description === description,
+  );
+
   const handleSubmit: SubmitHandler<TicketFormValues> = async (values) => {
+    if (isResolved || isSubmitting) return;
     await onSubmit(values);
   };
 
@@ -61,7 +82,7 @@ export function TicketForm({
       onSubmit={form.handleSubmit(handleSubmit)}
       noValidate
     >
-      <div className="grid gap-2">
+      <div className="grid min-w-0 content-start gap-2">
         <Label htmlFor="ticket-title">Tiêu đề</Label>
         <Input
           id="ticket-title"
@@ -77,7 +98,7 @@ export function TicketForm({
         ) : null}
       </div>
 
-      <div className="grid gap-2">
+      <div className="grid min-w-0 content-start gap-2">
         <Label htmlFor="ticket-description">Mô tả</Label>
         <Textarea
           id="ticket-description"
@@ -94,9 +115,26 @@ export function TicketForm({
         ) : null}
       </div>
 
+      {showKnowledgeSuggestions ? (
+        <TicketSelfService
+          title={title}
+          description={description}
+          disabled={isSubmitting}
+          resolvedArticle={
+            isResolved ? (resolution?.articleTitle ?? null) : null
+          }
+          onResolved={(articleTitle) =>
+            setResolution({ title, description, articleTitle })
+          }
+          onContinue={() => setResolution(null)}
+        />
+      ) : null}
+
       <div className="grid gap-4 sm:grid-cols-2">
-        <div className="grid gap-2">
-          <Label>Độ ưu tiên</Label>
+        <div className="grid min-w-0 content-start gap-2">
+          <Label id="ticket-priority-label" htmlFor="ticket-priority">
+            Độ ưu tiên
+          </Label>
           <Controller
             control={form.control}
             name="priority"
@@ -106,7 +144,13 @@ export function TicketForm({
                 onValueChange={field.onChange}
                 disabled={isSubmitting}
               >
-                <SelectTrigger className="w-full">
+                <SelectTrigger
+                  id="ticket-priority"
+                  aria-labelledby="ticket-priority-label"
+                  className="w-full"
+                  ref={field.ref}
+                  onBlur={field.onBlur}
+                >
                   <SelectValue placeholder="Chọn độ ưu tiên" />
                 </SelectTrigger>
                 <SelectContent>
@@ -121,8 +165,10 @@ export function TicketForm({
           />
         </div>
 
-        <div className="grid gap-2">
-          <Label htmlFor="ticket-category-id">Danh mục</Label>
+        <div className="grid min-w-0 content-start gap-2">
+          <Label id="ticket-category-label" htmlFor="ticket-category-id">
+            Danh mục
+          </Label>
           {categoriesQuery.isLoading ? (
             <div className="flex h-10 items-center gap-2 rounded-lg border bg-muted/25 px-3 text-sm text-muted-foreground">
               <Loader2 className="size-4 animate-spin" />
@@ -172,6 +218,10 @@ export function TicketForm({
                     >
                       <SelectTrigger
                         id="ticket-category-id"
+                        aria-labelledby="ticket-category-label"
+                        aria-describedby="ticket-category-help"
+                        ref={field.ref}
+                        onBlur={field.onBlur}
                         className="w-full pl-9"
                       >
                         <SelectValue placeholder="Chọn danh mục" />
@@ -193,7 +243,10 @@ export function TicketForm({
                   )}
                 />
               </div>
-              <p className="text-xs text-muted-foreground">
+              <p
+                id="ticket-category-help"
+                className="text-xs text-muted-foreground"
+              >
                 Chọn danh mục phù hợp để yêu cầu được phân loại chính xác hơn.
               </p>
             </>
@@ -230,7 +283,7 @@ export function TicketForm({
             Hủy
           </Button>
         ) : null}
-        <Button type="submit" disabled={isSubmitting}>
+        <Button type="submit" disabled={isSubmitting || isResolved}>
           <Save className="size-4" />
           {isSubmitting ? "Đang lưu..." : submitLabel}
         </Button>

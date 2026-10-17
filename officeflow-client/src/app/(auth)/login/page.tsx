@@ -168,7 +168,7 @@ export default function LoginPage() {
           </div>
 
           <form className="grid gap-5" onSubmit={form.handleSubmit(onSubmit)} aria-busy={isBusy} noValidate>
-            <div className="grid gap-2">
+            <div className="grid min-w-0 content-start gap-2">
               <Label htmlFor="email" className="text-sm font-semibold text-foreground">Email công việc</Label>
               <div className={styles.inputWrap}>
                 <Mail className={styles.inputIcon} aria-hidden="true" />
