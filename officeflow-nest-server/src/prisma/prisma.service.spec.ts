@@ -7,6 +7,7 @@ describe('Prisma startup readiness', () => {
   let disconnectSpy: jest.SpyInstance<Promise<void>, []>;
   let outboxReadSpy: jest.SpyInstance;
   let notificationReadSpy: jest.SpyInstance;
+  let slaAlertReadSpy: jest.SpyInstance;
 
   beforeEach(() => {
     const config = new ConfigService({
@@ -22,6 +23,11 @@ describe('Prisma startup readiness', () => {
       .mockResolvedValue(null);
     notificationReadSpy = jest
       .spyOn(service.notification, 'findFirst')
+      .mockResolvedValue(null);
+    jest.spyOn(service.ticket, 'findFirst').mockResolvedValue(null);
+    jest.spyOn(service.slaPolicy, 'findFirst').mockResolvedValue(null);
+    slaAlertReadSpy = jest
+      .spyOn(service.slaAlert, 'findFirst')
       .mockResolvedValue(null);
   });
 
@@ -40,7 +46,17 @@ describe('Prisma startup readiness', () => {
     expect(querySpy).toHaveBeenCalledWith(['SELECT 1']);
     expect(outboxReadSpy).toHaveBeenCalledTimes(1);
     expect(notificationReadSpy).toHaveBeenCalledTimes(1);
+    expect(slaAlertReadSpy).toHaveBeenCalledTimes(1);
     expect(disconnectSpy).not.toHaveBeenCalled();
+  });
+
+  it('fails startup and closes the pool when the SLA schema is unavailable', async () => {
+    jest.spyOn(service, '$queryRaw').mockResolvedValue([{ ok: 1 }]);
+    const error = new Error('SLA schema unavailable');
+    slaAlertReadSpy.mockRejectedValue(error);
+
+    await expect(service.onModuleInit()).rejects.toBe(error);
+    expect(disconnectSpy).toHaveBeenCalledTimes(1);
   });
 
   it('fails startup and closes the pool when connect succeeds but queries fail', async () => {
