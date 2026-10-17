@@ -1,0 +1,48 @@
+{
+  "fixtureOnly": true,
+  "checks": [
+    "Uses the system theme without a saved choice",
+    "An explicit theme choice synchronizes across tabs",
+    "The chosen theme survives reload",
+    "Password visibility toggles without changing its value",
+    "EMPLOYEE navigation keeps role visibility; staff ticket selection remains functional",
+    "MANAGER navigation keeps role visibility; staff ticket selection remains functional",
+    "IT_STAFF navigation keeps role visibility; staff ticket selection remains functional",
+    "Hairline SVG responds to the pointer",
+    "Reduced motion disables Hairline interaction and CSS animation",
+    "Resizing an open mobile menu restores page scrolling"
+  ],
+  "errors": [],
+  "accessibility": [
+    {
+      "route": "/login",
+      "theme": "light",
+      "violations": []
+    },
+    {
+      "route": "/forgot-password",
+      "theme": "light",
+      "violations": []
+    },
+    {
+      "route": "/reset-password",
+      "theme": "light",
+      "violations": []
+    },
+    {
+      "route": "/login",
+      "theme": "dark",
+      "violations": []
+    },
+    {
+      "route": "/forgot-password",
+      "theme": "dark",
+      "violations": []
+    },
+    {
+      "route": "/reset-password",
+      "theme": "dark",
+      "violations": []
+    }
+  ]
+}

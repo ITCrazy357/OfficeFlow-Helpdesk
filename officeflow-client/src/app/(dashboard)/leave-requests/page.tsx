@@ -3,7 +3,6 @@
 import { useMemo, useState } from "react";
 import {
   AlertCircle,
-  CalendarDays,
   ClipboardCheck,
   LockKeyhole,
   Plus,
@@ -94,10 +93,6 @@ export default function LeaveRequestsPage() {
     <div className="grid gap-6 motion-enter">
       <section className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <div className="mb-2 inline-flex items-center gap-2 rounded-full border bg-muted/60 px-3 py-1 text-xs font-medium text-muted-foreground">
-            <CalendarDays className="size-3.5" />
-            Nghỉ phép
-          </div>
           <h1 className="text-2xl font-semibold tracking-normal">
             Đơn nghỉ phép
           </h1>
@@ -106,7 +101,7 @@ export default function LeaveRequestsPage() {
           </p>
         </div>
 
-        <Button asChild className="bg-teal-950 hover:bg-teal-900">
+        <Button asChild className="bg-primary text-primary-foreground hover:bg-primary/90">
           <Link href="/leave-requests/new">
             <Plus className="size-4" />
             Tạo đơn nghỉ
@@ -138,7 +133,7 @@ export default function LeaveRequestsPage() {
               </span>
               <span>
                 <span className="block text-sm font-semibold">Đơn của tôi</span>
-                <span className="mt-0.5 block text-xs opacity-75">
+                <span className="mt-0.5 block text-xs">
                   Các đơn do chính bạn gửi
                 </span>
               </span>
@@ -164,7 +159,7 @@ export default function LeaveRequestsPage() {
                   <span className="block text-sm font-semibold">
                     Chờ tôi duyệt
                   </span>
-                  <span className="mt-0.5 block text-xs opacity-75">
+                  <span className="mt-0.5 block text-xs">
                     Chỉ các đơn giao trực tiếp cho bạn
                   </span>
                 </span>

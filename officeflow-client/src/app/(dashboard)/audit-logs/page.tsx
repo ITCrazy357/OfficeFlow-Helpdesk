@@ -13,7 +13,6 @@ import {
   ChevronRight,
   Eye,
   FilterX,
-  History,
   Inbox,
   Loader2,
   RefreshCw,
@@ -258,10 +257,6 @@ export default function AuditLogsPage() {
       <div className="grid gap-6 motion-enter">
         <section className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <div className="mb-2 inline-flex items-center gap-2 rounded-full border bg-muted/60 px-3 py-1 text-xs font-medium text-muted-foreground">
-              <History className="size-3.5" />
-              Quản trị hệ thống
-            </div>
             <h1 className="text-2xl font-semibold tracking-normal">
               Audit Logs
             </h1>
@@ -308,7 +303,7 @@ export default function AuditLogsPage() {
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <CardTitle className="flex items-center gap-2">
-                  <SlidersHorizontal className="size-4 text-teal-800" />
+                  <SlidersHorizontal className="size-4 text-teal-800 dark:text-teal-200" />
                   Bộ lọc nhật ký
                 </CardTitle>
                 <CardDescription>
@@ -332,7 +327,7 @@ export default function AuditLogsPage() {
                 <Label htmlFor="audit-keyword">Tìm kiếm</Label>
                 <div className="relative">
                   <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-                  <Input
+                  <Input type="search"
                     id="audit-keyword"
                     value={keyword}
                     onChange={(event) => {
@@ -581,7 +576,7 @@ export default function AuditLogsPage() {
           <Card className="shadow-sm">
             <CardContent className="grid min-h-72 place-items-center px-5 text-center">
               <div className="max-w-sm">
-                <span className="mx-auto grid size-12 place-items-center rounded-xl bg-teal-50 text-teal-800">
+                <span className="mx-auto grid size-12 place-items-center rounded-xl bg-teal-50 dark:bg-teal-400/10 text-teal-800 dark:text-teal-200">
                   <Inbox className="size-5" />
                 </span>
                 <p className="mt-4 font-medium">
@@ -608,7 +603,7 @@ export default function AuditLogsPage() {
                   resetPage();
                 }}
               >
-                <SelectTrigger size="sm" className="w-32">
+                <SelectTrigger size="sm" className="w-32" aria-label="Số dòng mỗi trang">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>

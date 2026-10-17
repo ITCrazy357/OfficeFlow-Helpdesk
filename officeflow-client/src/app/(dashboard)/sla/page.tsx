@@ -111,7 +111,7 @@ function PolicyForm({
                       >
                         <input
                           type="checkbox"
-                          className="size-4 accent-teal-800"
+                          className="of-checkbox"
                           checked={config.workingDays.includes(day)}
                           onChange={(event) =>
                             setConfig({

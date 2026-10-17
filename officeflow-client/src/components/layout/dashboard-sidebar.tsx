@@ -6,7 +6,6 @@ import {
   Building2,
   CalendarRange,
   Clock3,
-  CircleCheck,
   LayoutDashboard,
   ScrollText,
   Tags,
@@ -16,6 +15,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useEffect, useRef } from "react";
 
 import { Button } from "@/components/ui/button";
 import { cn } from "@/components/ui/utils";
@@ -38,8 +38,8 @@ type NavigationItem = {
 const navigationItems: NavigationItem[] = [
   {
     href: "/dashboard",
-    label: "Dashboard",
-    description: "Tổng quan",
+    label: "Tổng quan",
+    description: "Yêu cầu và tiến độ",
     icon: LayoutDashboard,
   },
   {
@@ -62,14 +62,14 @@ const navigationItems: NavigationItem[] = [
   },
   {
     href: "/knowledge",
-    label: "Knowledge",
+    label: "Kho kiến thức",
     description: "FAQ nội bộ",
     icon: BookOpenText,
   },
   {
     href: "/departments",
-    label: "Departments",
-    description: "Phòng ban",
+    label: "Phòng ban",
+    description: "Cơ cấu tổ chức",
     icon: Building2,
   },
   {
@@ -88,8 +88,8 @@ const navigationItems: NavigationItem[] = [
   },
   {
     href: "/audit-logs",
-    label: "Audit Logs",
-    description: "Nhật ký hệ thống",
+    label: "Nhật ký hệ thống",
+    description: "Hoạt động và thay đổi",
     icon: ScrollText,
     roles: ["ADMIN"],
   },
@@ -114,7 +114,7 @@ function BrandBlock() {
   return (
     <div className="px-5 py-5">
       <div className="flex items-center gap-3">
-        <div className="grid size-11 place-items-center rounded-xl bg-teal-950 text-sm font-semibold text-white shadow-sm shadow-teal-950/20">
+        <div className="grid size-10 place-items-center rounded-xl bg-sidebar-primary text-sm font-semibold text-sidebar-primary-foreground">
           OF
         </div>
         <div>
@@ -138,49 +138,46 @@ function SidebarNav({
   const pathname = usePathname();
 
   return (
-    <nav className="grid min-h-0 flex-1 content-start gap-1.5 overflow-y-auto p-3">
+    <nav aria-label="Điều hướng chính" className="grid min-h-0 flex-1 content-start gap-1 overflow-y-auto p-3">
       {navigationItems
         .filter((item) => !item.roles || item.roles.includes(userRole))
-        .map((item) => {
+        .map((item, index) => {
           const Icon = item.icon;
           const active = isActivePath(pathname, item.href);
 
           return (
+            <div key={item.href}>
+              {index === 0 || item.href === "/users" ? <p className="px-3 pb-2 pt-4 text-xs font-medium text-muted-foreground">{index === 0 ? "Không gian làm việc" : "Quản trị"}</p> : null}
             <Link
-              key={item.href}
               href={item.href}
               onClick={onNavigate}
               data-active={active}
               aria-current={active ? "page" : undefined}
               className={cn(
-                "motion-nav group flex items-center gap-3 rounded-lg px-3 py-3 text-sm font-medium",
+                "motion-nav group flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium",
                 active
-                  ? "bg-teal-950 text-white shadow-sm shadow-teal-950/15"
-                  : "text-muted-foreground hover:bg-teal-50 hover:text-teal-950",
+                  ? "bg-sidebar-accent text-sidebar-accent-foreground"
+                  : "text-sidebar-foreground/80 hover:bg-sidebar-accent/60 hover:text-sidebar-accent-foreground",
               )}
             >
               <span
                 className={cn(
-                  "grid size-9 shrink-0 place-items-center rounded-lg border transition-colors",
+                  "grid size-7 shrink-0 place-items-center transition-colors",
                   active
-                    ? "border-white/15 bg-white/10 text-white"
-                    : "border-border bg-card text-teal-800 group-hover:border-teal-200 group-hover:bg-white",
+                    ? "text-sidebar-primary"
+                    : "text-muted-foreground group-hover:text-sidebar-primary",
                 )}
               >
                 <Icon className="size-4" />
               </span>
               <span className="min-w-0">
                 <span className="block leading-tight">{item.label}</span>
-                <span
-                  className={cn(
-                    "mt-0.5 block truncate text-xs font-normal",
-                    active ? "text-white/75" : "text-muted-foreground",
-                  )}
-                >
+                <span className="mt-0.5 block truncate text-xs font-normal text-muted-foreground">
                   {item.description}
                 </span>
               </span>
             </Link>
+            </div>
           );
         })}
     </nav>
@@ -192,19 +189,46 @@ export function DashboardSidebar({
   onClose,
   userRole,
 }: DashboardSidebarProps) {
+  const panel = useRef<HTMLElement>(null);
+  const closeButton = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    if (!isOpen) return;
+    const previous = document.activeElement as HTMLElement | null;
+    const overflow = document.body.style.overflow;
+    const desktop = window.matchMedia("(min-width: 768px)");
+    const handleResize = () => { if (desktop.matches) onClose(); };
+    document.body.style.overflow = "hidden";
+    closeButton.current?.focus();
+    const handleKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") onClose();
+      if (event.key !== "Tab") return;
+      const items = panel.current?.querySelectorAll<HTMLElement>('a[href], button:not(:disabled)');
+      if (!items?.length) return;
+      const first = items[0];
+      const last = items[items.length - 1];
+      if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
+      else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
+    };
+    window.addEventListener("keydown", handleKey);
+    desktop.addEventListener("change", handleResize);
+    return () => {
+      document.body.style.overflow = overflow;
+      window.removeEventListener("keydown", handleKey);
+      desktop.removeEventListener("change", handleResize);
+      previous?.focus();
+    };
+  }, [isOpen, onClose]);
   return (
     <>
-      <aside className="fixed inset-y-0 left-0 z-30 hidden w-64 border-r bg-sidebar/95 shadow-sm backdrop-blur md:flex md:flex-col">
-        <div className="border-b bg-card/70">
+      <a href="#main-content" className="sr-only z-50 rounded-lg bg-card p-3 text-foreground focus:not-sr-only focus:fixed focus:left-4 focus:top-4">Đến nội dung chính</a>
+      <aside className="fixed inset-y-0 left-0 z-30 hidden w-64 border-r border-sidebar-border bg-sidebar md:flex md:flex-col">
+        <div className="border-b border-sidebar-border">
           <BrandBlock />
         </div>
         <SidebarNav userRole={userRole} />
-        <div className="m-3 mt-auto flex items-center gap-3 rounded-lg border bg-card p-3 text-xs text-muted-foreground shadow-sm">
-          <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-emerald-50 text-emerald-700">
-            <CircleCheck className="size-4" />
-          </span>
+        <div className="mx-5 mb-6 mt-auto border-t border-sidebar-border pt-4 text-xs text-muted-foreground">
           <div>
-            <p className="font-semibold text-foreground">Hệ thống sẵn sàng</p>
+            <p className="font-semibold text-foreground">OfficeFlow Helpdesk</p>
             <p className="mt-0.5">Không gian làm việc nội bộ</p>
           </div>
         </div>
@@ -225,6 +249,10 @@ export function DashboardSidebar({
       />
 
       <aside
+        ref={panel}
+        role={isOpen ? "dialog" : undefined}
+        aria-modal={isOpen ? true : undefined}
+        aria-label="Điều hướng"
         inert={!isOpen}
         aria-hidden={!isOpen}
         className={cn(
@@ -235,6 +263,7 @@ export function DashboardSidebar({
         <div className="flex items-center justify-between border-b bg-card/70 pr-3">
           <BrandBlock />
           <Button
+            ref={closeButton}
             type="button"
             variant="ghost"
             size="icon"

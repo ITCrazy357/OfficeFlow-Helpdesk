@@ -8,7 +8,6 @@ import {
   Eye,
   EyeOff,
   Headset,
-  LoaderCircle,
   LockKeyhole,
   LogIn,
   Mail,
@@ -24,6 +23,8 @@ import type { SubmitHandler } from "react-hook-form";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Loader } from "@/components/ui/loader";
+import { OfficeFlowFigure } from "@/components/ui/officeflow-figure";
 import { useLogin } from "@/features/auth/hooks";
 import { restoreSessionApi } from "@/features/auth/api";
 import { loginSchema, type LoginFormValues } from "@/features/auth/schemas";
@@ -111,7 +112,6 @@ export default function LoginPage() {
   return (
     <main className={styles.page}>
       <section className={styles.introduction} aria-labelledby="welcome-title">
-        <div className={styles.orbits} aria-hidden="true" />
         <div className={styles.brand}>
           <LockKeyhole className="size-3.5" aria-hidden="true" />
           <span>OfficeFlow Helpdesk</span>
@@ -125,7 +125,8 @@ export default function LoginPage() {
             Gửi yêu cầu, theo dõi tiến độ và kết nối với đội ngũ IT.
             Mọi việc trong một không gian chung.
           </p>
-          <ul className="mt-8 hidden gap-3 lg:grid">
+          <div className={styles.figure}><OfficeFlowFigure kind="hub" /></div>
+          <ul className="mt-4 hidden gap-4 lg:grid">
             {productNotes.map(({ icon: Icon, title, description }) => (
               <li key={title} className={styles.feature}>
                 <span className={styles.featureIcon}><Icon className="size-5" aria-hidden="true" /></span>
@@ -158,17 +159,17 @@ export default function LoginPage() {
           <div className="mb-8">
             <div className="mb-6 flex items-center justify-between gap-3">
               <div className={styles.loginIcon}><LogIn className="size-6" aria-hidden="true" /></div>
-              <span className="rounded-full border border-emerald-100 bg-emerald-50 px-3 py-1.5 text-xs font-medium text-emerald-800">Dành cho nội bộ</span>
+              <span className="rounded-full border border-emerald-100 dark:border-emerald-400/25 bg-emerald-50 dark:bg-emerald-400/10 px-3 py-1.5 text-xs font-medium text-emerald-800 dark:text-emerald-200">Dành cho nội bộ</span>
             </div>
-            <h2 id="login-title" className="text-[1.75rem] font-bold tracking-tight text-slate-900">Đăng nhập</h2>
-            <p className="mt-2 text-sm leading-6 text-slate-500">
+            <h2 id="login-title" className="text-[1.75rem] font-semibold tracking-tight text-foreground">Đăng nhập</h2>
+            <p className="mt-2 text-sm leading-6 text-muted-foreground">
               Chào mừng bạn trở lại! Truy cập OfficeFlow bằng tài khoản được cấp.
             </p>
           </div>
 
           <form className="grid gap-5" onSubmit={form.handleSubmit(onSubmit)} aria-busy={isBusy} noValidate>
             <div className="grid gap-2">
-              <Label htmlFor="email" className="text-sm font-semibold text-slate-700">Email công việc</Label>
+              <Label htmlFor="email" className="text-sm font-semibold text-foreground">Email công việc</Label>
               <div className={styles.inputWrap}>
                 <Mail className={styles.inputIcon} aria-hidden="true" />
                 <Input
@@ -185,13 +186,13 @@ export default function LoginPage() {
                   {...form.register("email")}
                 />
               </div>
-              {emailError ? <p id="email-error" role="alert" className="text-xs font-medium text-red-700">{emailError}</p> : null}
+              {emailError ? <p id="email-error" role="alert" className="text-xs font-medium text-red-700 dark:text-red-200">{emailError}</p> : null}
             </div>
 
             <div className="grid gap-2">
               <div className="flex items-center justify-between gap-3">
-                <Label htmlFor="password" className="text-sm font-semibold text-slate-700">Mật khẩu</Label>
-                <Link href="/forgot-password" className="rounded-sm text-xs font-semibold text-teal-700 hover:text-teal-950 hover:underline">Quên mật khẩu?</Link>
+                <Label htmlFor="password" className="text-sm font-semibold text-foreground">Mật khẩu</Label>
+                <Link href="/forgot-password" className="rounded-sm text-xs font-semibold text-primary hover:underline">Quên mật khẩu?</Link>
               </div>
               <div className={styles.inputWrap}>
                 <LockKeyhole className={styles.inputIcon} aria-hidden="true" />
@@ -218,33 +219,33 @@ export default function LoginPage() {
                   {showPassword ? <EyeOff className="size-4" aria-hidden="true" /> : <Eye className="size-4" aria-hidden="true" />}
                 </button>
               </div>
-              {passwordError ? <p id="password-error" role="alert" className="text-xs font-medium text-red-700">{passwordError}</p> : null}
+              {passwordError ? <p id="password-error" role="alert" className="text-xs font-medium text-red-700 dark:text-red-200">{passwordError}</p> : null}
             </div>
 
             {formError ? (
-              <div role="alert" className="motion-toast rounded-lg border border-red-200 bg-red-50 px-3 py-2.5 text-sm font-medium text-red-700">{formError}</div>
+              <div role="alert" className="motion-toast rounded-lg border border-red-200 dark:border-red-400/25 bg-red-50 dark:bg-red-400/10 px-3 py-2.5 text-sm font-medium text-red-700 dark:text-red-200">{formError}</div>
             ) : null}
 
             <Button type="submit" className={styles.submitButton} disabled={isBusy}>
               <span aria-live="polite">
                 {isRestoringSession ? "Đang kiểm tra phiên..." : loginMutation.isPending ? "Đang đăng nhập..." : "Đăng nhập vào hệ thống"}
               </span>
-              {isBusy ? <LoaderCircle className="size-4 motion-safe:animate-spin" aria-hidden="true" /> : <ArrowRight className="size-4 text-emerald-200" aria-hidden="true" />}
+              {isBusy ? <Loader /> : <ArrowRight className="size-4" aria-hidden="true" />}
             </Button>
           </form>
 
-          <div className="mt-7 border-t border-slate-100 pt-5 text-center">
-            <p className="text-xs leading-5 text-slate-500">Tài khoản được cấp bởi quản trị viên.</p>
-            <p className="mt-1 text-xs leading-5 text-slate-500">
-              Liên hệ <span className="font-semibold text-teal-700">đội ngũ IT</span> nếu bạn cần hỗ trợ truy cập.
+          <div className="mt-7 border-t pt-5 text-center">
+            <p className="text-xs leading-5 text-muted-foreground">Tài khoản được cấp bởi quản trị viên.</p>
+            <p className="mt-1 text-xs leading-5 text-muted-foreground">
+              Liên hệ <span className="font-semibold text-primary">đội ngũ IT</span> nếu bạn cần hỗ trợ truy cập.
             </p>
-            <div className="mt-5 flex items-center justify-center gap-2 rounded-lg border border-emerald-100/80 bg-emerald-50/70 px-3 py-2.5 text-xs font-medium text-teal-800">
+            <div className="mt-5 flex items-center justify-center gap-2 rounded-lg border border-emerald-100/80 dark:border-emerald-400/25 bg-emerald-50/70 dark:bg-emerald-400/10 px-3 py-2.5 text-xs font-medium text-teal-800 dark:text-teal-200">
               <CircleCheck className="size-3.5 shrink-0" aria-hidden="true" />
               Không gian hỗ trợ dành cho đội ngũ của bạn
             </div>
           </div>
         </div>
-        <p className="relative mt-6 text-center text-xs text-slate-500">OfficeFlow Helpdesk · Kết nối công việc mỗi ngày</p>
+        <p className="relative mt-6 text-center text-xs text-muted-foreground">OfficeFlow Helpdesk · Kết nối công việc mỗi ngày</p>
       </section>
     </main>
   );

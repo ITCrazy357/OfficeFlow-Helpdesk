@@ -3,7 +3,6 @@
 import {
   ArrowLeft,
   CircleCheck,
-  FilePlus2,
   MailCheck,
   Sparkles,
 } from "lucide-react";
@@ -79,10 +78,6 @@ export default function NewTicketPage() {
               Quay lại
             </Link>
           </Button>
-          <div className="mb-2 inline-flex items-center gap-2 rounded-full border bg-muted/60 px-3 py-1 text-xs font-medium text-muted-foreground">
-            <FilePlus2 className="size-3.5" />
-            Ticket mới
-          </div>
           <h1 className="text-2xl font-semibold tracking-normal">
             Tạo ticket mới
           </h1>
@@ -92,7 +87,7 @@ export default function NewTicketPage() {
         </div>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-[1fr_360px]">
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
         <Card className="shadow-sm motion-panel">
           <CardHeader className="border-b">
             <CardTitle>Thông tin ticket</CardTitle>
@@ -143,7 +138,7 @@ export default function NewTicketPage() {
                 style={{ "--motion-index": index } as CSSProperties}
               >
                 <CardContent className="flex gap-3 pt-0">
-                  <div className="grid size-9 shrink-0 place-items-center rounded-lg bg-teal-950/5 text-teal-950">
+                  <div className="grid size-9 shrink-0 place-items-center rounded-lg bg-teal-950/5 dark:bg-teal-200/10 text-teal-950 dark:text-teal-200">
                     <Icon className="size-4" />
                   </div>
                   <p className="text-sm leading-6 text-muted-foreground">

@@ -180,7 +180,7 @@ export function TicketAssetPanel({
           <div className="rounded-lg border bg-muted/20 p-4">
             <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
               <div className="flex min-w-0 gap-3">
-                <span className="grid size-11 shrink-0 place-items-center rounded-lg bg-teal-950/5 text-teal-950">
+                <span className="grid size-11 shrink-0 place-items-center rounded-lg bg-teal-950/5 dark:bg-teal-200/10 text-teal-950 dark:text-teal-200">
                   <Boxes className="size-5" />
                 </span>
                 <div className="min-w-0">
@@ -263,7 +263,7 @@ export function TicketAssetPanel({
               <>
                 <div className="relative">
                   <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-                  <Input
+                  <Input type="search" aria-label="Tìm theo mã, tên, model hoặc serial"
                     value={keyword}
                     onChange={(event) => setKeyword(event.target.value)}
                     className="pl-9"

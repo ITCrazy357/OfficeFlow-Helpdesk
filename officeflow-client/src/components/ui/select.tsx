@@ -39,8 +39,16 @@ function SelectTrigger({
 }: React.ComponentProps<typeof SelectPrimitive.Trigger> & {
   size?: "sm" | "default"
 }) {
+  const value = React.Children.toArray(children).find(
+    (child): child is React.ReactElement<{ placeholder?: React.ReactNode }> =>
+      React.isValidElement(child) && child.type === SelectValue
+  )
+  const accessibleName = typeof value?.props.placeholder === "string"
+    ? value.props.placeholder
+    : undefined
   return (
     <SelectPrimitive.Trigger
+      aria-label={accessibleName}
       data-slot="select-trigger"
       data-size={size}
       className={cn(

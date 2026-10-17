@@ -7,8 +7,6 @@ import {
   ChevronLeft,
   ChevronRight,
   Clock3,
-  Filter,
-  Inbox,
   Plus,
   Search,
   SlidersHorizontal,
@@ -24,6 +22,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { OfficeFlowFigure } from "@/components/ui/officeflow-figure";
 import {
   Select,
   SelectContent,
@@ -115,7 +114,7 @@ function TicketsTable({
               <input
                 type="checkbox"
                 aria-label="Chọn tất cả ticket đang cần xử lý trên trang"
-                className="size-4 cursor-pointer accent-teal-800"
+                className="of-checkbox"
                 checked={
                   activeTickets.length > 0 &&
                   activeTickets.every((ticket) =>
@@ -150,7 +149,7 @@ function TicketsTable({
                 <input
                   type="checkbox"
                   aria-label={`Chọn ticket #${ticket.id}`}
-                  className="size-4 cursor-pointer accent-teal-800"
+                  className="of-checkbox"
                   checked={selection.ids.includes(ticket.id)}
                   disabled={selection.disabled || !isActiveTicket(ticket)}
                   onChange={() => selection.toggle(ticket.id)}
@@ -217,7 +216,7 @@ function TicketsMobileList({
             <label className="mb-3 flex items-center gap-2 text-sm">
               <input
                 type="checkbox"
-                className="size-4 accent-teal-800"
+                className="of-checkbox"
                 aria-label={`Chọn ticket #${ticket.id}`}
                 checked={selection.ids.includes(ticket.id)}
                 disabled={selection.disabled || !isActiveTicket(ticket)}
@@ -396,10 +395,6 @@ export default function TicketsPage() {
     <div className="grid gap-6 motion-enter">
       <section className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <div className="mb-2 inline-flex items-center gap-2 rounded-full border bg-muted/60 px-3 py-1 text-xs font-medium text-muted-foreground">
-            <Filter className="size-3.5" />
-            Không gian ticket
-          </div>
           <h1 className="text-2xl font-semibold tracking-normal">Tickets</h1>
           <p className="mt-1 text-sm text-muted-foreground">
             Quản lý yêu cầu hỗ trợ theo quyền, trạng thái, độ ưu tiên và hạn
@@ -407,7 +402,7 @@ export default function TicketsPage() {
           </p>
         </div>
 
-        <Button asChild className="bg-teal-950 hover:bg-teal-900">
+        <Button asChild className="bg-primary text-primary-foreground hover:bg-primary/90">
           <Link href="/tickets/new">
             <Plus className="size-4" />
             Tạo ticket
@@ -448,7 +443,7 @@ export default function TicketsPage() {
           >
             <div className="relative">
               <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-              <Input
+              <Input type="search" aria-label="Tìm theo tiêu đề hoặc mô tả"
                 value={searchInput}
                 onChange={(event) => setSearchInput(event.target.value)}
                 className="pl-8"
@@ -628,9 +623,7 @@ export default function TicketsPage() {
             ) : (
               <div className="grid min-h-72 place-items-center px-4 text-center">
                 <div className="max-w-md">
-                  <div className="mx-auto mb-4 grid size-12 place-items-center rounded-xl bg-teal-50 text-teal-800">
-                    <Inbox className="size-5" />
-                  </div>
+                  <OfficeFlowFigure kind="drawer" className="mx-auto mb-2 w-36" />
                   <p className="font-medium">Chưa có ticket phù hợp</p>
                   <p className="mt-1 max-w-md text-sm text-muted-foreground">
                     Thử đổi bộ lọc hoặc tạo ticket mới để bắt đầu luồng hỗ trợ.

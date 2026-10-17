@@ -3,9 +3,9 @@ import {
   CheckCircle2,
   Clock3,
   XCircle,
-  type LucideIcon,
 } from "lucide-react";
 
+import type { LucideIcon } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/components/ui/utils";
 import { leaveRequestStatusLabels } from "../constants";

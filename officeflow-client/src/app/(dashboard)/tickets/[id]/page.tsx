@@ -575,15 +575,15 @@ export default function TicketDetailPage() {
       {actionFeedback ? (
         <div
           role="status"
-          className="flex items-start gap-3 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900 motion-toast"
+          className="flex items-start gap-3 rounded-lg border border-emerald-200 dark:border-emerald-400/25 bg-emerald-50 dark:bg-emerald-400/10 px-4 py-3 text-sm text-emerald-900 dark:text-emerald-200 motion-toast"
         >
-          <MailCheck className="mt-0.5 size-4 shrink-0 text-emerald-700" />
+          <MailCheck className="mt-0.5 size-4 shrink-0 text-emerald-700 dark:text-emerald-200" />
           <p className="font-medium leading-5">{actionFeedback}</p>
         </div>
       ) : null}
 
       {searchParams.get("assetLink") === "failed" ? (
-        <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-medium text-amber-900 motion-toast">
+        <div className="rounded-lg border border-amber-200 dark:border-amber-400/25 bg-amber-50 dark:bg-amber-400/10 px-3 py-2 text-sm font-medium text-amber-900 dark:text-amber-200 motion-toast">
           Ticket đã được tạo nhưng chưa thể liên kết tài sản. Bạn có thể thử lại
           tại mục Tài sản liên quan bên dưới.
         </div>
@@ -629,16 +629,16 @@ export default function TicketDetailPage() {
         <Card
           className={
             slaState === "OVERDUE"
-              ? "border-red-200 bg-red-50 text-red-950 shadow-sm motion-panel"
-              : "border-amber-200 bg-amber-50 text-amber-950 shadow-sm motion-panel"
+              ? "border-red-200 dark:border-red-400/25 bg-red-50 dark:bg-red-400/10 text-red-950 dark:text-red-200 shadow-sm motion-panel"
+              : "border-amber-200 dark:border-amber-400/25 bg-amber-50 dark:bg-amber-400/10 text-amber-950 dark:text-amber-200 shadow-sm motion-panel"
           }
         >
           <CardContent className="flex items-start gap-3 pt-0">
             <div
               className={
                 slaState === "OVERDUE"
-                  ? "grid size-10 shrink-0 place-items-center rounded-lg bg-red-100 text-red-700"
-                  : "grid size-10 shrink-0 place-items-center rounded-lg bg-amber-100 text-amber-700"
+                  ? "grid size-10 shrink-0 place-items-center rounded-lg bg-red-100 dark:bg-red-400/10 text-red-700 dark:text-red-200"
+                  : "grid size-10 shrink-0 place-items-center rounded-lg bg-amber-100 dark:bg-amber-400/10 text-amber-700 dark:text-amber-200"
               }
             >
               <AlertTriangle className="size-5" />
@@ -652,8 +652,8 @@ export default function TicketDetailPage() {
               <CardDescription
                 className={
                   slaState === "OVERDUE"
-                    ? "mt-1 text-red-800"
-                    : "mt-1 text-amber-800"
+                    ? "mt-1 text-red-800 dark:text-red-200"
+                    : "mt-1 text-amber-800 dark:text-amber-200"
                 }
               >
                 {slaMeta.description} Hạn xử lý: {formatDateTime(dueAt)}.
@@ -663,7 +663,7 @@ export default function TicketDetailPage() {
         </Card>
       ) : null}
 
-      <div className="grid gap-6 lg:grid-cols-[1fr_360px]">
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
         <div className="grid gap-6">
           <TicketResponseSla ticket={ticket} />
           <Card className="shadow-sm motion-panel">
@@ -854,7 +854,7 @@ export default function TicketDetailPage() {
                     key={item.label}
                     className="flex gap-3 rounded-lg border bg-muted/20 p-3"
                   >
-                    <div className="grid size-9 shrink-0 place-items-center rounded-lg bg-teal-950/5 text-teal-950">
+                    <div className="grid size-9 shrink-0 place-items-center rounded-lg bg-teal-950/5 dark:bg-teal-200/10 text-teal-950 dark:text-teal-200">
                       <Icon className="size-4" />
                     </div>
                     <div className="min-w-0">
@@ -911,7 +911,7 @@ export default function TicketDetailPage() {
                             {status.label}
                             {status.value === "RESOLVED" ? (
                               <MailCheck
-                                className="size-3.5 text-emerald-700"
+                                className="size-3.5 text-emerald-700 dark:text-emerald-200"
                                 aria-label="Có email thông báo"
                               />
                             ) : null}
@@ -929,12 +929,12 @@ export default function TicketDetailPage() {
                 staffUsersQuery.isSuccess &&
                 !selectedStaff &&
                 !isTerminalTicket(ticket.status) ? (
-                  <p className="text-sm text-amber-800">
+                  <p className="text-sm text-amber-800 dark:text-amber-200">
                     Người phụ trách hiện không đủ điều kiện. Hãy giao lại ticket
                     trước khi chuyển sang Đang xử lý.
                   </p>
                 ) : null}
-                <div className="flex items-start gap-2 rounded-lg border border-emerald-200/80 bg-emerald-50/70 p-3 text-xs leading-5 text-emerald-900">
+                <div className="flex items-start gap-2 rounded-lg border border-emerald-200/80 dark:border-emerald-400/25 bg-emerald-50/70 dark:bg-emerald-400/10 p-3 text-xs leading-5 text-emerald-900 dark:text-emerald-200">
                   <MailCheck className="mt-0.5 size-3.5 shrink-0" />
                   <p>
                     Chuyển sang Đã xử lý sẽ gửi email kết quả cho người tạo nếu
@@ -989,7 +989,7 @@ export default function TicketDetailPage() {
                         </Button>
                       </div>
                     ) : null}
-                    <Input
+                    <Input type="search" aria-label="Tìm theo tên, email hoặc phòng ban"
                       value={staffSearch}
                       onChange={(event) => setStaffSearch(event.target.value)}
                       placeholder="Tìm theo tên, email hoặc phòng ban"
@@ -1038,7 +1038,7 @@ export default function TicketDetailPage() {
                         Đang gán người xử lý...
                       </p>
                     ) : null}
-                    <div className="flex items-start gap-2 rounded-lg border border-sky-200/80 bg-sky-50/70 p-3 text-xs leading-5 text-sky-900">
+                    <div className="flex items-start gap-2 rounded-lg border border-sky-200/80 dark:border-sky-400/25 bg-sky-50/70 dark:bg-sky-400/10 p-3 text-xs leading-5 text-sky-900 dark:text-sky-200">
                       <MailCheck className="mt-0.5 size-3.5 shrink-0" />
                       <p>
                         Khi gán hoặc chuyển người xử lý, hệ thống gửi email cho
@@ -1111,7 +1111,7 @@ export default function TicketDetailPage() {
                       style={{ "--motion-index": index } as CSSProperties}
                     >
                       <div className="flex items-start gap-3">
-                        <div className="grid size-9 shrink-0 place-items-center rounded-lg bg-teal-950/5 text-teal-950">
+                        <div className="grid size-9 shrink-0 place-items-center rounded-lg bg-teal-950/5 dark:bg-teal-200/10 text-teal-950 dark:text-teal-200">
                           <Sparkles className="size-4" />
                         </div>
                         <div className="min-w-0">

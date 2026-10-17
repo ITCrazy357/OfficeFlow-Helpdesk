@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowLeft, Boxes, CircleCheck, ShieldCheck } from "lucide-react";
+import { ArrowLeft, CircleCheck, ShieldCheck } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
@@ -93,10 +93,6 @@ export default function NewAssetPage() {
             Quay lại
           </Link>
         </Button>
-        <div className="mb-2 flex items-center gap-2 text-sm font-medium text-teal-800">
-          <Boxes className="size-4" />
-          Asset Management
-        </div>
         <h1 className="text-2xl font-semibold tracking-normal">
           Thêm tài sản mới
         </h1>
@@ -105,7 +101,7 @@ export default function NewAssetPage() {
         </p>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
         <Card className="shadow-sm motion-panel">
           <CardHeader className="border-b">
             <CardTitle>Thông tin tài sản</CardTitle>
@@ -128,7 +124,7 @@ export default function NewAssetPage() {
           <Card className="shadow-sm motion-panel">
             <CardContent className="grid gap-4 pt-0">
               <div className="flex gap-3">
-                <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-emerald-50 text-emerald-700">
+                <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-emerald-50 dark:bg-emerald-400/10 text-emerald-700 dark:text-emerald-200">
                   <CircleCheck className="size-4" />
                 </span>
                 <div>
@@ -141,7 +137,7 @@ export default function NewAssetPage() {
                 </div>
               </div>
               <div className="flex gap-3">
-                <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-sky-50 text-sky-700">
+                <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-sky-50 dark:bg-sky-400/10 text-sky-700 dark:text-sky-200">
                   <ShieldCheck className="size-4" />
                 </span>
                 <div>

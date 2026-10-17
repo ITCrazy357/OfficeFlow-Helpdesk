@@ -134,7 +134,7 @@ export function CreateTicketAssetSelector({
           <>
             <div className="relative">
               <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-              <Input
+              <Input type="search" aria-label="Tìm mã, tên hoặc model"
                 value={keyword}
                 onChange={(event) => setKeyword(event.target.value)}
                 className="pl-9"

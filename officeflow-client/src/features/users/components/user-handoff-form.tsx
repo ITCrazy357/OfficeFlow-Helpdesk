@@ -89,7 +89,7 @@ export function UserHandoffForm({
           checked={confirmed && Boolean(replacement)}
           onChange={(event) => setConfirmed(event.target.checked)}
           disabled={isSubmitting || !replacement}
-          className="mt-1"
+          className="of-checkbox"
         />
         <span>
           Tôi xác nhận chuyển các trách nhiệm trên từ {user.name} sang{" "}

@@ -11,12 +11,10 @@ import {
   ChevronRight,
   Eye,
   FileQuestion,
-  Inbox,
   Loader2,
   Pencil,
   Plus,
   Search,
-  Sparkles,
   Tags,
   Trash2,
 } from "lucide-react";
@@ -31,6 +29,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { OfficeFlowFigure } from "@/components/ui/officeflow-figure";
 import {
   Select,
   SelectContent,
@@ -119,8 +118,8 @@ function KnowledgeStatusBadge({ isPublished }: { isPublished: boolean }) {
       className={cn(
         "motion-badge",
         isPublished
-          ? "border-emerald-200 bg-emerald-50 text-emerald-700"
-          : "border-amber-200 bg-amber-50 text-amber-800",
+          ? "border-emerald-200 dark:border-emerald-400/25 bg-emerald-50 dark:bg-emerald-400/10 text-emerald-700 dark:text-emerald-200"
+          : "border-amber-200 dark:border-amber-400/25 bg-amber-50 dark:bg-amber-400/10 text-amber-800 dark:text-amber-200",
       )}
     >
       {isPublished ? "Đã xuất bản" : "Bản nháp"}
@@ -192,7 +191,7 @@ function ArticleCard({
       type="button"
       className={cn(
         "motion-card w-full rounded-lg border bg-card p-4 text-left shadow-sm outline-none transition-colors hover:border-teal-200 hover:bg-teal-50/35",
-        isActive && "border-teal-300 bg-teal-50/60 shadow-teal-950/5",
+        isActive && "border-teal-300 dark:border-teal-400/25 bg-teal-50/60 dark:bg-teal-400/10 shadow-teal-950/5",
       )}
       style={{ "--motion-index": index } as CSSProperties}
       onClick={onSelect}
@@ -213,7 +212,7 @@ function ArticleCard({
             {article.summary || "Chưa có tóm tắt cho bài hướng dẫn này."}
           </p>
         </div>
-        <BookOpenText className="size-5 shrink-0 text-teal-800" />
+        <BookOpenText className="size-5 shrink-0 text-teal-800 dark:text-teal-200" />
       </div>
 
       <div className="mt-4 flex flex-wrap items-center gap-2">
@@ -413,10 +412,6 @@ function KnowledgeContent({
     <div className="grid gap-6 motion-enter">
       <section className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <div className="mb-2 inline-flex items-center gap-2 rounded-full border bg-muted/60 px-3 py-1 text-xs font-medium text-muted-foreground">
-            <Sparkles className="size-3.5" />
-            Knowledge Base
-          </div>
           <h1 className="text-2xl font-semibold tracking-normal">
             Trung tâm trợ giúp
           </h1>
@@ -429,7 +424,7 @@ function KnowledgeContent({
         {canManage ? (
           <Button
             type="button"
-            className="bg-teal-950 hover:bg-teal-900"
+            className="bg-primary text-primary-foreground hover:bg-primary/90"
             onClick={() => {
               setFormMode("create");
               setSelectedArticleId(null);
@@ -443,7 +438,7 @@ function KnowledgeContent({
         ) : null}
       </section>
 
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_420px]">
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_380px]">
         <div className="grid gap-5 self-start">
           <Card className="shadow-sm motion-panel">
             <CardHeader className="border-b">
@@ -458,10 +453,10 @@ function KnowledgeContent({
               </div>
             </CardHeader>
             <CardContent className="pt-0">
-              <div className="grid gap-3 xl:grid-cols-[1fr_180px_190px_auto]">
+              <div className="grid gap-3 2xl:grid-cols-2">
                 <div className="relative">
                   <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-                  <Input
+                  <Input type="search" aria-label="Tìm lỗi VPN, email, máy in..."
                     value={searchInput}
                     onChange={(event) => setSearchInput(event.target.value)}
                     className="pl-8"
@@ -562,9 +557,7 @@ function KnowledgeContent({
                 ) : (
                   <div className="grid min-h-72 place-items-center px-4 text-center">
                     <div className="max-w-md">
-                      <div className="mx-auto mb-4 grid size-12 place-items-center rounded-xl bg-teal-50 text-teal-800">
-                        <Inbox className="size-5" />
-                      </div>
+                      <OfficeFlowFigure kind="loupe" className="mx-auto mb-2 w-36" />
                       <p className="font-medium">Chưa có bài viết phù hợp</p>
                       <p className="mt-1 text-sm text-muted-foreground">
                         Thử đổi từ khóa hoặc tag để mở rộng kết quả tìm kiếm.
@@ -839,7 +832,7 @@ function KnowledgeContent({
             <Card className="shadow-sm motion-panel">
               <CardContent className="grid min-h-80 place-items-center px-6 py-10 text-center">
                 <div>
-                  <div className="mx-auto mb-4 grid size-12 place-items-center rounded-xl bg-teal-50 text-teal-800">
+                  <div className="mx-auto mb-4 grid size-12 place-items-center rounded-xl bg-teal-50 dark:bg-teal-400/10 text-teal-800 dark:text-teal-200">
                     <FileQuestion className="size-5" />
                   </div>
                   <p className="font-semibold">Chọn một bài viết</p>

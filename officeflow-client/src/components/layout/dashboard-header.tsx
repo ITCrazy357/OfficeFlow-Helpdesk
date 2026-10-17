@@ -23,6 +23,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
+import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { useLogout, useLogoutAll } from "@/features/auth/hooks";
 import type { AuthUser, UserRole } from "@/features/auth/types";
 import { NotificationBell } from "@/features/notifications/components/notification-bell";
@@ -51,6 +52,9 @@ function getInitials(name: string) {
 }
 
 function getCurrentPageLabel(pathname: string) {
+  if (pathname.startsWith("/assets")) return "Tài sản";
+  if (pathname.startsWith("/ticket-categories")) return "Danh mục ticket";
+  if (pathname.startsWith("/audit-logs")) return "Nhật ký hệ thống";
   if (pathname === "/sla") return "Chính sách SLA";
   if (pathname.startsWith("/leave-requests/")) {
     return pathname.endsWith("/new")
@@ -133,9 +137,9 @@ export function DashboardHeader({ user, onMenuClick }: DashboardHeaderProps) {
   }
 
   return (
-    <header className="sticky top-0 z-20 border-b bg-card/95 shadow-sm shadow-slate-900/5 backdrop-blur-xl">
-      <div className="mx-auto flex min-h-18 w-full max-w-7xl items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
-        <div className="flex min-w-0 items-center gap-3">
+    <header className="sticky top-0 z-20 border-b bg-background/95 backdrop-blur-md">
+      <div className="mx-auto flex min-h-18 w-full max-w-7xl items-center justify-between gap-2 px-4 sm:gap-4 sm:px-6 lg:px-8">
+        <div className="flex min-w-0 flex-1 items-center gap-3">
           <Button
             type="button"
             variant="outline"
@@ -148,29 +152,30 @@ export function DashboardHeader({ user, onMenuClick }: DashboardHeaderProps) {
           </Button>
 
           <div className="hidden items-center gap-2 text-sm lg:flex">
-            <span className="text-muted-foreground">Workspace</span>
+            <span className="text-muted-foreground">OfficeFlow</span>
             <ChevronRight className="size-3.5 text-muted-foreground/60" />
             <span className="font-semibold text-foreground">{currentPage}</span>
           </div>
 
           <div className="min-w-0 lg:hidden">
-            <p className="text-sm font-semibold text-foreground">
-              OfficeFlow Helpdesk
+            <p className="truncate text-sm font-semibold text-foreground">
+              {currentPage}
             </p>
             <p className="truncate text-xs text-muted-foreground">
-              Dashboard nội bộ
+              OfficeFlow Helpdesk
             </p>
           </div>
         </div>
 
-        <div className="flex min-w-0 items-center gap-3">
+        <div className="flex shrink-0 items-center gap-1.5 sm:gap-3">
+          <ThemeToggle />
           <NotificationBell />
 
-          <div className="grid size-10 shrink-0 place-items-center rounded-lg bg-teal-950 text-sm font-semibold text-white shadow-sm shadow-teal-950/15">
+          <div className="hidden size-9 shrink-0 place-items-center rounded-full bg-primary text-sm font-semibold text-primary-foreground sm:grid">
             {getInitials(user.name) || <UserRound className="size-4" />}
           </div>
 
-          <div className="hidden min-w-0 text-right sm:block">
+          <div className="hidden min-w-0 max-w-44 text-right sm:block">
             <p className="truncate text-sm font-semibold text-foreground">
               {user.name}
             </p>
@@ -183,8 +188,9 @@ export function DashboardHeader({ user, onMenuClick }: DashboardHeaderProps) {
           <Button
             type="button"
             variant="outline"
-            className="px-3 sm:px-4"
+            className="px-2 sm:px-4"
             onClick={() => router.push("/change-password")}
+            aria-label="Đổi mật khẩu"
           >
             <KeyRound className="size-4" />
             <span className="hidden lg:inline">Đổi mật khẩu</span>
@@ -199,7 +205,7 @@ export function DashboardHeader({ user, onMenuClick }: DashboardHeaderProps) {
             }}
           >
             <AlertDialogTrigger asChild>
-              <Button type="button" variant="outline" className="px-3 sm:px-4">
+              <Button type="button" variant="ghost" className="px-2 sm:px-4" aria-label="Đăng xuất">
                 <LogOut className="size-4" />
                 <span className="hidden sm:inline">Đăng xuất</span>
               </Button>

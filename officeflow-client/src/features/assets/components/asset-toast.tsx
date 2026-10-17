@@ -38,7 +38,7 @@ export function AssetToast({
       className={cn(
         "motion-toast fixed right-4 top-20 z-[70] flex max-w-[calc(100vw-2rem)] items-start gap-3 rounded-lg border bg-card p-3 shadow-xl sm:w-96",
         tone === "success"
-          ? "border-emerald-200"
+          ? "border-emerald-200 dark:border-emerald-400/25"
           : "border-destructive/25",
       )}
     >
@@ -46,7 +46,7 @@ export function AssetToast({
         className={cn(
           "grid size-9 shrink-0 place-items-center rounded-lg",
           tone === "success"
-            ? "bg-emerald-50 text-emerald-700"
+            ? "bg-emerald-50 dark:bg-emerald-400/10 text-emerald-700 dark:text-emerald-200"
             : "bg-destructive/10 text-destructive",
         )}
       >

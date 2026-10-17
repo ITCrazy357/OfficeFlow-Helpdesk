@@ -14,7 +14,6 @@ import {
   Plus,
   Shield,
   UserCheck,
-  Users,
 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
@@ -326,7 +325,7 @@ export default function UsersPage() {
         }}
       >
         <AlertDialogHeader>
-          <div className="mb-3 grid size-11 place-items-center rounded-full bg-emerald-100 text-emerald-700">
+          <div className="mb-3 grid size-11 place-items-center rounded-full bg-emerald-100 dark:bg-emerald-400/10 text-emerald-700 dark:text-emerald-200">
             <CircleCheck className="size-6" aria-hidden="true" />
           </div>
           <AlertDialogTitle>{handoffNotice?.title}</AlertDialogTitle>
@@ -410,10 +409,6 @@ export default function UsersPage() {
       {handoffResultDialog}
       <section className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <div className="mb-2 inline-flex items-center gap-2 rounded-full border bg-muted/60 px-3 py-1 text-xs font-medium text-muted-foreground">
-            <Users className="size-3.5" />
-            Quản trị hệ thống
-          </div>
           <h1 className="text-2xl font-semibold tracking-normal">
             Quản lý người dùng
           </h1>
@@ -437,7 +432,7 @@ export default function UsersPage() {
       {actionMessage ? (
         <div
           role="status"
-          className="flex items-start gap-3 rounded-lg border border-teal-200 bg-teal-50 px-4 py-3 text-sm font-medium text-teal-800 motion-toast"
+          className="flex items-start gap-3 rounded-lg border border-teal-200 dark:border-teal-400/25 bg-teal-50 dark:bg-teal-400/10 px-4 py-3 text-sm font-medium text-teal-800 dark:text-teal-200 motion-toast"
         >
           <MailCheck className="mt-0.5 size-4 shrink-0" />
           <p className="leading-5">{actionMessage}</p>
@@ -460,7 +455,7 @@ export default function UsersPage() {
               <CardTitle className="flex items-center gap-2 text-3xl">
                 {value}
                 {index === 1 ? (
-                  <UserCheck className="size-5 text-teal-800" />
+                  <UserCheck className="size-5 text-teal-800 dark:text-teal-200" />
                 ) : null}
               </CardTitle>
             </CardHeader>
@@ -521,8 +516,8 @@ export default function UsersPage() {
                           variant="outline"
                           className={
                             user.isActive
-                              ? "border-teal-200 bg-teal-50 text-teal-700"
-                              : "border-slate-200 bg-slate-100 text-slate-700"
+                              ? "border-teal-200 dark:border-teal-400/25 bg-teal-50 dark:bg-teal-400/10 text-teal-700 dark:text-teal-200"
+                              : "border-slate-200 dark:border-slate-400/25 bg-slate-100 dark:bg-slate-400/10 text-slate-700 dark:text-slate-200"
                           }
                         >
                           {user.isActive ? "Đang làm việc" : "Đã nghỉ việc"}
@@ -533,8 +528,8 @@ export default function UsersPage() {
                           variant="outline"
                           className={
                             user.isLocked
-                              ? "border-red-200 bg-red-50 text-red-700"
-                              : "border-teal-200 bg-teal-50 text-teal-700"
+                              ? "border-red-200 dark:border-red-400/25 bg-red-50 dark:bg-red-400/10 text-red-700 dark:text-red-200"
+                              : "border-teal-200 dark:border-teal-400/25 bg-teal-50 dark:bg-teal-400/10 text-teal-700 dark:text-teal-200"
                           }
                         >
                           {user.isLocked ? "Tạm khóa" : "Bình thường"}
@@ -674,7 +669,7 @@ export default function UsersPage() {
                             ? "Mở khóa tài khoản"
                             : "Khóa tài khoản"}
                 {panel.type === "create" || panel.type === "reset" ? (
-                  <MailCheck className="size-4 text-teal-700" />
+                  <MailCheck className="size-4 text-teal-700 dark:text-teal-200" />
                 ) : null}
               </CardTitle>
               <CardDescription>

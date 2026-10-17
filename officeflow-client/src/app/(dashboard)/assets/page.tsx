@@ -7,7 +7,6 @@ import {
   ArrowLeft,
   ArrowRight,
   Boxes,
-  PackageOpen,
   Plus,
   RotateCcw,
   Search,
@@ -25,6 +24,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { OfficeFlowFigure } from "@/components/ui/officeflow-figure";
 import {
   Select,
   SelectContent,
@@ -245,10 +245,6 @@ export default function AssetsPage() {
     <div className="grid gap-6 motion-enter">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <div className="mb-2 flex items-center gap-2 text-sm font-medium text-teal-800">
-            <Boxes className="size-4" />
-            Asset Management
-          </div>
           <h1 className="text-2xl font-semibold tracking-normal">
             {allowManagement ? "Quản lý tài sản" : "Tài sản của tôi"}
           </h1>
@@ -288,7 +284,7 @@ export default function AssetsPage() {
         <CardContent className="grid gap-3 pt-0 sm:grid-cols-2 xl:grid-cols-4">
           <div className="relative sm:col-span-2 xl:col-span-1">
             <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
+            <Input type="search"
               value={keyword}
               onChange={(event) => {
                 setKeyword(event.target.value);
@@ -373,7 +369,7 @@ export default function AssetsPage() {
                   : "Đang tải dữ liệu"}
               </CardDescription>
             </div>
-            <div className="grid size-10 place-items-center rounded-lg bg-teal-950/5 text-teal-950">
+            <div className="grid size-10 place-items-center rounded-lg bg-teal-950/5 dark:bg-teal-200/10 text-teal-950 dark:text-teal-200">
               <Boxes className="size-5" />
             </div>
           </div>
@@ -488,7 +484,7 @@ export default function AssetsPage() {
           ) : (
             <div className="grid min-h-64 place-items-center rounded-lg border border-dashed p-6 text-center">
               <div>
-                <PackageOpen className="mx-auto size-8 text-muted-foreground" />
+                <OfficeFlowFigure kind="cabinet" className="mx-auto w-36" />
                 <p className="mt-3 font-semibold">
                   {hasFilters
                     ? "Không tìm thấy tài sản phù hợp"

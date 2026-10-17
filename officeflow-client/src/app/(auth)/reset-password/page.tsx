@@ -93,7 +93,7 @@ export default function ResetPasswordPage() {
       <main className="grid min-h-[100dvh] place-items-center bg-background px-4 py-10">
         <Card className="w-full max-w-md">
           <CardHeader className="space-y-4 border-b">
-            <div className="grid size-11 place-items-center rounded-xl bg-teal-50 text-teal-800">
+            <div className="grid size-11 place-items-center rounded-xl bg-teal-50 dark:bg-teal-400/10 text-teal-800 dark:text-teal-200">
               <ShieldCheck className="size-5" />
             </div>
             <div>
@@ -105,7 +105,7 @@ export default function ResetPasswordPage() {
             </div>
           </CardHeader>
           <CardContent>
-            <Button asChild className="w-full bg-teal-950 hover:bg-teal-900">
+            <Button asChild className="w-full bg-primary text-primary-foreground hover:bg-primary/90">
               <Link href="/login">Đăng nhập</Link>
             </Button>
           </CardContent>
@@ -119,7 +119,7 @@ export default function ResetPasswordPage() {
       <main className="grid min-h-[100dvh] place-items-center bg-background px-4 py-10">
         <Card className="w-full max-w-md">
           <CardHeader className="space-y-4 border-b">
-            <div className="grid size-11 place-items-center rounded-xl bg-red-50 text-destructive">
+            <div className="grid size-11 place-items-center rounded-xl bg-red-50 dark:bg-red-400/10 text-destructive">
               <AlertCircle className="size-5" />
             </div>
             <div>
@@ -131,7 +131,7 @@ export default function ResetPasswordPage() {
             </div>
           </CardHeader>
           <CardContent className="grid gap-3">
-            <Button asChild className="w-full bg-teal-950 hover:bg-teal-900">
+            <Button asChild className="w-full bg-primary text-primary-foreground hover:bg-primary/90">
               <Link href="/forgot-password">Yêu cầu liên kết mới</Link>
             </Button>
             <Button asChild variant="outline" className="w-full">
@@ -213,7 +213,7 @@ export default function ResetPasswordPage() {
 
             <Button
               type="submit"
-              className="w-full bg-teal-950 hover:bg-teal-900"
+              className="w-full bg-primary text-primary-foreground hover:bg-primary/90"
               disabled={resetPassword.isPending}
             >
               <KeyRound className="size-4" />
