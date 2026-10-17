@@ -4,7 +4,7 @@ import { AppController } from './app.controller';
 import { PrismaService } from './prisma/prisma.service';
 
 const mockPrismaService = {
-  $queryRaw: jest.fn(),
+  assertReady: jest.fn(),
 };
 
 describe('AppController', () => {
@@ -36,14 +36,20 @@ describe('AppController', () => {
   });
 
   describe('getDbHealth', () => {
-    it('should check the database connection', async () => {
-      mockPrismaService.$queryRaw.mockResolvedValue([{ connected: 1 }]);
+    it('requires the connection and release schema to be ready', async () => {
+      mockPrismaService.assertReady.mockResolvedValue(undefined);
 
       await expect(appController.getDbHealth()).resolves.toEqual({
         status: 'ok',
         version: 'local',
       });
-      expect(mockPrismaService.$queryRaw).toHaveBeenCalledTimes(1);
+      expect(mockPrismaService.assertReady).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not report success when the schema check fails', async () => {
+      const error = new Error('Missing SLA schema');
+      mockPrismaService.assertReady.mockRejectedValue(error);
+      await expect(appController.getDbHealth()).rejects.toBe(error);
     });
   });
 });

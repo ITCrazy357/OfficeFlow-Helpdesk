@@ -31,9 +31,9 @@ export class AppController {
   }
 
   @Get('db-health')
-  @Message('Database connected successfully')
+  @Message('Database schema ready')
   async getDbHealth() {
-    await this.prisma.$queryRaw`SELECT 1`;
+    await this.prisma.assertReady();
 
     return {
       status: 'ok',

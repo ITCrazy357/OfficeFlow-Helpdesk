@@ -22,6 +22,7 @@ import { MetricsService } from '../src/metrics/metrics.service';
 
 const mockPrismaService = {
   $queryRaw: jest.fn().mockResolvedValue([{ connected: 1 }]),
+  assertReady: jest.fn().mockResolvedValue(undefined),
   department: {
     findMany: jest.fn(),
   },
@@ -134,6 +135,17 @@ describe('AppController (e2e)', () => {
           version: 'local',
         });
       });
+  });
+
+  it('/api/db-health rejects an incomplete schema even when the DB connects', async () => {
+    mockPrismaService.assertReady.mockRejectedValueOnce(
+      new Error('Missing SLA table secret-database-url'),
+    );
+    const response = await request(httpServer)
+      .get('/api/db-health')
+      .expect(500);
+    expect(JSON.stringify(response.body)).not.toContain('secret-database-url');
+    expect((response.body as ErrorResponseBody).success).toBe(false);
   });
   it('/api/auth/login should return validation error when email is missing', () => {
     return request(httpServer)

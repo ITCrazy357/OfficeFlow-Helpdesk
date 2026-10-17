@@ -8,7 +8,8 @@ This runbook defines how OfficeFlow verifies, migrates, and rolls back the activ
 1. Turn **Auto-Deploy** off for the backend service. GitHub Actions is the only
    deployment gate, so Render must not deploy a push before CI passes.
 2. Set **Health Check Path** to `/api/db-health`. This endpoint checks both the
-   NestJS process and the production database connection.
+   NestJS process, the production database connection, and required outbox/SLA
+   tables and columns. A missing schema must fail this check.
 3. Keep the service connected to the `main` branch and the repository that owns
    `.github/workflows/backend-ci.yml`.
 4. Provision a managed Redis instance in the same region as the API and set:
@@ -62,7 +63,10 @@ A green deploy job therefore means:
 - CI passed;
 - Render accepted the exact commit;
 - that commit is serving production traffic;
-- the API can query the production database.
+- the API can query the production database and required outbox/SLA schema.
+
+This does not replace an authenticated ticket-list smoke test or verification of
+other business workflows.
 
 ## Migration strategy
 
@@ -134,6 +138,31 @@ Docker Command:     npm run start:prod
 
 Do not configure the pre-deploy command while leaving `start:deploy` as the Docker
 command, because that runs the migration command twice unnecessarily.
+
+### Tickets return P2021 after the SLA deployment
+
+`The table Sla_alerts does not exist` means the running code cannot use the
+required SLA schema. A successful deploy or `SELECT 1` does not establish that
+migration `20261017120000_add_business_sla` was applied to this database.
+
+1. Open the deployed service's Shell, in `officeflow-nest-server`. Use its
+   existing production environment; do not substitute a local `.env` file.
+2. Run the read-only command `npm exec -- prisma migrate status`. Confirm the
+   database target and inspect every pending/failed migration.
+3. If the only pending migration is `20261017120000_add_business_sla`, verify a
+   database backup, then run `npm run migrate:deploy`. That migration adds SLA
+   tables/columns/indexes, expands enum values and backfills warning timestamps;
+   it does not drop tickets or reset the database.
+4. If older migrations are pending, or any migration has failed, review the
+   migration history and actual schema before proceeding. In particular,
+   `20260729195212_updateinsert` contains destructive statements. Do not mark a
+   migration applied merely to bypass the error, or rerun partially applied SQL.
+5. Verify migration status, `/api/db-health`, the authenticated ticket list and
+   the next SLA scheduler run. Configure either the native/Docker `start:deploy`
+   command or the paid pre-deploy migration step described above for later
+   releases.
+
+Do not seed, reset, or create an empty replacement database to repair this error.
 
 ### Expand-contract rule
 

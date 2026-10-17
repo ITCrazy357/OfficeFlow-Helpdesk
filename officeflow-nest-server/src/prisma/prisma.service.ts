@@ -2,7 +2,7 @@ import { Injectable, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
 import { PrismaClient } from '@prisma/client';
 import { PrismaMariaDb } from '@prisma/adapter-mariadb';
 import { getDatabaseAdapterConfig } from './database.config';
-import { assertOutboxSchemaReady } from './schema-readiness';
+import { assertDatabaseSchemaReady } from './schema-readiness';
 import { ConfigService } from '@nestjs/config';
 
 @Injectable()
@@ -26,14 +26,17 @@ export class PrismaService
   async onModuleInit() {
     try {
       await this.$connect();
-      // The adapter may swallow its initial capability-query error. Require an
-      // actual query to succeed before Nest reports the application as ready.
-      await this.$queryRaw`SELECT 1`;
-      await assertOutboxSchemaReady(this);
+      await this.assertReady();
     } catch (error) {
       await this.$disconnect().catch(() => undefined);
       throw error;
     }
+  }
+
+  async assertReady(): Promise<void> {
+    // A connection alone does not prove that this release's schema is present.
+    await this.$queryRaw`SELECT 1`;
+    await assertDatabaseSchemaReady(this);
   }
 
   async onModuleDestroy() {
