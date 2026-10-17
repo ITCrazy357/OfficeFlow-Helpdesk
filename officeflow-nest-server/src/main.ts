@@ -1,4 +1,5 @@
 import 'dotenv/config';
+import { writeSync } from 'node:fs';
 
 import {
   RequestMethod,
@@ -21,6 +22,7 @@ import { isAllowedOrigin } from './common/security/allowed-origins';
 
 import { ConfigService } from '@nestjs/config';
 import { requestObservabilityMiddleware } from './common/middleware/request-observability.middleware';
+import { getSafeErrorDetails } from './common/diagnostics/request-diagnostics';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, {
@@ -96,4 +98,15 @@ async function bootstrap() {
   new Logger('Bootstrap').log({ event: 'application_started', port });
 }
 
-void bootstrap();
+void bootstrap().catch((error: unknown) => {
+  // Flush the failure before exiting, without Node dumping minified Prisma code.
+  writeSync(
+    process.stderr.fd,
+    `${JSON.stringify({
+      level: 'error',
+      event: 'application_start_failed',
+      ...getSafeErrorDetails(error),
+    })}\n`,
+  );
+  process.exit(1);
+});
