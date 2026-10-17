@@ -40,6 +40,8 @@ export type Ticket = {
   dueAt?: string | null;
   dueDate?: string | null;
   resolveAt?: string | null;
+  resolutionVersion?: number;
+  confirmedAt?: string | null;
   isOverdue?: boolean;
   firstResponseDueAt?: string | null;
   firstRespondedAt?: string | null;

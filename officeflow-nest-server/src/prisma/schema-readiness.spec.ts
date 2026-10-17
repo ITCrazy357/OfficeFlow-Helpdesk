@@ -12,6 +12,10 @@ describe('Database schema readiness', () => {
     asset: { findFirst: jest.fn() },
     assetMaintenance: { findFirst: jest.fn() },
     assetWarrantyReminder: { findFirst: jest.fn() },
+    leaveRequest: { findFirst: jest.fn() },
+    leaveDay: { findFirst: jest.fn() },
+    leaveEntitlement: { findFirst: jest.fn() },
+    ticketFeedback: { findFirst: jest.fn() },
   };
   const client = database as unknown as Parameters<
     typeof assertDatabaseSchemaReady
@@ -35,6 +39,8 @@ describe('Database schema readiness', () => {
         firstResponseOverdue: true,
         responseWarningAt: true,
         resolutionWarningAt: true,
+        resolutionVersion: true,
+        confirmedAt: true,
       },
     });
     expect(database.slaPolicy.findFirst).toHaveBeenCalledTimes(1);
@@ -50,6 +56,10 @@ describe('Database schema readiness', () => {
     ['asset', 'P2022'],
     ['assetMaintenance', 'P2021'],
     ['assetWarrantyReminder', 'P2021'],
+    ['leaveRequest', 'P2022'],
+    ['leaveDay', 'P2021'],
+    ['leaveEntitlement', 'P2021'],
+    ['ticketFeedback', 'P2021'],
   ] as const)(
     'explains missing schema for %s without leaking DB details',
     async (model, code) => {

@@ -48,6 +48,7 @@ import type { AuthUser } from "@/features/auth/types";
 import { TicketAssetPanel } from "@/features/assets/components/ticket-asset-panel";
 import { useSuggestKnowledgeArticles } from "@/features/knowledge/hooks";
 import { TicketResponseSla } from "@/features/sla/components/ticket-response-sla";
+import { TicketResult } from "@/features/tickets/components/ticket-result";
 import {
   TicketPriorityBadge,
   TicketSlaBadge,
@@ -327,7 +328,8 @@ export default function TicketDetailPage() {
 
   const ticket = ticketQuery.data;
   const allowEdit = canEditTicket(user, ticket);
-  const allowStatusChange = canChangeStatus(user);
+  const allowStatusChange =
+    canChangeStatus(user) && !isTerminalTicket(ticket.status);
   const allowDelete = canDeleteTicket(user, ticket);
   const staffUsers = staffUsersQuery.data ?? [];
   const normalizedStaffSearch = normalizeSearch(staffSearch.trim());
@@ -666,6 +668,14 @@ export default function TicketDetailPage() {
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
         <div className="grid gap-6">
           <TicketResponseSla ticket={ticket} />
+          {(ticket.status === "RESOLVED" || ticket.status === "CLOSED") &&
+          user ? (
+            <TicketResult
+              key={ticket.id}
+              ticket={ticket}
+              isRequester={user.id === ticket.createdBy?.id}
+            />
+          ) : null}
           <Card className="shadow-sm motion-panel">
             <CardHeader className="border-b">
               <CardTitle>Mô tả yêu cầu</CardTitle>
@@ -892,8 +902,10 @@ export default function TicketDetailPage() {
                   </SelectTrigger>
                   <SelectContent>
                     {ticketStatusOptions
-                      .filter((status) =>
-                        canTransitionTicket(ticket.status, status.value),
+                      .filter(
+                        (status) =>
+                          status.value !== "CLOSED" &&
+                          canTransitionTicket(ticket.status, status.value),
                       )
                       .map((status) => (
                         <SelectItem
@@ -989,7 +1001,9 @@ export default function TicketDetailPage() {
                         </Button>
                       </div>
                     ) : null}
-                    <Input type="search" aria-label="Tìm theo tên, email hoặc phòng ban"
+                    <Input
+                      type="search"
+                      aria-label="Tìm theo tên, email hoặc phòng ban"
                       value={staffSearch}
                       onChange={(event) => setStaffSearch(event.target.value)}
                       placeholder="Tìm theo tên, email hoặc phòng ban"

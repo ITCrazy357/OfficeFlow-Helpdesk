@@ -4,8 +4,25 @@ import { validate } from 'class-validator';
 import { CreateLeaveRequestDto } from './create-leave-request.dto';
 import { GetLeaveRequestDto } from './get-leave-request.dto';
 import { RejectLeaveRequestDto } from './reject-leave-request.dto';
+import { SetLeaveEntitlementDto } from './leave-planning.dto';
 
 describe('Leave request DTOs', () => {
+  it.each([0, 0.5, 1, 12.5, 366])(
+    'accepts a valid %s-day allowance without integer-divisor validation',
+    async (days) => {
+      await expect(
+        validate(plainToInstance(SetLeaveEntitlementDto, { days, version: 0 })),
+      ).resolves.toHaveLength(0);
+    },
+  );
+  it.each([12.25, -0.5, 366.5, '12.5', null, undefined])(
+    'rejects an invalid allowance %s',
+    async (days) => {
+      await expect(
+        validate(plainToInstance(SetLeaveEntitlementDto, { days, version: 0 })),
+      ).resolves.not.toHaveLength(0);
+    },
+  );
   it('accepts a valid create payload and trims its reason', async () => {
     const dto = plainToInstance(CreateLeaveRequestDto, {
       startDate: '2026-09-10',

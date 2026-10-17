@@ -40,6 +40,8 @@ import type {
   LeaveRequestStatus,
 } from "@/features/leave-requests/types";
 import { getLeaveRequestErrorMessage } from "@/features/leave-requests/constants";
+import { LeaveBalancePanel } from "@/features/leave-requests/components/leave-balance-panel";
+import { LeaveTeamCalendar } from "@/features/leave-requests/components/leave-team-calendar";
 
 const PAGE_SIZE = 10;
 
@@ -48,8 +50,7 @@ type StatusFilter = "ALL" | LeaveRequestStatus;
 
 export default function LeaveRequestsPage() {
   const { data: user } = useMe();
-  const [selectedScope, setSelectedScope] =
-    useState<LeaveRequestScope>("mine");
+  const [selectedScope, setSelectedScope] = useState<LeaveRequestScope>("mine");
   const [minePage, setMinePage] = useState(1);
   const [pendingPage, setPendingPage] = useState(1);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("ALL");
@@ -101,13 +102,23 @@ export default function LeaveRequestsPage() {
           </p>
         </div>
 
-        <Button asChild className="bg-primary text-primary-foreground hover:bg-primary/90">
+        <Button
+          asChild
+          className="bg-primary text-primary-foreground hover:bg-primary/90"
+        >
           <Link href="/leave-requests/new">
             <Plus className="size-4" />
             Tạo đơn nghỉ
           </Link>
         </Button>
       </section>
+
+      {user ? (
+        <div className="grid min-w-0 items-start gap-6 xl:grid-cols-2">
+          <LeaveBalancePanel user={user} />
+          <LeaveTeamCalendar user={user} />
+        </div>
+      ) : null}
 
       <Card className="shadow-sm motion-panel">
         <CardContent className="grid gap-4 pt-0">

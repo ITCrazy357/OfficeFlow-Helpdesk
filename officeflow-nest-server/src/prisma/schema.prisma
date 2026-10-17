@@ -121,6 +121,19 @@ enum LeaveStatus {
   CANCELLED
 }
 
+enum LeaveType {
+  LEGACY
+  ANNUAL
+  UNPAID
+  SICK
+}
+
+enum LeavePeriod {
+  FULL_DAY
+  MORNING
+  AFTERNOON
+}
+
 enum OutboxStatus {
   PENDING
   PROCESSING
@@ -194,6 +207,9 @@ model User {
   leaveRequestsRequested LeaveRequest[]      @relation("LeaveRequester")
   leaveRequestsToApprove LeaveRequest[]      @relation("LeaveApprover")
   leaveRequestsReviewed  LeaveRequest[]      @relation("LeaveReviewer")
+  leaveEntitlements      LeaveEntitlement[]
+  ticketFeedbacks        TicketFeedback[]    @relation("FeedbackAuthor")
+  supportFeedbacks       TicketFeedback[]    @relation("FeedbackAssignee")
   passwordResetToken     PasswordResetToken?
 
   @@index([departmentId])
@@ -215,6 +231,11 @@ model LeaveRequest {
 
   reason String @db.Text
 
+  type             LeaveType   @default(LEGACY)
+  period           LeavePeriod @default(FULL_DAY)
+  calendarSnapshot Json?
+  days             LeaveDay[]
+
   status LeaveStatus @default(PENDING)
 
   reviewNote String?   @db.Text
@@ -231,7 +252,34 @@ model LeaveRequest {
   @@index([approverId, status, createdAt])
   @@index([requesterId, status, startDate])
   @@index([reviewedById, reviewedAt])
+  @@index([status, startDate, endDate])
   @@map("Leave_requests")
+}
+
+// Integer half-days avoid rounding. Pending requests reserve the same units
+// that approval consumes; cancelled/rejected requests no longer count.
+model LeaveDay {
+  id        Int          @id @default(autoincrement())
+  requestId Int
+  request   LeaveRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  date      DateTime     @db.Date
+  halfDays  Int
+
+  @@unique([requestId, date])
+  @@index([date])
+  @@map("Leave_days")
+}
+
+model LeaveEntitlement {
+  userId    Int
+  user      User     @relation(fields: [userId], references: [id], onDelete: Restrict)
+  year      Int
+  halfDays  Int
+  version   Int      @default(1)
+  updatedAt DateTime @updatedAt
+
+  @@id([userId, year])
+  @@map("Leave_entitlements")
 }
 
 model RefreshToken {
@@ -283,6 +331,10 @@ model Ticket {
   resolveAt DateTime? // Thòi điểm xủ lý xong
   isOverdue Boolean   @default(false) // Đã quá hạn hay chưa
 
+  resolutionVersion Int             @default(0)
+  confirmedAt       DateTime?
+  feedback          TicketFeedback?
+
   slaPolicy            Json?
   firstResponseDueAt   DateTime?
   firstRespondedAt     DateTime?
@@ -326,6 +378,24 @@ model Ticket {
   @@index([status, responseWarningAt])
   @@index([status, resolutionWarningAt])
   @@map("Tickets")
+}
+
+model TicketFeedback {
+  ticketId          Int      @id
+  ticket            Ticket   @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  authorId          Int
+  author            User     @relation("FeedbackAuthor", fields: [authorId], references: [id], onDelete: Restrict)
+  assignedToId      Int?
+  assignedTo        User?    @relation("FeedbackAssignee", fields: [assignedToId], references: [id], onDelete: SetNull)
+  score             Int
+  comment           String?  @db.VarChar(2000)
+  resolutionVersion Int
+  createdAt         DateTime @default(now())
+
+  @@index([authorId])
+  @@index([assignedToId, createdAt])
+  @@index([createdAt])
+  @@map("Ticket_feedbacks")
 }
 
 model SlaPolicy {

@@ -40,7 +40,12 @@ function parseDateOnly(value: string) {
 }
 
 export function getTodayDateInputValue() {
-  return new Date().toISOString().slice(0, 10);
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Ho_Chi_Minh",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date());
 }
 
 export function formatLeaveDate(value?: string | null) {
@@ -119,8 +124,30 @@ export function getLeaveRequestErrorMessage(
       "Đơn này không còn ở trạng thái chờ duyệt.",
     "Leave request has already been processed":
       "Đơn này đã được xử lý trước đó.",
+    "Half-day leave must start and end on the same date":
+      "Nghỉ nửa ngày phải bắt đầu và kết thúc trong cùng ngày.",
+    "Leave contains no working days":
+      "Khoảng nghỉ không có ngày làm việc theo lịch đã cấu hình.",
+    "Leave must span between 1 and 366 calendar days":
+      "Khoảng nghỉ phải từ 1 đến 366 ngày theo lịch.",
+    "Leave working calendar is not configured":
+      "Chưa cấu hình ngày làm việc để tính phép. Vui lòng liên hệ ADMIN.",
+    "Leave allowance changed. Reload before saving":
+      "Hạn mức vừa được cập nhật. Kiểm tra số dư mới trước khi lưu lại.",
+    "Allowance cannot be lower than used and reserved leave":
+      "Hạn mức không được thấp hơn số đã duyệt và đang chờ duyệt.",
     Forbidden: "Bạn không có quyền thực hiện thao tác này.",
   };
 
+  const missingYear = message.match(
+    /^Annual leave allowance is not configured for (\d{4})$/,
+  );
+  if (missingYear)
+    return `Chưa cấu hình hạn mức phép năm ${missingYear[1]}. Vui lòng liên hệ ADMIN.`;
+  const insufficientYear = message.match(
+    /^Insufficient annual leave balance for (\d{4})$/,
+  );
+  if (insufficientYear)
+    return `Số dư phép năm ${insufficientYear[1]} không đủ để gửi đơn này.`;
   return translations[message] ?? message;
 }

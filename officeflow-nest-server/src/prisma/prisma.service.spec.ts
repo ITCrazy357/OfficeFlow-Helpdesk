@@ -28,6 +28,10 @@ describe('Prisma startup readiness', () => {
     jest.spyOn(service.slaPolicy, 'findFirst').mockResolvedValue(null);
     jest.spyOn(service.asset, 'findFirst').mockResolvedValue(null);
     jest.spyOn(service.assetMaintenance, 'findFirst').mockResolvedValue(null);
+    jest.spyOn(service.leaveRequest, 'findFirst').mockResolvedValue(null);
+    jest.spyOn(service.leaveDay, 'findFirst').mockResolvedValue(null);
+    jest.spyOn(service.leaveEntitlement, 'findFirst').mockResolvedValue(null);
+    jest.spyOn(service.ticketFeedback, 'findFirst').mockResolvedValue(null);
     jest
       .spyOn(service.assetWarrantyReminder, 'findFirst')
       .mockResolvedValue(null);

@@ -36,6 +36,10 @@ Render automatically provides `RENDER_GIT_COMMIT` at runtime. The health endpoin
 returns this SHA so GitHub can prove that it is checking the new release instead
 of the previous healthy release.
 
+See [leave planning and ticket feedback](leave-planning-and-ticket-feedback.md)
+for migration `20261018160000_add_leave_planning_and_ticket_feedback`, annual
+allowance setup, legacy leave handling, and requester-only ticket confirmation.
+
 ## One-time GitHub configuration
 
 Under **Settings > Environments > production**, configure:

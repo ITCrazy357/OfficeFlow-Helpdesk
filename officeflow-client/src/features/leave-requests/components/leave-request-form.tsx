@@ -9,7 +9,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { getLeaveDayCount, getTodayDateInputValue } from "../constants";
+import {
+  getLeaveRequestErrorMessage,
+  getTodayDateInputValue,
+} from "../constants";
+import { useLeavePreview } from "../planning";
+import { leavePeriodLabels, leaveTypeLabels } from "../planning-utils";
 import {
   leaveRequestFormSchema,
   type LeaveRequestFormValues,
@@ -30,18 +35,28 @@ export function LeaveRequestForm({
   const form = useForm<LeaveRequestFormValues>({
     resolver: zodResolver(leaveRequestFormSchema),
     defaultValues: {
+      type: "ANNUAL",
+      period: "FULL_DAY",
       startDate: "",
       endDate: "",
       reason: "",
     },
   });
-  const [startDate, endDate] = useWatch({
+  const [startDate, endDate, type, period] = useWatch({
     control: form.control,
-    name: ["startDate", "endDate"],
+    name: ["startDate", "endDate", "type", "period"],
   });
-  const dayCount = getLeaveDayCount(startDate, endDate);
+  const preview = useLeavePreview(
+    { startDate, endDate, type, period },
+    /^\d{4}-\d{2}-\d{2}$/.test(startDate) &&
+      /^\d{4}-\d{2}-\d{2}$/.test(endDate) &&
+      endDate >= startDate &&
+      (period === "FULL_DAY" || startDate === endDate),
+  );
 
-  const handleSubmit: SubmitHandler<LeaveRequestFormValues> = async (values) => {
+  const handleSubmit: SubmitHandler<LeaveRequestFormValues> = async (
+    values,
+  ) => {
     await onSubmit(values);
   };
 
@@ -51,6 +66,38 @@ export function LeaveRequestForm({
       onSubmit={form.handleSubmit(handleSubmit)}
       noValidate
     >
+      <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid content-start gap-2">
+          <Label htmlFor="leave-type">Loại nghỉ</Label>
+          <select
+            id="leave-type"
+            className="h-10 min-w-0 rounded-md border bg-background px-3 text-sm"
+            disabled={isSubmitting}
+            {...form.register("type")}
+          >
+            {(["ANNUAL", "UNPAID", "SICK"] as const).map((value) => (
+              <option key={value} value={value}>
+                {leaveTypeLabels[value]}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="grid content-start gap-2">
+          <Label htmlFor="leave-period">Thời gian nghỉ</Label>
+          <select
+            id="leave-period"
+            className="h-10 min-w-0 rounded-md border bg-background px-3 text-sm"
+            disabled={isSubmitting}
+            {...form.register("period")}
+          >
+            {(["FULL_DAY", "MORNING", "AFTERNOON"] as const).map((value) => (
+              <option key={value} value={value}>
+                {leavePeriodLabels[value]}
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="grid min-w-0 content-start gap-2">
           <Label htmlFor="leave-start-date">Ngày bắt đầu</Label>
@@ -88,9 +135,7 @@ export function LeaveRequestForm({
             {...form.register("endDate")}
           />
           <p id="leave-end-date-help" className="text-xs text-muted-foreground">
-            {dayCount > 0
-              ? `${dayCount} ngày theo lịch, tính cả ngày đầu và ngày cuối.`
-              : "Chọn ngày cuối cùng của kỳ nghỉ."}
+            Chỉ tính ngày làm việc, loại ngày nghỉ theo lịch SLA.
           </p>
           {form.formState.errors.endDate?.message ? (
             <p className="text-xs font-medium text-destructive">
@@ -99,6 +144,39 @@ export function LeaveRequestForm({
           ) : null}
         </div>
       </div>
+
+      {preview.isFetching ? (
+        <p role="status" className="text-sm text-muted-foreground">
+          Đang tính ngày công...
+        </p>
+      ) : preview.isError ? (
+        <p role="alert" className="text-sm text-destructive">
+          {getLeaveRequestErrorMessage(preview.error)}
+        </p>
+      ) : preview.data ? (
+        <div
+          className="grid gap-1 rounded-lg border bg-muted/20 p-3 text-sm"
+          role="status"
+        >
+          <p className="font-medium">
+            Thời lượng: {preview.data.days} ngày công
+          </p>
+          {type === "ANNUAL" ? (
+            preview.data.balances.map((balance) => (
+              <p key={balance.year} className="text-muted-foreground">
+                Năm {balance.year}:{" "}
+                {balance.remaining === null
+                  ? "Chưa cấu hình hạn mức — liên hệ ADMIN trước khi gửi."
+                  : `Còn ${balance.remaining} ngày khả dụng (đã trừ phần chờ duyệt).`}
+              </p>
+            ))
+          ) : (
+            <p className="text-muted-foreground">
+              Loại nghỉ này không trừ phép năm.
+            </p>
+          )}
+        </div>
+      ) : null}
 
       <div className="grid min-w-0 content-start gap-2">
         <Label htmlFor="leave-reason">Lý do nghỉ</Label>

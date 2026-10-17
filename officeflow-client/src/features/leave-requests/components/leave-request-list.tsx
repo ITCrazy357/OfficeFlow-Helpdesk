@@ -26,13 +26,10 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import type { Pagination } from "@/types/api";
-import {
-  formatLeaveDate,
-  formatLeaveDateTime,
-  getLeaveDayCount,
-} from "../constants";
+import { formatLeaveDate, formatLeaveDateTime } from "../constants";
 import type { LeaveRequest } from "../types";
 import { LeaveRequestStatusBadge } from "./leave-request-status-badge";
+import { leaveDuration, leaveTypeLabels } from "../planning-utils";
 
 type LeaveRequestListScope = "mine" | "pending";
 
@@ -47,19 +44,18 @@ type LeaveRequestListProps = {
 };
 
 function LeavePeriod({ leaveRequest }: { leaveRequest: LeaveRequest }) {
-  const dayCount = getLeaveDayCount(
-    leaveRequest.startDate,
-    leaveRequest.endDate,
-  );
-
   return (
     <div className="min-w-44">
       <p className="font-medium">
-        {formatLeaveDate(leaveRequest.startDate)} - {formatLeaveDate(leaveRequest.endDate)}
+        {formatLeaveDate(leaveRequest.startDate)} -{" "}
+        {formatLeaveDate(leaveRequest.endDate)}
       </p>
       <p className="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
         <Clock3 className="size-3" />
-        {dayCount} ngày theo lịch
+        {leaveDuration(leaveRequest)}
+      </p>
+      <p className="mt-1 text-xs text-muted-foreground">
+        {leaveTypeLabels[leaveRequest.type ?? "LEGACY"]}
       </p>
     </div>
   );
@@ -80,7 +76,9 @@ function LeaveRequestsTable({
           <TableHead>Kỳ nghỉ</TableHead>
           <TableHead>Lý do</TableHead>
           <TableHead>Trạng thái</TableHead>
-          <TableHead>{scope === "mine" ? "Người duyệt" : "Nhân viên"}</TableHead>
+          <TableHead>
+            {scope === "mine" ? "Người duyệt" : "Nhân viên"}
+          </TableHead>
           <TableHead>Ngày gửi</TableHead>
         </TableRow>
       </TableHeader>
@@ -141,7 +139,8 @@ function LeaveRequestsMobileList({
                 Đơn #{leaveRequest.id}
               </p>
               <p className="mt-1 font-semibold">
-                {formatLeaveDate(leaveRequest.startDate)} - {formatLeaveDate(leaveRequest.endDate)}
+                {formatLeaveDate(leaveRequest.startDate)} -{" "}
+                {formatLeaveDate(leaveRequest.endDate)}
               </p>
             </div>
             <LeaveRequestStatusBadge status={leaveRequest.status} />
@@ -159,7 +158,8 @@ function LeaveRequestsMobileList({
                 : leaveRequest.requester.name}
             </span>
             <span>
-              {getLeaveDayCount(leaveRequest.startDate, leaveRequest.endDate)} ngày
+              {leaveTypeLabels[leaveRequest.type ?? "LEGACY"]} ·{" "}
+              {leaveDuration(leaveRequest)}
             </span>
           </div>
         </Link>
@@ -209,7 +209,9 @@ export function LeaveRequestList({
             {scope === "mine" ? "Đơn của tôi" : "Đơn chờ tôi duyệt"}
           </CardTitle>
           <CardDescription>
-            {pagination ? `${pagination.totalItems} đơn nghỉ phép` : "Chưa có dữ liệu"}
+            {pagination
+              ? `${pagination.totalItems} đơn nghỉ phép`
+              : "Chưa có dữ liệu"}
             {isFetching ? " / Đang cập nhật" : ""}
           </CardDescription>
         </CardHeader>

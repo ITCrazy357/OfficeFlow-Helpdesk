@@ -54,7 +54,7 @@ export default function NewLeaveRequestPage() {
   const guidance = [
     {
       icon: CalendarClock,
-      text: "Ngày nghỉ không được trùng với đơn đang chờ duyệt hoặc đã được duyệt.",
+      text: "Buổi nghỉ không được trùng với đơn đang chờ duyệt hoặc đã được duyệt. Có thể đăng ký riêng sáng và chiều.",
     },
     {
       icon: CircleCheck,

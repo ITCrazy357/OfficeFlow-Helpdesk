@@ -13,6 +13,9 @@ import { OutboxService } from '../outbox/outbox.service';
 import { PrismaService } from '../prisma/prisma.service';
 
 import { LeaveRequestService } from './leave-requests.service';
+import { LeavePlanningService } from './leave-planning.service';
+import { leaveWorkingDays } from './leave-calendar';
+import { DEFAULT_SLA_POLICY } from '../sla/sla-policy';
 
 const mockTransaction = {
   user: {
@@ -102,6 +105,23 @@ describe('LeaveRequestService', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         LeaveRequestService,
+        {
+          provide: LeavePlanningService,
+          useValue: {
+            plan: jest.fn((_tx, dto: { startDate: string; endDate: string }) =>
+              Promise.resolve({
+                calendar: DEFAULT_SLA_POLICY,
+                days: leaveWorkingDays(
+                  dto.startDate,
+                  dto.endDate,
+                  'FULL_DAY',
+                  DEFAULT_SLA_POLICY,
+                ),
+              }),
+            ),
+            assertAvailable: jest.fn().mockResolvedValue(undefined),
+          },
+        },
         {
           provide: PrismaService,
           useValue: mockPrismaService,

@@ -49,6 +49,8 @@ const ticketStatusSelect = {
   priority: true,
   dueAt: true,
   resolveAt: true,
+  resolutionVersion: true,
+  confirmedAt: true,
   isOverdue: true,
   firstResponseDueAt: true,
   firstRespondedAt: true,
@@ -359,6 +361,10 @@ export class TicketWorkflowService {
         }
 
         assertTicketStatusTransition(currentTicket.status, nextStatus);
+        if (nextStatus === TicketStatus.CLOSED)
+          throw new ForbiddenException(
+            'Only the requester can confirm the ticket result',
+          );
 
         if (
           nextStatus === TicketStatus.IN_PROGRESS &&
@@ -368,11 +374,7 @@ export class TicketWorkflowService {
         }
 
         const resolveAt =
-          nextStatus === TicketStatus.RESOLVED
-            ? new Date()
-            : nextStatus === TicketStatus.CLOSED
-              ? currentTicket.resolveAt
-              : null;
+          nextStatus === TicketStatus.RESOLVED ? new Date() : null;
 
         const claimed = await transaction.ticket.updateMany({
           where: {
@@ -382,6 +384,10 @@ export class TicketWorkflowService {
           data: {
             status: nextStatus,
             resolveAt,
+            ...(nextStatus === TicketStatus.RESOLVED
+              ? { resolutionVersion: { increment: 1 } }
+              : {}),
+            confirmedAt: null,
             // A resolution after the deadline is a breach even if the polling
             // worker has not run yet. Reopening keeps the original commitment.
             ...(resolveAt &&

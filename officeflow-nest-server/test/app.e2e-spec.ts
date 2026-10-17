@@ -21,6 +21,7 @@ import { SlaService } from '../src/sla/sla.service';
 import { AssetWarrantyReminderService } from '../src/assets/asset-warranty-reminder.service';
 import { RefreshTokenCleanupService } from '../src/auth/refresh-token-cleanup.service';
 import { MetricsService } from '../src/metrics/metrics.service';
+import { LeavePlanningService } from '../src/leave-requests/leave-planning.service';
 
 const mockPrismaService = {
   $queryRaw: jest.fn().mockResolvedValue([{ connected: 1 }]),
@@ -257,6 +258,131 @@ describe('AppController (e2e)', () => {
 
   it('/api/dashboard/performance requires authentication', () => {
     return request(httpServer).get('/api/dashboard/performance').expect(401);
+  });
+
+  it('protects leave planning and validates feedback commands through real HTTP guards', async () => {
+    await request(httpServer)
+      .get('/api/leave-request/calendar?month=2026-10')
+      .expect(401);
+    await request(httpServer)
+      .get('/api/leave-request/balance?year=2026')
+      .expect(401);
+    await request(httpServer)
+      .post('/api/tickets/1/confirm')
+      .send({ resolutionVersion: 0 })
+      .expect(401);
+    const session = {
+      userId: 41,
+      usedAt: null,
+      revokedAt: null,
+      expiresAt: new Date(Date.now() + 60_000),
+      user: {
+        role: 'EMPLOYEE',
+        isActive: true,
+        isLocked: false,
+        mustChangePassword: false,
+      },
+    };
+    mockPrismaService.refreshToken.findUnique.mockResolvedValue(session);
+    const token = app.get(JwtService).sign(
+      { sub: 41, sid: 'leave-feedback-session' },
+      {
+        issuer: 'officeflow-api',
+        audience: 'officeflow-web',
+        expiresIn: '5m',
+      },
+    );
+    await request(httpServer)
+      .put('/api/leave-request/entitlements/41?year=2026')
+      .auth(token, { type: 'bearer' })
+      .send({ days: 12, version: 0 })
+      .expect(403);
+    await request(httpServer)
+      .get('/api/leave-request/balance?year=2026&userId=42')
+      .auth(token, { type: 'bearer' })
+      .expect(403);
+    for (const path of [
+      'balance?year=2026.5',
+      'balance?year=2026&role=ADMIN',
+      'calendar?month=2026-1',
+      'calendar?month=2026-10&page=0',
+    ]) {
+      await request(httpServer)
+        .get(`/api/leave-request/${path}`)
+        .auth(token, { type: 'bearer' })
+        .expect(400);
+    }
+    session.user.role = 'ADMIN';
+    const allowance = {
+      userId: 41,
+      year: 2026,
+      allowance: 12.5,
+      used: 0,
+      reserved: 0,
+      remaining: 12.5,
+      version: 1,
+      legacyRequests: 0,
+    };
+    const saveAllowance = jest
+      .spyOn(app.get(LeavePlanningService), 'setEntitlement')
+      .mockResolvedValueOnce(allowance);
+    await request(httpServer)
+      .put('/api/leave-request/entitlements/41?year=2026')
+      .auth(token, { type: 'bearer' })
+      .send({ days: 12.5, version: 0 })
+      .expect(200);
+    expect(saveAllowance).toHaveBeenCalledWith(
+      41,
+      2026,
+      { days: 12.5, version: 0 },
+      expect.objectContaining({ userId: 41, role: 'ADMIN' }),
+    );
+    saveAllowance.mockRestore();
+    for (const days of [12.25, -1, 367, null]) {
+      await request(httpServer)
+        .put('/api/leave-request/entitlements/41?year=2026')
+        .auth(token, { type: 'bearer' })
+        .send({ days, version: 0 })
+        .expect(400);
+    }
+    for (const input of [
+      { startDate: '2035-01-08', endDate: '2035-01-08', type: 'LEGACY' },
+      { startDate: '2035-01-08', endDate: '2035-01-08', period: null },
+    ]) {
+      await request(httpServer)
+        .post('/api/leave-request/preview')
+        .auth(token, { type: 'bearer' })
+        .send(input)
+        .expect(400);
+    }
+    for (const input of [
+      { resolutionVersion: null },
+      { resolutionVersion: -1 },
+      { resolutionVersion: 1, createdById: 41 },
+    ]) {
+      await request(httpServer)
+        .post('/api/tickets/1/confirm')
+        .auth(token, { type: 'bearer' })
+        .send(input)
+        .expect(400);
+    }
+    await request(httpServer)
+      .post('/api/tickets/1/reopen')
+      .auth(token, { type: 'bearer' })
+      .send({ resolutionVersion: 0, reason: '  ' })
+      .expect(400);
+    for (const score of [0, 6, 1.5, '5']) {
+      await request(httpServer)
+        .post('/api/tickets/1/feedback')
+        .auth(token, { type: 'bearer' })
+        .send({ score })
+        .expect(400);
+    }
+    await request(httpServer)
+      .post('/api/tickets/1/feedback')
+      .auth(token, { type: 'bearer' })
+      .send({ score: 1, comment: '  ' })
+      .expect(400);
   });
 
   it('protects asset care costs and validates maintenance actions through real HTTP guards', async () => {
