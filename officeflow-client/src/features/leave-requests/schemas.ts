@@ -6,6 +6,8 @@ const dateOnlySchema = z.string().trim().pipe(z.iso.date("Ngày không hợp l�
 
 export const leaveRequestFormSchema = z
   .object({
+    type: z.enum(["ANNUAL", "UNPAID", "SICK"]),
+    period: z.enum(["FULL_DAY", "MORNING", "AFTERNOON"]),
     startDate: dateOnlySchema,
     endDate: dateOnlySchema,
     reason: z
@@ -15,6 +17,13 @@ export const leaveRequestFormSchema = z
       .max(2000, "Lý do tối đa 2.000 ký tự"),
   })
   .superRefine((values, context) => {
+    if (values.period !== "FULL_DAY" && values.startDate !== values.endDate) {
+      context.addIssue({
+        code: "custom",
+        path: ["endDate"],
+        message: "Nghỉ nửa ngày phải bắt đầu và kết thúc trong cùng ngày",
+      });
+    }
     if (values.startDate < getTodayDateInputValue()) {
       context.addIssue({
         code: "custom",
@@ -38,6 +47,8 @@ export function toLeaveRequestPayload(
   values: LeaveRequestFormValues,
 ): CreateLeaveRequestInput {
   return {
+    type: values.type,
+    period: values.period,
     startDate: values.startDate,
     endDate: values.endDate,
     reason: values.reason.trim(),

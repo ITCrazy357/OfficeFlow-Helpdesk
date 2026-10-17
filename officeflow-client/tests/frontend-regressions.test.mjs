@@ -470,6 +470,7 @@ test("leave and asset forms reject impossible calendar dates", () => {
   const year = new Date().getFullYear() + 4;
   assert.equal(
     leaveRequestFormSchema.safeParse({
+      type: "ANNUAL", period: "FULL_DAY",
       startDate: `${year}-02-30`,
       endDate: `${year}-03-01`,
       reason: "Annual leave",
@@ -485,6 +486,90 @@ test("leave and asset forms reject impossible calendar dates", () => {
     assetFormSchema.safeParse({ ...asset, purchaseDate: "2027-02-29" }).success,
     false,
   );
+});
+
+test("leave types and half-days validate without inferring a balance or counting calendar weekends", () => {
+  const load = createSourceLoader();
+  const { leaveRequestFormSchema, toLeaveRequestPayload } = load("features/leave-requests/schemas.ts");
+  const utils = load("features/leave-requests/planning-utils.ts");
+  const payload = { type: "ANNUAL", period: "MORNING", startDate: "2035-01-08", endDate: "2035-01-08", reason: " Nghỉ việc gia đình " };
+  assert.equal(leaveRequestFormSchema.safeParse(payload).success, true);
+  assert.deepEqual(toLeaveRequestPayload(payload), { ...payload, reason: "Nghỉ việc gia đình" });
+  assert.equal(leaveRequestFormSchema.safeParse({ ...payload, endDate: "2035-01-09" }).success, false);
+  assert.equal(leaveRequestFormSchema.safeParse({ ...payload, type: "LEGACY" }).success, false);
+  assert.equal(utils.leaveDuration({ ...payload, days: [{ date: payload.startDate, halfDays: 1 }] }), "0.5 ngày công · Buổi sáng");
+  assert.equal(utils.leaveDuration({ ...payload, days: [] }), "Đơn cũ: chưa xác định ngày công");
+  assert.equal(utils.monthDays("2028-02").length, 29);
+  assert.equal(utils.monthDays("2026-13").length, 0);
+});
+
+test("department calendar counts distinct people in the same session and uses saved working dates", () => {
+  const utils = createSourceLoader()("features/leave-requests/planning-utils.ts");
+  const morning = { id: 1, requester: { id: 1, name: "A" }, period: "MORNING", startDate: "2035-01-08", endDate: "2035-01-08", days: [{ date: "2035-01-08", halfDays: 1 }] };
+  const afternoon = { ...morning, id: 2, requester: { id: 2, name: "B" }, period: "AFTERNOON" };
+  assert.equal(utils.overlappingLeaveCount([morning, afternoon]), 1);
+  assert.equal(utils.overlappingLeaveCount([morning, afternoon, { ...morning, id: 3, requester: { id: 3 } }]), 2);
+  assert.equal(utils.overlappingLeaveCount([morning, { ...morning, id: 4, period: "AFTERNOON" }]), 1);
+  assert.equal(utils.leavesOnDate([morning], "2035-01-09").length, 0);
+  const spanning = { ...morning, startDate: "2035-01-05", days: [{ date: "2035-01-08", halfDays: 2 }] };
+  assert.equal(utils.leavesOnDate([spanning], "2035-01-06").length, 0);
+});
+
+test("planning APIs retain year, scope and version; successful or conflicting writes refresh balances", async () => {
+  const calls = [];
+  const invalidated = [];
+  const cleared = [];
+  const data = { userId: 8, year: 2035, allowance: null, remaining: null, version: 0 };
+  let failure;
+  const transport = async (method, ...args) => { calls.push([method, ...args]); if (failure) throw failure; return { data: { data } }; };
+  const load = createSourceLoader({
+    "@tanstack/react-query": { useQuery: options => options, useMutation: options => options, useQueryClient: () => ({ invalidateQueries: async options => invalidated.push(options), setQueriesData: (...args) => cleared.push(args) }) },
+    "@/lib/axios": { api: { get: (...args) => transport("GET", ...args), post: (...args) => transport("POST", ...args), put: (...args) => transport("PUT", ...args) } },
+  });
+  const hooks = load("features/leave-requests/planning.ts");
+  const signal = new AbortController().signal;
+  assert.deepEqual(await hooks.useLeaveBalance(2035, 8).queryFn({ signal }), data);
+  assert.deepEqual(calls[0], ["GET", "/leave-request/balance", { params: { year: 2035, userId: 8 }, signal }]);
+  const save = hooks.useSetLeaveEntitlement();
+  await save.mutationFn({ userId: 8, year: 2035, days: 12.5, version: 2 });
+  assert.deepEqual(calls[1], ["PUT", "/leave-request/entitlements/8", { days: 12.5, version: 2 }, { params: { year: 2035 } }]);
+  await save.onSettled();
+  assert.deepEqual(invalidated, [{ queryKey: ["leave-requests", "planning"] }]);
+  failure = rejectStatus({}, 403);
+  await assert.rejects(hooks.useLeaveCalendar("2035-01", 1).queryFn({ signal }));
+  assert.deepEqual(cleared, [[{ queryKey: ["leave-requests", "planning"] }, null]]);
+});
+
+test("ticket response APIs send the resolution cycle and validate a low rating before submission", async () => {
+  const calls = [];
+  const invalidated = [];
+  const load = createSourceLoader({
+    "@tanstack/react-query": { useMutation: options => options, useQueryClient: () => ({ invalidateQueries: async filter => invalidated.push(filter) }) },
+    "@/lib/axios": { api: { post: async (...args) => { calls.push(args); } } },
+  });
+  const feedback = load("features/tickets/feedback.ts");
+  assert.match(feedback.validateTicketRating(1, " "), /lý do/);
+  assert.equal(feedback.validateTicketRating(2, "Chưa rõ hướng dẫn"), null);
+  assert.equal(feedback.validateTicketRating(5, ""), null);
+  assert.ok(feedback.validateTicketRating(0, ""));
+  const mutation = feedback.useRespondToTicket(7);
+  await mutation.mutationFn({ action: "reopen", resolutionVersion: 3, reason: "Vẫn lỗi VPN" });
+  assert.deepEqual(calls, [["/tickets/7/reopen", { resolutionVersion: 3, reason: "Vẫn lỗi VPN" }]]);
+  await mutation.onSettled();
+  assert.deepEqual(invalidated, [{ queryKey: ["tickets"] }, { queryKey: ["dashboard"] }]);
+});
+
+test("leave create, review and cancellation refresh balances and calendars even after conflicts", async () => {
+  const refreshed = [];
+  const load = createSourceLoader({
+    "@tanstack/react-query": { useMutation: options => options, useQueryClient: () => ({ invalidateQueries: async filter => refreshed.push(filter) }) },
+    "./api": {},
+  });
+  const hooks = load("features/leave-requests/hooks.ts");
+  for (const mutation of [hooks.useCreateLeaveRequest(), hooks.useApproveLeaveRequest(), hooks.useRejectLeaveRequest(), hooks.useCancelLeaveRequest()]) {
+    await mutation.onSettled();
+  }
+  assert.deepEqual(refreshed, Array.from({ length: 4 }, () => ({ queryKey: ["leave-requests"] })));
 });
 
 test("handoff candidates exclude the source, inactive/locked accounts and non-management roles", () => {

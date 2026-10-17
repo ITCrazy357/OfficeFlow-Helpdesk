@@ -1,8 +1,22 @@
 import { Transform } from 'class-transformer';
-import { IsString, Matches, MaxLength, MinLength } from 'class-validator';
+import {
+  IsEnum,
+  IsIn,
+  IsString,
+  Matches,
+  MaxLength,
+  MinLength,
+} from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
+import { LeavePeriod, LeaveType } from '@prisma/client';
 
 export class CreateLeaveRequestDto {
+  @IsIn([LeaveType.ANNUAL, LeaveType.UNPAID, LeaveType.SICK])
+  type?: LeaveType = LeaveType.ANNUAL;
+
+  @IsEnum(LeavePeriod)
+  period?: LeavePeriod = LeavePeriod.FULL_DAY;
+
   @ApiProperty({
     example: '2026-09-01',
     description: 'Start date of the leave request in YYYY-MM-DD format',

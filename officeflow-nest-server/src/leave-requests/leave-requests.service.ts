@@ -11,6 +11,8 @@ import {
   AuditLogAction,
   AuditLogEntity,
   LeaveStatus,
+  LeaveType,
+  LeavePeriod,
   Prisma,
   UserRole,
 } from '@prisma/client';
@@ -20,7 +22,8 @@ import type { CurrentUserPayload } from '../common/decorators/current-user.decor
 import { OUTBOX_EVENT_TYPES } from '../outbox/outbox.constants';
 import { OutboxService } from '../outbox/outbox.service';
 import { PrismaService } from '../prisma/prisma.service';
-import { parseDateOnly, startOfUtcDate } from '../utils/formatDate';
+import { parseDateOnly } from '../utils/formatDate';
+import { LeavePlanningService } from './leave-planning.service';
 
 import { CreateLeaveRequestDto } from './dto/create-leave-request.dto';
 import {
@@ -34,6 +37,9 @@ const leaveRequestDetailSelect = {
   startDate: true,
   endDate: true,
   reason: true,
+  type: true,
+  period: true,
+  days: { select: { date: true, halfDays: true } },
   status: true,
   reviewNote: true,
   reviewedAt: true,
@@ -71,6 +77,7 @@ export class LeaveRequestService {
     private readonly prisma: PrismaService,
     private readonly auditLogsService: AuditLogsService,
     private readonly outboxService: OutboxService,
+    private readonly planning: LeavePlanningService,
   ) {}
 
   private async createInSerializableTransaction(
@@ -78,6 +85,7 @@ export class LeaveRequestService {
     startDate: Date,
     endDate: Date,
     reason: string,
+    dto: CreateLeaveRequestDto,
   ) {
     const requesterId = currentUser.userId;
 
@@ -135,6 +143,9 @@ export class LeaveRequestService {
               );
             }
 
+            const plan = await this.planning.plan(tx, dto);
+            const type = dto.type ?? LeaveType.ANNUAL;
+            const period = dto.period ?? LeavePeriod.FULL_DAY;
             const existing = await tx.leaveRequest.findFirst({
               where: {
                 requesterId,
@@ -147,6 +158,19 @@ export class LeaveRequestService {
                 endDate: {
                   gte: startDate,
                 },
+                OR: [
+                  { type: LeaveType.LEGACY },
+                  {
+                    days: {
+                      some: { date: { in: plan.days.map((day) => day.date) } },
+                    },
+                  },
+                ],
+                ...(period !== LeavePeriod.FULL_DAY
+                  ? {
+                      period: { in: [LeavePeriod.FULL_DAY, period] },
+                    }
+                  : {}),
               },
               select: {
                 id: true,
@@ -159,6 +183,9 @@ export class LeaveRequestService {
               );
             }
 
+            if (type === LeaveType.ANNUAL)
+              await this.planning.assertAvailable(tx, requesterId, plan.days);
+
             const leaveRequest = await tx.leaveRequest.create({
               data: {
                 requesterId,
@@ -166,6 +193,10 @@ export class LeaveRequestService {
                 startDate,
                 endDate,
                 reason,
+                type,
+                period,
+                calendarSnapshot: plan.calendar,
+                days: { create: plan.days },
               },
               select: leaveRequestDetailSelect,
             });
@@ -183,6 +214,10 @@ export class LeaveRequestService {
                   status: LeaveStatus.PENDING,
                   startDate: dtoDate(startDate),
                   endDate: dtoDate(endDate),
+                  type,
+                  period,
+                  workingDays:
+                    plan.days.reduce((sum, day) => sum + day.halfDays, 0) / 2,
                 },
                 ipAddress: currentUser.ipAddress,
                 userAgent: currentUser.userAgent,
@@ -227,7 +262,6 @@ export class LeaveRequestService {
   async create(dto: CreateLeaveRequestDto, currentUser: CurrentUserPayload) {
     const startDate = parseDateOnly(dto.startDate);
     const endDate = parseDateOnly(dto.endDate);
-    const today = startOfUtcDate(new Date());
 
     if (startDate > endDate) {
       throw new BadRequestException(
@@ -235,15 +269,12 @@ export class LeaveRequestService {
       );
     }
 
-    if (startDate < today) {
-      throw new BadRequestException('Start date can not be in the past');
-    }
-
     return this.createInSerializableTransaction(
       currentUser,
       startDate,
       endDate,
       dto.reason,
+      dto,
     );
   }
 

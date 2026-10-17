@@ -1,5 +1,10 @@
 "use client";
 
+import {
+  leaveDuration,
+  leaveTypeLabels,
+} from "@/features/leave-requests/planning-utils";
+
 import { useState } from "react";
 import {
   AlertCircle,
@@ -42,7 +47,6 @@ import { LeaveRequestStatusBadge } from "@/features/leave-requests/components/le
 import {
   formatLeaveDate,
   formatLeaveDateTime,
-  getLeaveDayCount,
   getLeaveRequestErrorMessage,
   leaveRequestStatusLabels,
 } from "@/features/leave-requests/constants";
@@ -111,13 +115,7 @@ function ErrorCard({
   );
 }
 
-function DetailItem({
-  label,
-  value,
-}: {
-  label: string;
-  value: string;
-}) {
+function DetailItem({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-lg border bg-muted/20 p-3">
       <p className="text-xs font-medium text-muted-foreground">{label}</p>
@@ -135,10 +133,7 @@ export default function LeaveRequestDetailPage() {
     Number.isInteger(rawLeaveRequestId) && rawLeaveRequestId > 0
       ? rawLeaveRequestId
       : 0;
-  const leaveRequestQuery = useLeaveRequest(
-    leaveRequestId,
-    leaveRequestId > 0,
-  );
+  const leaveRequestQuery = useLeaveRequest(leaveRequestId, leaveRequestId > 0);
   const approveLeaveRequest = useApproveLeaveRequest();
   const rejectLeaveRequest = useRejectLeaveRequest();
   const cancelLeaveRequest = useCancelLeaveRequest();
@@ -194,10 +189,7 @@ export default function LeaveRequestDetailPage() {
     approveLeaveRequest.isPending ||
     rejectLeaveRequest.isPending ||
     cancelLeaveRequest.isPending;
-  const dayCount = getLeaveDayCount(
-    leaveRequest.startDate,
-    leaveRequest.endDate,
-  );
+  const duration = leaveDuration(leaveRequest);
 
   async function handleApprove() {
     setActionError(null);
@@ -271,10 +263,11 @@ export default function LeaveRequestDetailPage() {
             <LeaveRequestStatusBadge status={leaveRequest.status} />
           </div>
           <h1 className="text-2xl font-semibold tracking-normal">
-            {formatLeaveDate(leaveRequest.startDate)} - {formatLeaveDate(leaveRequest.endDate)}
+            {formatLeaveDate(leaveRequest.startDate)} -{" "}
+            {formatLeaveDate(leaveRequest.endDate)}
           </h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            {dayCount} ngày theo lịch, gửi lúc {formatLeaveDateTime(leaveRequest.createdAt)}.
+            {duration}, gửi lúc {formatLeaveDateTime(leaveRequest.createdAt)}.
           </p>
         </div>
       </section>
@@ -325,9 +318,10 @@ export default function LeaveRequestDetailPage() {
                   label="Ngày kết thúc"
                   value={formatLeaveDate(leaveRequest.endDate)}
                 />
+                <DetailItem label="Thời lượng" value={duration} />
                 <DetailItem
-                  label="Thời lượng"
-                  value={`${dayCount} ngày theo lịch`}
+                  label="Loại nghỉ"
+                  value={leaveTypeLabels[leaveRequest.type ?? "LEGACY"]}
                 />
               </div>
 
@@ -340,7 +334,8 @@ export default function LeaveRequestDetailPage() {
                   {leaveRequest.reason}
                 </p>
                 <p className="mt-2 text-xs leading-5 text-muted-foreground">
-                  Nội dung này chỉ được trả về cho người gửi và người duyệt được chỉ định.
+                  Nội dung này chỉ được trả về cho người gửi và người duyệt được
+                  chỉ định.
                 </p>
               </div>
             </CardContent>
@@ -368,7 +363,8 @@ export default function LeaveRequestDetailPage() {
             <CardHeader className="border-b">
               <CardTitle>Luồng phê duyệt</CardTitle>
               <CardDescription>
-                Trạng thái hiện tại: {leaveRequestStatusLabels[leaveRequest.status]}.
+                Trạng thái hiện tại:{" "}
+                {leaveRequestStatusLabels[leaveRequest.status]}.
               </CardDescription>
             </CardHeader>
             <CardContent className="grid gap-4 pt-0">
@@ -389,7 +385,9 @@ export default function LeaveRequestDetailPage() {
                   <UserRoundCheck className="size-4" />
                 </span>
                 <div>
-                  <p className="text-xs text-muted-foreground">Người duyệt được chỉ định</p>
+                  <p className="text-xs text-muted-foreground">
+                    Người duyệt được chỉ định
+                  </p>
                   <p className="mt-0.5 font-semibold">
                     {leaveRequest.approver.name}
                   </p>
@@ -475,7 +473,8 @@ export default function LeaveRequestDetailPage() {
             <div className="flex items-start gap-3 rounded-lg border bg-card p-4 text-xs leading-5 text-muted-foreground shadow-sm">
               <LockKeyhole className="mt-0.5 size-4 shrink-0 text-teal-800 dark:text-teal-300" />
               <p>
-                Bạn thấy lý do của đơn này vì được chỉ định là người duyệt, không phải do quyền Admin.
+                Bạn thấy lý do của đơn này vì được chỉ định là người duyệt,
+                không phải do quyền Admin.
               </p>
             </div>
           ) : null}
@@ -494,7 +493,8 @@ export default function LeaveRequestDetailPage() {
           <AlertDialogHeader>
             <AlertDialogTitle>Duyệt đơn nghỉ phép?</AlertDialogTitle>
             <AlertDialogDescription>
-              Đơn #{leaveRequest.id} của {leaveRequest.requester.name} sẽ chuyển sang trạng thái đã duyệt.
+              Đơn #{leaveRequest.id} của {leaveRequest.requester.name} sẽ chuyển
+              sang trạng thái đã duyệt.
             </AlertDialogDescription>
           </AlertDialogHeader>
           {actionError ? (
@@ -525,7 +525,9 @@ export default function LeaveRequestDetailPage() {
                 }}
               >
                 <CheckCircle2 className="size-4" />
-                {approveLeaveRequest.isPending ? "Đang duyệt..." : "Xác nhận duyệt"}
+                {approveLeaveRequest.isPending
+                  ? "Đang duyệt..."
+                  : "Xác nhận duyệt"}
               </Button>
             </AlertDialogAction>
           </AlertDialogFooter>
@@ -547,7 +549,8 @@ export default function LeaveRequestDetailPage() {
           <AlertDialogHeader>
             <AlertDialogTitle>Từ chối đơn nghỉ phép</AlertDialogTitle>
             <AlertDialogDescription>
-              Ghi rõ lý do để người gửi hiểu quyết định và có thể điều chỉnh kế hoạch.
+              Ghi rõ lý do để người gửi hiểu quyết định và có thể điều chỉnh kế
+              hoạch.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <div className="grid min-w-0 content-start gap-2">
@@ -606,7 +609,9 @@ export default function LeaveRequestDetailPage() {
                 }}
               >
                 <XCircle className="size-4" />
-                {rejectLeaveRequest.isPending ? "Đang từ chối..." : "Xác nhận từ chối"}
+                {rejectLeaveRequest.isPending
+                  ? "Đang từ chối..."
+                  : "Xác nhận từ chối"}
               </Button>
             </AlertDialogAction>
           </AlertDialogFooter>
@@ -625,7 +630,8 @@ export default function LeaveRequestDetailPage() {
           <AlertDialogHeader>
             <AlertDialogTitle>Hủy đơn nghỉ phép?</AlertDialogTitle>
             <AlertDialogDescription>
-              Đơn #{leaveRequest.id} sẽ chuyển sang trạng thái đã hủy và không thể gửi lại để duyệt.
+              Đơn #{leaveRequest.id} sẽ chuyển sang trạng thái đã hủy và không
+              thể gửi lại để duyệt.
             </AlertDialogDescription>
           </AlertDialogHeader>
           {actionError ? (

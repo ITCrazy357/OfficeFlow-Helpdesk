@@ -385,7 +385,11 @@ describe('TicketsService', () => {
 
     expect(mockTransaction.ticket.updateMany).toHaveBeenCalledWith({
       where: { id: 5, status: TicketStatus.OPEN },
-      data: { status: TicketStatus.IN_PROGRESS, resolveAt: null },
+      data: {
+        status: TicketStatus.IN_PROGRESS,
+        resolveAt: null,
+        confirmedAt: null,
+      },
     });
     expect(mockTransaction.ticketHistory.create).not.toHaveBeenCalled();
     expect(mockAuditLogsService.create).not.toHaveBeenCalled();
@@ -435,18 +439,28 @@ describe('TicketsService', () => {
     },
   );
 
+  it('requires requester confirmation instead of letting staff close a resolved ticket', async () => {
+    mockTransaction.ticket.findUnique.mockResolvedValue({
+      id: 5,
+      status: TicketStatus.RESOLVED,
+    });
+    await expect(
+      service.updateStatus(
+        5,
+        { status: TicketStatus.CLOSED },
+        { userId: 1, role: UserRole.ADMIN },
+      ),
+    ).rejects.toThrow('Only the requester');
+    expect(mockTransaction.ticket.updateMany).not.toHaveBeenCalled();
+    expect(mockOutboxService.enqueue).not.toHaveBeenCalled();
+  });
+
   it.each([
     {
       from: TicketStatus.IN_PROGRESS,
       to: TicketStatus.RESOLVED,
       previousResolveAt: null,
       expectedResolveAt: new Date('2026-09-08T12:00:00.000Z'),
-    },
-    {
-      from: TicketStatus.RESOLVED,
-      to: TicketStatus.CLOSED,
-      previousResolveAt: new Date('2026-09-08T10:00:00.000Z'),
-      expectedResolveAt: new Date('2026-09-08T10:00:00.000Z'),
     },
     {
       from: TicketStatus.RESOLVED,
@@ -492,7 +506,14 @@ describe('TicketsService', () => {
         // Exact data also proves that changing status does not overwrite SLA fields.
         expect(mockTransaction.ticket.updateMany).toHaveBeenCalledWith({
           where: { id: 5, status: from },
-          data: { status: to, resolveAt: expectedResolveAt },
+          data: {
+            status: to,
+            resolveAt: expectedResolveAt,
+            confirmedAt: null,
+            ...(to === TicketStatus.RESOLVED
+              ? { resolutionVersion: { increment: 1 } }
+              : {}),
+          },
         });
         expect(mockTransaction.ticketHistory.create).toHaveBeenCalledTimes(1);
         expect(mockTransaction.ticketHistory.create).toHaveBeenCalledWith({

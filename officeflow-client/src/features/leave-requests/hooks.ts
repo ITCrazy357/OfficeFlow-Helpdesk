@@ -36,10 +36,6 @@ function updateLeaveRequestCaches(
     leaveRequestsQueryKeys.detail(leaveRequest.id),
     leaveRequest,
   );
-  queryClient.invalidateQueries({ queryKey: leaveRequestsQueryKeys.mine() });
-  queryClient.invalidateQueries({
-    queryKey: leaveRequestsQueryKeys.pending(),
-  });
 }
 
 export function useMyLeaveRequests(
@@ -85,10 +81,9 @@ export function useCreateLeaveRequest() {
         leaveRequestsQueryKeys.detail(leaveRequest.id),
         leaveRequest,
       );
-      queryClient.invalidateQueries({
-        queryKey: leaveRequestsQueryKeys.mine(),
-      });
     },
+    onSettled: () =>
+      queryClient.invalidateQueries({ queryKey: leaveRequestsQueryKeys.all }),
   });
 }
 
@@ -100,6 +95,8 @@ export function useApproveLeaveRequest() {
     onSuccess: (leaveRequest) => {
       updateLeaveRequestCaches(queryClient, leaveRequest);
     },
+    onSettled: () =>
+      queryClient.invalidateQueries({ queryKey: leaveRequestsQueryKeys.all }),
   });
 }
 
@@ -107,11 +104,18 @@ export function useRejectLeaveRequest() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ id, input }: { id: number; input: RejectLeaveRequestInput }) =>
-      rejectLeaveRequestApi(id, input),
+    mutationFn: ({
+      id,
+      input,
+    }: {
+      id: number;
+      input: RejectLeaveRequestInput;
+    }) => rejectLeaveRequestApi(id, input),
     onSuccess: (leaveRequest) => {
       updateLeaveRequestCaches(queryClient, leaveRequest);
     },
+    onSettled: () =>
+      queryClient.invalidateQueries({ queryKey: leaveRequestsQueryKeys.all }),
   });
 }
 
@@ -123,5 +127,7 @@ export function useCancelLeaveRequest() {
     onSuccess: (leaveRequest) => {
       updateLeaveRequestCaches(queryClient, leaveRequest);
     },
+    onSettled: () =>
+      queryClient.invalidateQueries({ queryKey: leaveRequestsQueryKeys.all }),
   });
 }

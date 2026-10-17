@@ -32,6 +32,9 @@ import { assetCareDates } from '../../src/assets/asset-care.util';
 import { NotificationsService } from '../../src/notifications/notifications.service';
 import { NotificationsListener } from '../../src/notifications/notifications.listener';
 import type { TicketSlaAlertEvent } from '../../src/notifications/events/ticket-sla-alert.event';
+import { LeavePlanningService } from '../../src/leave-requests/leave-planning.service';
+import { LeaveRequestService } from '../../src/leave-requests/leave-requests.service';
+import { TicketFeedbackService } from '../../src/tickets/ticket-feedback.service';
 
 describe('Real MySQL/Redis integration (disposable containers only)', () => {
   const prisma = new PrismaService(
@@ -46,6 +49,19 @@ describe('Real MySQL/Redis integration (disposable containers only)', () => {
     uploadFile: jest.fn(),
   };
   const assets = new AssetsService(prisma, audit, outbox);
+  const planning = new LeavePlanningService(
+    prisma,
+    new SlaPolicyService(prisma, audit),
+    audit,
+  );
+  const leave = new LeaveRequestService(prisma, audit, outbox, planning);
+  const feedback = new TicketFeedbackService(
+    prisma,
+    new TicketAccessPolicyService(prisma),
+    audit,
+    outbox,
+    new EventEmitter2(),
+  );
   let tickets: TicketsService;
   let redis: RedisService;
   let limiter: ResilientThrottlerStorage;
@@ -1109,5 +1125,365 @@ describe('Real MySQL/Redis integration (disposable containers only)', () => {
         where: { ticketId: ticket.id, kind: 'WARNING' },
       }),
     ).toBe(1);
+  });
+
+  async function leaveFixture() {
+    await prisma.slaPolicy.upsert({
+      where: { id: 1 },
+      create: { id: 1, config: DEFAULT_SLA_POLICY },
+      update: { config: DEFAULT_SLA_POLICY },
+    });
+    const department = await prisma.department.create({
+      data: { name: randomUUID() },
+    });
+    const manager = await prisma.user.create({
+      data: {
+        name: 'Quản lý',
+        email: `${randomUUID()}@test.invalid`,
+        passwordHash: 'test-only',
+        role: 'MANAGER',
+        departmentId: department.id,
+      },
+    });
+    const requester = await prisma.user.create({
+      data: {
+        name: 'Người nghỉ',
+        email: `${randomUUID()}@test.invalid`,
+        passwordHash: 'test-only',
+        departmentId: department.id,
+        managerId: manager.id,
+      },
+    });
+    return {
+      actor: { userId: requester.id, role: 'EMPLOYEE' as const },
+      manager: { userId: manager.id, role: 'MANAGER' as const },
+      department,
+    };
+  }
+
+  it('reserves annual leave atomically, releases cancellations and keeps approval from charging twice', async () => {
+    const { actor, manager } = await leaveFixture();
+    const base = {
+      startDate: '2035-01-08',
+      endDate: '2035-01-08',
+      reason: 'Việc gia đình',
+      type: 'ANNUAL' as const,
+      period: 'MORNING' as const,
+    };
+    await expect(leave.create(base, actor)).rejects.toThrow('not configured');
+    await planning.setEntitlement(
+      actor.userId,
+      2035,
+      { days: 0.5, version: 0 },
+      admin,
+    );
+    const parallel = await Promise.allSettled([
+      leave.create(base, actor),
+      leave.create(
+        { ...base, startDate: '2035-01-09', endDate: '2035-01-09' },
+        actor,
+      ),
+    ]);
+    const successes = parallel.filter(
+      (
+        result,
+      ): result is PromiseFulfilledResult<
+        Awaited<ReturnType<typeof leave.create>>
+      > => result.status === 'fulfilled',
+    );
+    expect(successes).toHaveLength(1);
+    expect(await planning.getBalance({ year: 2035 }, actor)).toMatchObject({
+      used: 0,
+      reserved: 0.5,
+      remaining: 0,
+    });
+    await expect(
+      planning.setEntitlement(
+        actor.userId,
+        2035,
+        { days: 0, version: 1 },
+        admin,
+      ),
+    ).rejects.toThrow('lower');
+    await leave.cancel(successes[0].value.id, actor);
+    expect(await planning.getBalance({ year: 2035 }, actor)).toMatchObject({
+      reserved: 0,
+      remaining: 0.5,
+    });
+    const request = await leave.create(base, actor);
+    await leave.approve(request.id, manager);
+    expect(await planning.getBalance({ year: 2035 }, actor)).toMatchObject({
+      used: 0.5,
+      reserved: 0,
+      remaining: 0,
+    });
+    await expect(leave.approve(request.id, manager)).rejects.toThrow('already');
+    await expect(
+      planning.getBalance({ year: 2035, userId: actor.userId }, outsider),
+    ).rejects.toThrow('Forbidden');
+  });
+
+  it('supports complementary half-days, excludes holidays and keeps saved units and private reasons out of team calendars', async () => {
+    const { actor, manager, department } = await leaveFixture();
+    const base = {
+      startDate: '2035-01-08',
+      endDate: '2035-01-08',
+      reason: 'Thông tin riêng tư',
+      type: 'UNPAID' as const,
+      period: 'MORNING' as const,
+    };
+    const morning = await leave.create(base, actor);
+    const afternoon = await leave.create(
+      { ...base, period: 'AFTERNOON' },
+      actor,
+    );
+    expect(morning.days[0].halfDays + afternoon.days[0].halfDays).toBe(2);
+    await expect(
+      leave.create({ ...base, type: 'SICK' }, actor),
+    ).rejects.toThrow('overlaps');
+    await expect(
+      leave.create({ ...base, period: 'FULL_DAY' }, actor),
+    ).rejects.toThrow('overlaps');
+    await expect(
+      leave.create({ ...base, endDate: '2035-01-09' }, actor),
+    ).rejects.toThrow('same date');
+    const calendar = await planning.calendar(
+      { month: '2035-01', page: 1 },
+      actor,
+    );
+    expect(calendar.items).toHaveLength(2);
+    expect(JSON.stringify(calendar)).not.toContain(base.reason);
+    expect(calendar.items[0]).not.toHaveProperty('type');
+    await expect(
+      planning.calendar(
+        { month: '2035-01', page: 1, departmentId: department.id },
+        outsider,
+      ),
+    ).rejects.toThrow('Forbidden');
+    await expect(leave.findOne(morning.id, outsider)).rejects.toThrow(
+      'not found',
+    );
+    const policy = { ...DEFAULT_SLA_POLICY, holidays: ['2035-01-09'] };
+    await prisma.slaPolicy.update({
+      where: { id: 1 },
+      data: { config: policy },
+    });
+    const unpaid = await leave.create(
+      {
+        ...base,
+        period: 'FULL_DAY',
+        startDate: '2035-01-09',
+        endDate: '2035-01-10',
+      },
+      actor,
+    );
+    expect(unpaid.days).toEqual([
+      { date: new Date('2035-01-10T00:00:00Z'), halfDays: 2 },
+    ]);
+    await prisma.slaPolicy.update({
+      where: { id: 1 },
+      data: { config: { ...policy, holidays: ['2035-01-08', '2035-01-10'] } },
+    });
+    await leave.approve(unpaid.id, manager);
+    expect((await leave.findOne(unpaid.id, actor)).days).toHaveLength(1);
+    expect(await planning.getBalance({ year: 2035 }, actor)).toMatchObject({
+      allowance: null,
+      used: 0,
+      reserved: 0,
+    });
+    const legacy = await prisma.leaveRequest.create({
+      data: {
+        requesterId: actor.userId,
+        approverId: manager.userId,
+        startDate: new Date('2035-02-01'),
+        endDate: new Date('2035-02-02'),
+        reason: 'Old leave',
+      },
+    });
+    expect(legacy.type).toBe('LEGACY');
+    expect(await planning.getBalance({ year: 2035 }, actor)).toMatchObject({
+      legacyRequests: 1,
+    });
+    const enqueue = jest
+      .spyOn(outbox, 'enqueue')
+      .mockRejectedValueOnce(new Error('forced leave outbox failure'));
+    await expect(
+      leave.create(
+        { ...base, startDate: '2035-03-05', endDate: '2035-03-05' },
+        actor,
+      ),
+    ).rejects.toThrow('forced leave');
+    expect(
+      await prisma.leaveDay.count({
+        where: {
+          request: { requesterId: actor.userId },
+          date: new Date('2035-03-05'),
+        },
+      }),
+    ).toBe(0);
+    enqueue.mockRestore();
+  });
+
+  it('requires requester confirmation, rejects stale cycles, preserves original SLA and serializes competing responses', async () => {
+    const ticket = await createTicket();
+    await tickets.updateStatus(ticket.id, { status: 'IN_PROGRESS' }, admin);
+    const resolved = await tickets.updateStatus(
+      ticket.id,
+      { status: 'RESOLVED' },
+      admin,
+    );
+    const before = await prisma.ticket.findUniqueOrThrow({
+      where: { id: ticket.id },
+    });
+    await expect(
+      tickets.updateStatus(ticket.id, { status: 'CLOSED' }, admin),
+    ).rejects.toThrow('Only the requester');
+    await expect(
+      feedback.confirm(
+        ticket.id,
+        { resolutionVersion: resolved.resolutionVersion },
+        admin,
+      ),
+    ).rejects.toThrow('Only the requester');
+    await feedback.reopen(
+      ticket.id,
+      {
+        resolutionVersion: resolved.resolutionVersion,
+        reason: 'Vẫn chưa truy cập VPN được',
+      },
+      employee,
+    );
+    expect(
+      await prisma.ticket.findUniqueOrThrow({ where: { id: ticket.id } }),
+    ).toMatchObject({
+      status: 'IN_PROGRESS',
+      resolveAt: null,
+      dueAt: before.dueAt,
+      assignedToId: before.assignedToId,
+    });
+    const resolvedAgain = await tickets.updateStatus(
+      ticket.id,
+      { status: 'RESOLVED' },
+      admin,
+    );
+    expect(resolvedAgain.resolutionVersion).toBe(
+      resolved.resolutionVersion + 1,
+    );
+    await expect(
+      feedback.confirm(
+        ticket.id,
+        { resolutionVersion: resolved.resolutionVersion },
+        employee,
+      ),
+    ).rejects.toThrow('changed');
+    const races = await Promise.allSettled([
+      feedback.confirm(
+        ticket.id,
+        { resolutionVersion: resolvedAgain.resolutionVersion },
+        employee,
+      ),
+      feedback.reopen(
+        ticket.id,
+        {
+          resolutionVersion: resolvedAgain.resolutionVersion,
+          reason: 'VPN vẫn còn lỗi',
+        },
+        employee,
+      ),
+    ]);
+    expect(
+      races.filter((result) => result.status === 'fulfilled'),
+    ).toHaveLength(1);
+    let final = await prisma.ticket.findUniqueOrThrow({
+      where: { id: ticket.id },
+    });
+    if (final.status === 'IN_PROGRESS') {
+      const last = await tickets.updateStatus(
+        ticket.id,
+        { status: 'RESOLVED' },
+        admin,
+      );
+      await feedback.confirm(
+        ticket.id,
+        { resolutionVersion: last.resolutionVersion },
+        employee,
+      );
+      final = await prisma.ticket.findUniqueOrThrow({
+        where: { id: ticket.id },
+      });
+    }
+    expect(final).toMatchObject({ status: 'CLOSED', dueAt: before.dueAt });
+    expect(final.confirmedAt).not.toBeNull();
+    expect(
+      await prisma.ticketComment.count({
+        where: {
+          ticketId: ticket.id,
+          content: { contains: 'Yêu cầu xử lý tiếp' },
+        },
+      }),
+    ).toBeGreaterThan(0);
+    await expect(
+      feedback.rate(ticket.id, { score: 1 }, employee),
+    ).rejects.toThrow('reason');
+    await expect(
+      feedback.rate(ticket.id, { score: 5 }, outsider),
+    ).rejects.toThrow('Only the requester');
+    const ratings = await Promise.allSettled([
+      feedback.rate(ticket.id, { score: 5 }, employee),
+      feedback.rate(ticket.id, { score: 4 }, employee),
+    ]);
+    expect(
+      ratings.filter((result) => result.status === 'fulfilled'),
+    ).toHaveLength(1);
+    expect(
+      await prisma.ticketFeedback.count({ where: { ticketId: ticket.id } }),
+    ).toBe(1);
+    await expect(feedback.get(ticket.id, outsider)).rejects.toThrow();
+  });
+
+  it('rolls back requester responses and ratings if audit or outbox fails', async () => {
+    const ticket = await createTicket();
+    await tickets.updateStatus(ticket.id, { status: 'IN_PROGRESS' }, admin);
+    const resolved = await tickets.updateStatus(
+      ticket.id,
+      { status: 'RESOLVED' },
+      admin,
+    );
+    const enqueue = jest
+      .spyOn(outbox, 'enqueue')
+      .mockRejectedValueOnce(new Error('forced result outbox failure'));
+    await expect(
+      feedback.reopen(
+        ticket.id,
+        {
+          resolutionVersion: resolved.resolutionVersion,
+          reason: 'Cần hỗ trợ tiếp',
+        },
+        employee,
+      ),
+    ).rejects.toThrow('forced result');
+    expect(
+      await prisma.ticket.findUniqueOrThrow({ where: { id: ticket.id } }),
+    ).toMatchObject({ status: 'RESOLVED' });
+    expect(
+      await prisma.ticketComment.count({ where: { ticketId: ticket.id } }),
+    ).toBe(0);
+    enqueue.mockRestore();
+    await feedback.confirm(
+      ticket.id,
+      { resolutionVersion: resolved.resolutionVersion },
+      employee,
+    );
+    jest
+      .spyOn(audit, 'create')
+      .mockRejectedValueOnce(new Error('forced feedback audit failure'));
+    await expect(
+      feedback.rate(ticket.id, { score: 5 }, employee),
+    ).rejects.toThrow('forced feedback');
+    expect(
+      await prisma.ticketFeedback.findUnique({
+        where: { ticketId: ticket.id },
+      }),
+    ).toBeNull();
   });
 });

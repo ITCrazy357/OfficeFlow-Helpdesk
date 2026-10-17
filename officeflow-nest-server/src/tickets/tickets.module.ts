@@ -12,10 +12,12 @@ import { TicketWorkflowService } from './ticket-workflow.service';
 import { TicketAttachmentService } from './ticket-attachment.service';
 import { TicketCommentService } from './ticket-comment.service';
 import { SlaModule } from '../sla/sla.module';
+import { TicketFeedbackController } from './ticket-feedback.controller';
+import { TicketFeedbackService } from './ticket-feedback.service';
 
 @Module({
   imports: [AuthModule, CloudinaryModule, AuditLogsModule, SlaModule],
-  controllers: [TicketsController],
+  controllers: [TicketsController, TicketFeedbackController],
   providers: [
     TicketsService,
     TicketAccessPolicyService,
@@ -23,6 +25,7 @@ import { SlaModule } from '../sla/sla.module';
     TicketWorkflowService,
     TicketAttachmentService,
     TicketCommentService,
+    TicketFeedbackService,
   ],
 })
 export class TicketsModule {}

@@ -285,6 +285,8 @@ export class TicketQueryService {
     const ticket = await this.prisma.ticket.findUnique({
       where: { id },
       select: {
+        resolutionVersion: true,
+        confirmedAt: true,
         id: true,
         title: true,
         description: true,
