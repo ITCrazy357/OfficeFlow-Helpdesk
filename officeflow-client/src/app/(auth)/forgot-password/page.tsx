@@ -53,7 +53,7 @@ export default function ForgotPasswordPage() {
 
   return (
     <main className="grid min-h-[100dvh] place-items-center bg-background px-4 py-10">
-      <Card className="w-full max-w-md border-white/80 bg-white/95 shadow-xl shadow-slate-200/80 motion-panel">
+      <Card className="w-full max-w-md border-border bg-card motion-panel">
         <CardHeader className="space-y-4 border-b">
           <div className="grid size-11 place-items-center rounded-xl bg-teal-950 text-white">
             {requestAccepted ? (
@@ -79,7 +79,7 @@ export default function ForgotPasswordPage() {
             <div className="grid gap-4">
               <p
                 aria-live="polite"
-                className="rounded-lg border border-teal-900/10 bg-teal-50 px-4 py-3 text-sm leading-6 text-teal-950"
+                className="rounded-lg border border-teal-900/10 bg-teal-50 dark:bg-teal-400/10 px-4 py-3 text-sm leading-6 text-teal-950 dark:text-teal-200"
               >
                 Vì lý do bảo mật, hệ thống luôn hiển thị thông báo này dù email
                 có tồn tại hay không. Liên kết hợp lệ trong 15 phút và chỉ dùng
@@ -127,7 +127,7 @@ export default function ForgotPasswordPage() {
 
               <Button
                 type="submit"
-                className="w-full bg-teal-950 hover:bg-teal-900"
+                className="w-full bg-primary text-primary-foreground hover:bg-primary/90"
                 disabled={forgotPassword.isPending}
               >
                 <Mail className="size-4" />

@@ -79,10 +79,6 @@ export default function NewLeaveRequestPage() {
             Quay lại
           </Link>
         </Button>
-        <div className="mb-2 inline-flex items-center gap-2 rounded-full border bg-muted/60 px-3 py-1 text-xs font-medium text-muted-foreground">
-          <CalendarClock className="size-3.5" />
-          Đơn mới
-        </div>
         <h1 className="text-2xl font-semibold tracking-normal">
           Tạo đơn nghỉ phép
         </h1>
@@ -91,7 +87,7 @@ export default function NewLeaveRequestPage() {
         </p>
       </section>
 
-      <div className="grid gap-6 lg:grid-cols-[1fr_360px]">
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
         <Card className="shadow-sm motion-panel">
           <CardHeader className="border-b">
             <CardTitle>Thông tin đơn nghỉ</CardTitle>

@@ -25,7 +25,6 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 import { cn } from "@/components/ui/utils";
 import type { AuthUser } from "@/features/auth/types";
 import { getApiErrorMessage } from "@/lib/axios";
@@ -86,7 +85,7 @@ function getAttachmentVisual(attachment: TicketAttachment) {
   if (fileType.startsWith("image/")) {
     return {
       icon: FileImage,
-      tone: "bg-emerald-50 text-emerald-700 ring-emerald-100",
+      tone: "bg-emerald-50 dark:bg-emerald-400/10 text-emerald-700 dark:text-emerald-200 ring-emerald-100",
       label: "Ảnh",
     };
   }
@@ -94,7 +93,7 @@ function getAttachmentVisual(attachment: TicketAttachment) {
   if (fileType.startsWith("video/")) {
     return {
       icon: FileVideo,
-      tone: "bg-sky-50 text-sky-700 ring-sky-100",
+      tone: "bg-sky-50 dark:bg-sky-400/10 text-sky-700 dark:text-sky-200 ring-sky-100",
       label: "Video",
     };
   }
@@ -107,14 +106,14 @@ function getAttachmentVisual(attachment: TicketAttachment) {
   ) {
     return {
       icon: FileArchive,
-      tone: "bg-amber-50 text-amber-700 ring-amber-100",
+      tone: "bg-amber-50 dark:bg-amber-400/10 text-amber-700 dark:text-amber-200 ring-amber-100",
       label: "Nén",
     };
   }
 
   return {
     icon: FileText,
-    tone: "bg-teal-50 text-teal-800 ring-teal-100",
+    tone: "bg-teal-50 dark:bg-teal-400/10 text-teal-800 dark:text-teal-200 ring-teal-100",
     label: getFileExtension(attachment.fileName),
   };
 }
@@ -327,7 +326,7 @@ export function TicketAttachments({
             className={cn(
               "rounded-lg border border-dashed bg-muted/25 p-4 transition-colors",
               isDragging
-                ? "border-teal-400 bg-teal-50 text-teal-950"
+                ? "border-teal-400 bg-teal-50 dark:bg-teal-400/10 text-teal-950 dark:text-teal-200"
                 : "border-border hover:border-teal-200 hover:bg-teal-50/40",
               isUploading && "pointer-events-none opacity-80",
             )}
@@ -337,7 +336,7 @@ export function TicketAttachments({
           >
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div className="flex items-center gap-3">
-                <div className="grid size-10 shrink-0 place-items-center rounded-lg bg-card text-teal-800 ring-1 ring-border">
+                <div className="grid size-10 shrink-0 place-items-center rounded-lg bg-card text-teal-800 dark:text-teal-200 ring-1 ring-border">
                   {isUploading ? (
                     <Loader2 className="size-5 animate-spin" />
                   ) : (
@@ -363,10 +362,11 @@ export function TicketAttachments({
                 Chọn tệp
               </Button>
             </div>
-            <Input
+            <input
               ref={fileInputRef}
               type="file"
               className="sr-only"
+              aria-label="Chọn tệp đính kèm ticket"
               disabled={isUploading}
               onChange={(event) => void handleFiles(event.target.files)}
             />

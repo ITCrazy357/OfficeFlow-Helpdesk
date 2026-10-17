@@ -53,7 +53,7 @@ function NotificationRow({
         "motion-card relative w-full rounded-lg border text-left transition-colors",
         notification.isRead
           ? "bg-card hover:bg-muted/35"
-          : "border-teal-200 bg-teal-50/55 hover:bg-teal-50",
+          : "border-teal-200 dark:border-teal-400/25 bg-teal-50/55 dark:bg-teal-400/10 hover:bg-teal-50",
       )}
       style={{ "--motion-index": index } as CSSProperties}
     >

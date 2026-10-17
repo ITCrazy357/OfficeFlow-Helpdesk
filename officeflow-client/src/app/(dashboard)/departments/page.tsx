@@ -1,7 +1,7 @@
 "use client";
 
 import type { CSSProperties } from "react";
-import { AlertCircle, Building2, Layers3 } from "lucide-react";
+import { AlertCircle, Layers3 } from "lucide-react";
 
 import {
   Card,
@@ -82,12 +82,8 @@ export default function DepartmentsPage() {
     <div className="grid gap-6 motion-enter">
       <section className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <div className="mb-2 inline-flex items-center gap-2 rounded-full border bg-muted/60 px-3 py-1 text-xs font-medium text-muted-foreground">
-            <Building2 className="size-3.5" />
-            Organization module
-          </div>
           <h1 className="text-2xl font-semibold tracking-normal">
-            Departments
+            Phòng ban
           </h1>
           <p className="mt-1 text-sm text-muted-foreground">
             Danh sách phòng ban đang được dùng trong hệ thống.
@@ -104,7 +100,7 @@ export default function DepartmentsPage() {
             <CardDescription>Tổng phòng ban</CardDescription>
             <CardTitle className="flex items-center gap-2 text-3xl">
               {departments.length}
-              <Layers3 className="size-5 text-teal-800" />
+              <Layers3 className="size-5 text-teal-800 dark:text-teal-200" />
             </CardTitle>
           </CardHeader>
         </Card>

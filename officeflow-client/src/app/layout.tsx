@@ -14,7 +14,10 @@ export default function RootLayout({
   children: ReactNode;
 }>) {
   return (
-    <html lang="vi">
+    <html lang="vi" suppressHydrationWarning>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: `(function(){var t;try{t=localStorage.getItem('officeflow-theme')}catch(e){}document.documentElement.classList.toggle('dark',t==='dark'||(t!=='light'&&t!=='dark'&&matchMedia('(prefers-color-scheme: dark)').matches))})()` }} />
+      </head>
       <body className="bg-background text-foreground antialiased">
         <AppQueryClientProvider>{children}</AppQueryClientProvider>
       </body>

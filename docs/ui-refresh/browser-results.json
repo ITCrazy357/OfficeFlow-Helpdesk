@@ -1,0 +1,968 @@
+{
+  "fixtureOnly": true,
+  "results": [
+    {
+      "route": "/dashboard",
+      "theme": "light",
+      "width": 1440,
+      "overflow": false,
+      "heading": "Tổng quan vận hành",
+      "offenders": []
+    },
+    {
+      "route": "/tickets",
+      "theme": "light",
+      "width": 1440,
+      "overflow": false,
+      "heading": "Tickets",
+      "offenders": []
+    },
+    {
+      "route": "/tickets/new",
+      "theme": "light",
+      "width": 1440,
+      "overflow": false,
+      "heading": "Tạo ticket mới",
+      "offenders": []
+    },
+    {
+      "route": "/tickets/1",
+      "theme": "light",
+      "width": 1440,
+      "overflow": false,
+      "heading": "#1 Không thể kết nối VPN khi làm việc từ xa",
+      "offenders": []
+    },
+    {
+      "route": "/assets",
+      "theme": "light",
+      "width": 1440,
+      "overflow": false,
+      "heading": "Quản lý tài sản",
+      "offenders": []
+    },
+    {
+      "route": "/assets/new",
+      "theme": "light",
+      "width": 1440,
+      "overflow": false,
+      "heading": "Thêm tài sản mới",
+      "offenders": []
+    },
+    {
+      "route": "/assets/1",
+      "theme": "light",
+      "width": 1440,
+      "overflow": false,
+      "heading": "Laptop đội vận hành",
+      "offenders": []
+    },
+    {
+      "route": "/assets/1/edit",
+      "theme": "light",
+      "width": 1440,
+      "overflow": false,
+      "heading": "Chỉnh sửa tài sản",
+      "offenders": []
+    },
+    {
+      "route": "/knowledge",
+      "theme": "light",
+      "width": 1440,
+      "overflow": false,
+      "heading": "Trung tâm trợ giúp",
+      "offenders": []
+    },
+    {
+      "route": "/leave-requests",
+      "theme": "light",
+      "width": 1440,
+      "overflow": false,
+      "heading": "Đơn nghỉ phép",
+      "offenders": []
+    },
+    {
+      "route": "/leave-requests/new",
+      "theme": "light",
+      "width": 1440,
+      "overflow": false,
+      "heading": "Tạo đơn nghỉ phép",
+      "offenders": []
+    },
+    {
+      "route": "/leave-requests/1",
+      "theme": "light",
+      "width": 1440,
+      "overflow": false,
+      "heading": "20/10/2026 - 21/10/2026",
+      "offenders": []
+    },
+    {
+      "route": "/notifications",
+      "theme": "light",
+      "width": 1440,
+      "overflow": false,
+      "heading": "Tất cả thông báo",
+      "offenders": []
+    },
+    {
+      "route": "/departments",
+      "theme": "light",
+      "width": 1440,
+      "overflow": false,
+      "heading": "Phòng ban",
+      "offenders": []
+    },
+    {
+      "route": "/users",
+      "theme": "light",
+      "width": 1440,
+      "overflow": false,
+      "heading": "Quản lý người dùng",
+      "offenders": []
+    },
+    {
+      "route": "/ticket-categories",
+      "theme": "light",
+      "width": 1440,
+      "overflow": false,
+      "heading": "Danh mục ticket",
+      "offenders": []
+    },
+    {
+      "route": "/audit-logs",
+      "theme": "light",
+      "width": 1440,
+      "overflow": false,
+      "heading": "Audit Logs",
+      "offenders": []
+    },
+    {
+      "route": "/sla",
+      "theme": "light",
+      "width": 1440,
+      "overflow": false,
+      "heading": "Chính sách SLA",
+      "offenders": []
+    },
+    {
+      "route": "/change-password",
+      "theme": "light",
+      "width": 1440,
+      "overflow": false,
+      "heading": "Đổi mật khẩu",
+      "offenders": []
+    },
+    {
+      "route": "/dashboard",
+      "theme": "light",
+      "width": 390,
+      "overflow": false,
+      "heading": "Tổng quan vận hành",
+      "offenders": []
+    },
+    {
+      "route": "/tickets",
+      "theme": "light",
+      "width": 390,
+      "overflow": false,
+      "heading": "Tickets",
+      "offenders": []
+    },
+    {
+      "route": "/tickets/new",
+      "theme": "light",
+      "width": 390,
+      "overflow": false,
+      "heading": "Tạo ticket mới",
+      "offenders": []
+    },
+    {
+      "route": "/tickets/1",
+      "theme": "light",
+      "width": 390,
+      "overflow": false,
+      "heading": "#1 Không thể kết nối VPN khi làm việc từ xa",
+      "offenders": []
+    },
+    {
+      "route": "/assets",
+      "theme": "light",
+      "width": 390,
+      "overflow": false,
+      "heading": "Quản lý tài sản",
+      "offenders": []
+    },
+    {
+      "route": "/assets/new",
+      "theme": "light",
+      "width": 390,
+      "overflow": false,
+      "heading": "Thêm tài sản mới",
+      "offenders": []
+    },
+    {
+      "route": "/assets/1",
+      "theme": "light",
+      "width": 390,
+      "overflow": false,
+      "heading": "Laptop đội vận hành",
+      "offenders": []
+    },
+    {
+      "route": "/assets/1/edit",
+      "theme": "light",
+      "width": 390,
+      "overflow": false,
+      "heading": "Chỉnh sửa tài sản",
+      "offenders": []
+    },
+    {
+      "route": "/knowledge",
+      "theme": "light",
+      "width": 390,
+      "overflow": false,
+      "heading": "Trung tâm trợ giúp",
+      "offenders": []
+    },
+    {
+      "route": "/leave-requests",
+      "theme": "light",
+      "width": 390,
+      "overflow": false,
+      "heading": "Đơn nghỉ phép",
+      "offenders": []
+    },
+    {
+      "route": "/leave-requests/new",
+      "theme": "light",
+      "width": 390,
+      "overflow": false,
+      "heading": "Tạo đơn nghỉ phép",
+      "offenders": []
+    },
+    {
+      "route": "/leave-requests/1",
+      "theme": "light",
+      "width": 390,
+      "overflow": false,
+      "heading": "20/10/2026 - 21/10/2026",
+      "offenders": []
+    },
+    {
+      "route": "/notifications",
+      "theme": "light",
+      "width": 390,
+      "overflow": false,
+      "heading": "Tất cả thông báo",
+      "offenders": []
+    },
+    {
+      "route": "/departments",
+      "theme": "light",
+      "width": 390,
+      "overflow": false,
+      "heading": "Phòng ban",
+      "offenders": []
+    },
+    {
+      "route": "/users",
+      "theme": "light",
+      "width": 390,
+      "overflow": false,
+      "heading": "Quản lý người dùng",
+      "offenders": []
+    },
+    {
+      "route": "/ticket-categories",
+      "theme": "light",
+      "width": 390,
+      "overflow": false,
+      "heading": "Danh mục ticket",
+      "offenders": []
+    },
+    {
+      "route": "/audit-logs",
+      "theme": "light",
+      "width": 390,
+      "overflow": false,
+      "heading": "Audit Logs",
+      "offenders": []
+    },
+    {
+      "route": "/sla",
+      "theme": "light",
+      "width": 390,
+      "overflow": false,
+      "heading": "Chính sách SLA",
+      "offenders": []
+    },
+    {
+      "route": "/change-password",
+      "theme": "light",
+      "width": 390,
+      "overflow": false,
+      "heading": "Đổi mật khẩu",
+      "offenders": []
+    },
+    {
+      "route": "/dashboard",
+      "theme": "dark",
+      "width": 1440,
+      "overflow": false,
+      "heading": "Tổng quan vận hành",
+      "offenders": []
+    },
+    {
+      "route": "/tickets",
+      "theme": "dark",
+      "width": 1440,
+      "overflow": false,
+      "heading": "Tickets",
+      "offenders": []
+    },
+    {
+      "route": "/tickets/new",
+      "theme": "dark",
+      "width": 1440,
+      "overflow": false,
+      "heading": "Tạo ticket mới",
+      "offenders": []
+    },
+    {
+      "route": "/tickets/1",
+      "theme": "dark",
+      "width": 1440,
+      "overflow": false,
+      "heading": "#1 Không thể kết nối VPN khi làm việc từ xa",
+      "offenders": []
+    },
+    {
+      "route": "/assets",
+      "theme": "dark",
+      "width": 1440,
+      "overflow": false,
+      "heading": "Quản lý tài sản",
+      "offenders": []
+    },
+    {
+      "route": "/assets/new",
+      "theme": "dark",
+      "width": 1440,
+      "overflow": false,
+      "heading": "Thêm tài sản mới",
+      "offenders": []
+    },
+    {
+      "route": "/assets/1",
+      "theme": "dark",
+      "width": 1440,
+      "overflow": false,
+      "heading": "Laptop đội vận hành",
+      "offenders": []
+    },
+    {
+      "route": "/assets/1/edit",
+      "theme": "dark",
+      "width": 1440,
+      "overflow": false,
+      "heading": "Chỉnh sửa tài sản",
+      "offenders": []
+    },
+    {
+      "route": "/knowledge",
+      "theme": "dark",
+      "width": 1440,
+      "overflow": false,
+      "heading": "Trung tâm trợ giúp",
+      "offenders": []
+    },
+    {
+      "route": "/leave-requests",
+      "theme": "dark",
+      "width": 1440,
+      "overflow": false,
+      "heading": "Đơn nghỉ phép",
+      "offenders": []
+    },
+    {
+      "route": "/leave-requests/new",
+      "theme": "dark",
+      "width": 1440,
+      "overflow": false,
+      "heading": "Tạo đơn nghỉ phép",
+      "offenders": []
+    },
+    {
+      "route": "/leave-requests/1",
+      "theme": "dark",
+      "width": 1440,
+      "overflow": false,
+      "heading": "20/10/2026 - 21/10/2026",
+      "offenders": []
+    },
+    {
+      "route": "/notifications",
+      "theme": "dark",
+      "width": 1440,
+      "overflow": false,
+      "heading": "Tất cả thông báo",
+      "offenders": []
+    },
+    {
+      "route": "/departments",
+      "theme": "dark",
+      "width": 1440,
+      "overflow": false,
+      "heading": "Phòng ban",
+      "offenders": []
+    },
+    {
+      "route": "/users",
+      "theme": "dark",
+      "width": 1440,
+      "overflow": false,
+      "heading": "Quản lý người dùng",
+      "offenders": []
+    },
+    {
+      "route": "/ticket-categories",
+      "theme": "dark",
+      "width": 1440,
+      "overflow": false,
+      "heading": "Danh mục ticket",
+      "offenders": []
+    },
+    {
+      "route": "/audit-logs",
+      "theme": "dark",
+      "width": 1440,
+      "overflow": false,
+      "heading": "Audit Logs",
+      "offenders": []
+    },
+    {
+      "route": "/sla",
+      "theme": "dark",
+      "width": 1440,
+      "overflow": false,
+      "heading": "Chính sách SLA",
+      "offenders": []
+    },
+    {
+      "route": "/change-password",
+      "theme": "dark",
+      "width": 1440,
+      "overflow": false,
+      "heading": "Đổi mật khẩu",
+      "offenders": []
+    },
+    {
+      "route": "/dashboard",
+      "theme": "dark",
+      "width": 390,
+      "overflow": false,
+      "heading": "Tổng quan vận hành",
+      "offenders": []
+    },
+    {
+      "route": "/tickets",
+      "theme": "dark",
+      "width": 390,
+      "overflow": false,
+      "heading": "Tickets",
+      "offenders": []
+    },
+    {
+      "route": "/tickets/new",
+      "theme": "dark",
+      "width": 390,
+      "overflow": false,
+      "heading": "Tạo ticket mới",
+      "offenders": []
+    },
+    {
+      "route": "/tickets/1",
+      "theme": "dark",
+      "width": 390,
+      "overflow": false,
+      "heading": "#1 Không thể kết nối VPN khi làm việc từ xa",
+      "offenders": []
+    },
+    {
+      "route": "/assets",
+      "theme": "dark",
+      "width": 390,
+      "overflow": false,
+      "heading": "Quản lý tài sản",
+      "offenders": []
+    },
+    {
+      "route": "/assets/new",
+      "theme": "dark",
+      "width": 390,
+      "overflow": false,
+      "heading": "Thêm tài sản mới",
+      "offenders": []
+    },
+    {
+      "route": "/assets/1",
+      "theme": "dark",
+      "width": 390,
+      "overflow": false,
+      "heading": "Laptop đội vận hành",
+      "offenders": []
+    },
+    {
+      "route": "/assets/1/edit",
+      "theme": "dark",
+      "width": 390,
+      "overflow": false,
+      "heading": "Chỉnh sửa tài sản",
+      "offenders": []
+    },
+    {
+      "route": "/knowledge",
+      "theme": "dark",
+      "width": 390,
+      "overflow": false,
+      "heading": "Trung tâm trợ giúp",
+      "offenders": []
+    },
+    {
+      "route": "/leave-requests",
+      "theme": "dark",
+      "width": 390,
+      "overflow": false,
+      "heading": "Đơn nghỉ phép",
+      "offenders": []
+    },
+    {
+      "route": "/leave-requests/new",
+      "theme": "dark",
+      "width": 390,
+      "overflow": false,
+      "heading": "Tạo đơn nghỉ phép",
+      "offenders": []
+    },
+    {
+      "route": "/leave-requests/1",
+      "theme": "dark",
+      "width": 390,
+      "overflow": false,
+      "heading": "20/10/2026 - 21/10/2026",
+      "offenders": []
+    },
+    {
+      "route": "/notifications",
+      "theme": "dark",
+      "width": 390,
+      "overflow": false,
+      "heading": "Tất cả thông báo",
+      "offenders": []
+    },
+    {
+      "route": "/departments",
+      "theme": "dark",
+      "width": 390,
+      "overflow": false,
+      "heading": "Phòng ban",
+      "offenders": []
+    },
+    {
+      "route": "/users",
+      "theme": "dark",
+      "width": 390,
+      "overflow": false,
+      "heading": "Quản lý người dùng",
+      "offenders": []
+    },
+    {
+      "route": "/ticket-categories",
+      "theme": "dark",
+      "width": 390,
+      "overflow": false,
+      "heading": "Danh mục ticket",
+      "offenders": []
+    },
+    {
+      "route": "/audit-logs",
+      "theme": "dark",
+      "width": 390,
+      "overflow": false,
+      "heading": "Audit Logs",
+      "offenders": []
+    },
+    {
+      "route": "/sla",
+      "theme": "dark",
+      "width": 390,
+      "overflow": false,
+      "heading": "Chính sách SLA",
+      "offenders": []
+    },
+    {
+      "route": "/change-password",
+      "theme": "dark",
+      "width": 390,
+      "overflow": false,
+      "heading": "Đổi mật khẩu",
+      "offenders": []
+    },
+    {
+      "route": "/dashboard",
+      "theme": "dark",
+      "width": 320,
+      "overflow": false,
+      "heading": "Tổng quan vận hành",
+      "offenders": []
+    },
+    {
+      "route": "/dashboard",
+      "theme": "dark",
+      "width": 768,
+      "overflow": false,
+      "heading": "Tổng quan vận hành",
+      "offenders": []
+    },
+    {
+      "route": "/dashboard",
+      "theme": "dark",
+      "width": 1024,
+      "overflow": false,
+      "heading": "Tổng quan vận hành",
+      "offenders": []
+    },
+    {
+      "route": "/dashboard",
+      "theme": "dark",
+      "width": 1920,
+      "overflow": false,
+      "heading": "Tổng quan vận hành",
+      "offenders": []
+    },
+    {
+      "route": "/tickets",
+      "theme": "dark-empty",
+      "width": 390,
+      "overflow": false,
+      "heading": "Tickets",
+      "offenders": []
+    },
+    {
+      "route": "/assets",
+      "theme": "dark-empty",
+      "width": 390,
+      "overflow": false,
+      "heading": "Quản lý tài sản",
+      "offenders": []
+    },
+    {
+      "route": "/knowledge",
+      "theme": "dark-empty",
+      "width": 390,
+      "overflow": false,
+      "heading": "Trung tâm trợ giúp",
+      "offenders": []
+    },
+    {
+      "route": "/leave-requests",
+      "theme": "dark-empty",
+      "width": 390,
+      "overflow": false,
+      "heading": "Đơn nghỉ phép",
+      "offenders": []
+    },
+    {
+      "route": "/login",
+      "theme": "light",
+      "width": 1440,
+      "overflow": false,
+      "heading": "Hỗ trợ nội bộ,gọn gàng hơn.",
+      "offenders": []
+    },
+    {
+      "route": "/login",
+      "theme": "light",
+      "width": 390,
+      "overflow": false,
+      "heading": "Hỗ trợ nội bộ,gọn gàng hơn.",
+      "offenders": []
+    },
+    {
+      "route": "/forgot-password",
+      "theme": "light",
+      "width": 1440,
+      "overflow": false,
+      "heading": "Quên mật khẩu",
+      "offenders": []
+    },
+    {
+      "route": "/forgot-password",
+      "theme": "light",
+      "width": 390,
+      "overflow": false,
+      "heading": "Quên mật khẩu",
+      "offenders": []
+    },
+    {
+      "route": "/reset-password",
+      "theme": "light",
+      "width": 1440,
+      "overflow": false,
+      "heading": "Liên kết không hợp lệ",
+      "offenders": []
+    },
+    {
+      "route": "/reset-password",
+      "theme": "light",
+      "width": 390,
+      "overflow": false,
+      "heading": "Liên kết không hợp lệ",
+      "offenders": []
+    },
+    {
+      "route": "/login",
+      "theme": "dark",
+      "width": 1440,
+      "overflow": false,
+      "heading": "Hỗ trợ nội bộ,gọn gàng hơn.",
+      "offenders": []
+    },
+    {
+      "route": "/login",
+      "theme": "dark",
+      "width": 390,
+      "overflow": false,
+      "heading": "Hỗ trợ nội bộ,gọn gàng hơn.",
+      "offenders": []
+    },
+    {
+      "route": "/forgot-password",
+      "theme": "dark",
+      "width": 1440,
+      "overflow": false,
+      "heading": "Quên mật khẩu",
+      "offenders": []
+    },
+    {
+      "route": "/forgot-password",
+      "theme": "dark",
+      "width": 390,
+      "overflow": false,
+      "heading": "Quên mật khẩu",
+      "offenders": []
+    },
+    {
+      "route": "/reset-password",
+      "theme": "dark",
+      "width": 1440,
+      "overflow": false,
+      "heading": "Liên kết không hợp lệ",
+      "offenders": []
+    },
+    {
+      "route": "/reset-password",
+      "theme": "dark",
+      "width": 390,
+      "overflow": false,
+      "heading": "Liên kết không hợp lệ",
+      "offenders": []
+    }
+  ],
+  "errors": [],
+  "unmatched": [],
+  "accessibility": [
+    {
+      "route": "/dashboard",
+      "theme": "light",
+      "violations": []
+    },
+    {
+      "route": "/tickets",
+      "theme": "light",
+      "violations": []
+    },
+    {
+      "route": "/tickets/new",
+      "theme": "light",
+      "violations": []
+    },
+    {
+      "route": "/tickets/1",
+      "theme": "light",
+      "violations": []
+    },
+    {
+      "route": "/assets",
+      "theme": "light",
+      "violations": []
+    },
+    {
+      "route": "/assets/new",
+      "theme": "light",
+      "violations": []
+    },
+    {
+      "route": "/assets/1",
+      "theme": "light",
+      "violations": []
+    },
+    {
+      "route": "/assets/1/edit",
+      "theme": "light",
+      "violations": []
+    },
+    {
+      "route": "/knowledge",
+      "theme": "light",
+      "violations": []
+    },
+    {
+      "route": "/leave-requests",
+      "theme": "light",
+      "violations": []
+    },
+    {
+      "route": "/leave-requests/new",
+      "theme": "light",
+      "violations": []
+    },
+    {
+      "route": "/leave-requests/1",
+      "theme": "light",
+      "violations": []
+    },
+    {
+      "route": "/notifications",
+      "theme": "light",
+      "violations": []
+    },
+    {
+      "route": "/departments",
+      "theme": "light",
+      "violations": []
+    },
+    {
+      "route": "/users",
+      "theme": "light",
+      "violations": []
+    },
+    {
+      "route": "/ticket-categories",
+      "theme": "light",
+      "violations": []
+    },
+    {
+      "route": "/audit-logs",
+      "theme": "light",
+      "violations": []
+    },
+    {
+      "route": "/sla",
+      "theme": "light",
+      "violations": []
+    },
+    {
+      "route": "/change-password",
+      "theme": "light",
+      "violations": []
+    },
+    {
+      "route": "/dashboard",
+      "theme": "dark",
+      "violations": []
+    },
+    {
+      "route": "/tickets",
+      "theme": "dark",
+      "violations": []
+    },
+    {
+      "route": "/tickets/new",
+      "theme": "dark",
+      "violations": []
+    },
+    {
+      "route": "/tickets/1",
+      "theme": "dark",
+      "violations": []
+    },
+    {
+      "route": "/assets",
+      "theme": "dark",
+      "violations": []
+    },
+    {
+      "route": "/assets/new",
+      "theme": "dark",
+      "violations": []
+    },
+    {
+      "route": "/assets/1",
+      "theme": "dark",
+      "violations": []
+    },
+    {
+      "route": "/assets/1/edit",
+      "theme": "dark",
+      "violations": []
+    },
+    {
+      "route": "/knowledge",
+      "theme": "dark",
+      "violations": []
+    },
+    {
+      "route": "/leave-requests",
+      "theme": "dark",
+      "violations": []
+    },
+    {
+      "route": "/leave-requests/new",
+      "theme": "dark",
+      "violations": []
+    },
+    {
+      "route": "/leave-requests/1",
+      "theme": "dark",
+      "violations": []
+    },
+    {
+      "route": "/notifications",
+      "theme": "dark",
+      "violations": []
+    },
+    {
+      "route": "/departments",
+      "theme": "dark",
+      "violations": []
+    },
+    {
+      "route": "/users",
+      "theme": "dark",
+      "violations": []
+    },
+    {
+      "route": "/ticket-categories",
+      "theme": "dark",
+      "violations": []
+    },
+    {
+      "route": "/audit-logs",
+      "theme": "dark",
+      "violations": []
+    },
+    {
+      "route": "/sla",
+      "theme": "dark",
+      "violations": []
+    },
+    {
+      "route": "/change-password",
+      "theme": "dark",
+      "violations": []
+    }
+  ],
+  "finalRecheck": "Repeated every light-theme accessibility scan, audit pagination naming in dark mode, and 320px header after fixes."
+}

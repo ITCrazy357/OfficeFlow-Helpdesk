@@ -45,23 +45,23 @@ export const assetStatusMeta: Record<
 > = {
   AVAILABLE: {
     label: "Sẵn sàng",
-    className: "border-emerald-200 bg-emerald-50 text-emerald-800",
+    className: "border-emerald-200 dark:border-emerald-400/25 bg-emerald-50 dark:bg-emerald-400/10 text-emerald-800 dark:text-emerald-200",
   },
   ASSIGNED: {
     label: "Đang sử dụng",
-    className: "border-sky-200 bg-sky-50 text-sky-800",
+    className: "border-sky-200 dark:border-sky-400/25 bg-sky-50 dark:bg-sky-400/10 text-sky-800 dark:text-sky-200",
   },
   MAINTENANCE: {
     label: "Đang bảo trì",
-    className: "border-amber-200 bg-amber-50 text-amber-800",
+    className: "border-amber-200 dark:border-amber-400/25 bg-amber-50 dark:bg-amber-400/10 text-amber-800 dark:text-amber-200",
   },
   RETIRED: {
     label: "Đã ngừng sử dụng",
-    className: "border-slate-200 bg-slate-100 text-slate-700",
+    className: "border-slate-200 dark:border-slate-400/25 bg-slate-100 dark:bg-slate-400/10 text-slate-700 dark:text-slate-200",
   },
   LOST: {
     label: "Thất lạc",
-    className: "border-red-200 bg-red-50 text-red-800",
+    className: "border-red-200 dark:border-red-400/25 bg-red-50 dark:bg-red-400/10 text-red-800 dark:text-red-200",
   },
 };
 

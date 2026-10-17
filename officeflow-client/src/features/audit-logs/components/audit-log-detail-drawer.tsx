@@ -40,7 +40,7 @@ function DetailRow({
 }) {
   return (
     <div className="flex items-start gap-3 border-b py-3 last:border-b-0">
-      <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-muted text-teal-800">
+      <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-muted text-teal-800 dark:text-teal-200">
         <Icon className="size-4" />
       </span>
       <div className="min-w-0">
@@ -63,7 +63,7 @@ function JsonSnapshot({
   return (
     <section className="border-t px-5 py-5">
       <div className="mb-3 flex items-center gap-2">
-        <Database className="size-4 text-teal-800" />
+        <Database className="size-4 text-teal-800 dark:text-teal-200" />
         <h3 className="text-sm font-semibold">{title}</h3>
       </div>
       {hasValue ? (
@@ -135,7 +135,7 @@ export function AuditLogDetailDrawer({
       >
         <header className="flex items-start justify-between gap-4 border-b px-5 py-5">
           <div className="flex min-w-0 items-start gap-3">
-            <span className="grid size-10 shrink-0 place-items-center rounded-lg bg-teal-50 text-teal-800">
+            <span className="grid size-10 shrink-0 place-items-center rounded-lg bg-teal-50 dark:bg-teal-400/10 text-teal-800 dark:text-teal-200">
               <ScrollText className="size-5" />
             </span>
             <div className="min-w-0">
@@ -165,7 +165,7 @@ export function AuditLogDetailDrawer({
           {auditLogQuery.isLoading ? (
             <div className="grid min-h-80 place-items-center px-5 text-center">
               <div>
-                <Loader2 className="mx-auto size-6 animate-spin text-teal-800" />
+                <Loader2 className="mx-auto size-6 animate-spin text-teal-800 dark:text-teal-200" />
                 <p className="mt-3 text-sm text-muted-foreground">
                   Đang tải chi tiết...
                 </p>

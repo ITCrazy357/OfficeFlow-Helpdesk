@@ -8,7 +8,6 @@ import { useForm } from "react-hook-form";
 import {
   AlertCircle,
   CheckCircle2,
-  FolderCog,
   Pencil,
   Plus,
   Search,
@@ -252,10 +251,6 @@ export default function TicketCategoriesPage() {
     <div className="grid gap-6 motion-enter">
       <section className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <div className="mb-2 inline-flex items-center gap-2 rounded-full border bg-muted/60 px-3 py-1 text-xs font-medium text-muted-foreground">
-            <FolderCog className="size-3.5" />
-            Cấu hình ticket
-          </div>
           <h1 className="text-2xl font-semibold tracking-normal">
             Danh mục ticket
           </h1>
@@ -264,7 +259,7 @@ export default function TicketCategoriesPage() {
           </p>
         </div>
         <div className="flex items-center gap-3 rounded-lg border bg-card px-4 py-3 shadow-sm">
-          <span className="grid size-9 place-items-center rounded-lg bg-teal-50 text-teal-800">
+          <span className="grid size-9 place-items-center rounded-lg bg-teal-50 dark:bg-teal-400/10 text-teal-800 dark:text-teal-200">
             <Tags className="size-4" />
           </span>
           <div>
@@ -275,7 +270,7 @@ export default function TicketCategoriesPage() {
       </section>
 
       {feedback ? (
-        <div className="flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-800 motion-toast">
+        <div className="flex items-center gap-2 rounded-lg border border-emerald-200 dark:border-emerald-400/25 bg-emerald-50 dark:bg-emerald-400/10 px-4 py-3 text-sm font-medium text-emerald-800 dark:text-emerald-200 motion-toast">
           <CheckCircle2 className="size-4 shrink-0" />
           {feedback}
         </div>
@@ -358,7 +353,7 @@ export default function TicketCategoriesPage() {
           <CardContent className="grid gap-4 pt-0">
             <div className="relative">
               <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-              <Input
+              <Input type="search"
                 value={keyword}
                 onChange={(event) => setKeyword(event.target.value)}
                 className="pl-9"
@@ -368,16 +363,16 @@ export default function TicketCategoriesPage() {
             </div>
 
             {deleteCandidate ? (
-              <div className="rounded-lg border border-red-200 bg-red-50 p-4 motion-panel">
+              <div className="rounded-lg border border-red-200 dark:border-red-400/25 bg-red-50 dark:bg-red-400/10 p-4 motion-panel">
                 <div className="flex items-start gap-3">
-                  <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-red-100 text-red-700">
+                  <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-red-100 dark:bg-red-400/10 text-red-700 dark:text-red-200">
                     <Trash2 className="size-4" />
                   </span>
                   <div className="min-w-0">
-                    <p className="font-medium text-red-950">
+                    <p className="font-medium text-red-950 dark:text-red-200">
                       Xóa “{getTicketCategoryLabel(deleteCandidate.name)}”?
                     </p>
-                    <p className="mt-1 text-sm text-red-800">
+                    <p className="mt-1 text-sm text-red-800 dark:text-red-200">
                       {deleteCandidate._count.tickets > 0
                         ? `${deleteCandidate._count.tickets} ticket liên quan sẽ chuyển về chưa phân loại.`
                         : "Danh mục này chưa được ticket nào sử dụng."}
@@ -447,7 +442,7 @@ export default function TicketCategoriesPage() {
                         <TableCell>
                           <Badge
                             variant="outline"
-                            className="border-teal-200 bg-teal-50 text-teal-800"
+                            className="border-teal-200 dark:border-teal-400/25 bg-teal-50 dark:bg-teal-400/10 text-teal-800 dark:text-teal-200"
                           >
                             {category._count.tickets}
                           </Badge>

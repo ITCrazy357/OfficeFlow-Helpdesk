@@ -57,7 +57,7 @@ function DetailSkeleton() {
   return (
     <div className="grid gap-6">
       <div className="h-8 w-48 rounded-full bg-muted motion-shimmer" />
-      <div className="grid gap-6 lg:grid-cols-[1fr_340px]">
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_340px]">
         <Card>
           <CardContent className="grid gap-4 pt-0">
             <div className="h-8 w-2/3 rounded-full bg-muted motion-shimmer" />
@@ -306,7 +306,7 @@ export default function LeaveRequestDetailPage() {
         </div>
       ) : null}
 
-      <div className="grid gap-6 lg:grid-cols-[1fr_340px]">
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_340px]">
         <div className="grid gap-6">
           <Card className="shadow-sm motion-panel">
             <CardHeader className="border-b">

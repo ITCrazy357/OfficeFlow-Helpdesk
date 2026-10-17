@@ -1,7 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import { DashboardHeader } from "@/components/layout/dashboard-header";
@@ -32,6 +32,7 @@ export default function DashboardLayout({ children }: Props) {
   const router = useRouter();
   const clearSession = useClearSession();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const closeSidebar = useCallback(() => setIsSidebarOpen(false), []);
   const {
     data: user,
     error,
@@ -77,7 +78,7 @@ export default function DashboardLayout({ children }: Props) {
     <div className="min-h-[100dvh] bg-background">
       <DashboardSidebar
         isOpen={isSidebarOpen}
-        onClose={() => setIsSidebarOpen(false)}
+        onClose={closeSidebar}
         userRole={user.role}
       />
       <div className="min-h-[100dvh] md:pl-64">
@@ -85,7 +86,7 @@ export default function DashboardLayout({ children }: Props) {
           user={user}
           onMenuClick={() => setIsSidebarOpen(true)}
         />
-        <main className="mx-auto w-full max-w-7xl px-4 py-7 sm:px-6 lg:px-8">
+        <main id="main-content" tabIndex={-1} className="workspace-main mx-auto w-full max-w-7xl px-4 py-7 sm:px-6 lg:px-8">
           {children}
         </main>
       </div>

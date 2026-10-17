@@ -1,6 +1,5 @@
 import type { CSSProperties } from "react";
 import {
-  CalendarOff,
   ChevronLeft,
   ChevronRight,
   Clock3,
@@ -10,6 +9,7 @@ import {
 import Link from "next/link";
 
 import { Button } from "@/components/ui/button";
+import { OfficeFlowFigure } from "@/components/ui/officeflow-figure";
 import {
   Card,
   CardContent,
@@ -230,9 +230,7 @@ export function LeaveRequestList({
           ) : (
             <div className="grid min-h-72 place-items-center px-4 text-center">
               <div className="max-w-md">
-                <div className="mx-auto mb-4 grid size-12 place-items-center rounded-xl bg-teal-50 text-teal-800">
-                  <CalendarOff className="size-5" />
-                </div>
+                <OfficeFlowFigure kind="drawer" className="mx-auto mb-2 w-36" />
                 <p className="font-medium">
                   {scope === "pending"
                     ? "Không có đơn nào đang chờ bạn duyệt"

@@ -98,7 +98,7 @@ function AssetDetailSkeleton() {
   return (
     <div className="grid gap-6">
       <div className="h-9 w-72 rounded-lg bg-muted motion-shimmer" />
-      <div className="grid gap-6 lg:grid-cols-[1fr_360px]">
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
         <div className="grid gap-6">
           <div className="h-80 rounded-lg bg-muted motion-shimmer" />
           <div className="h-64 rounded-lg bg-muted motion-shimmer" />
@@ -120,7 +120,7 @@ function DetailItem({
 }) {
   return (
     <div className="flex gap-3 rounded-lg border bg-muted/20 p-3">
-      <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-teal-950/5 text-teal-950">
+      <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-teal-950/5 dark:bg-teal-200/10 text-teal-950 dark:text-teal-200">
         <Icon className="size-4" />
       </span>
       <div className="min-w-0">
@@ -353,7 +353,7 @@ export default function AssetDetailPage() {
         ) : null}
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-[1fr_360px]">
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
         <div className="grid gap-6">
           <Card className="shadow-sm motion-panel">
             <CardHeader className="border-b">
@@ -506,7 +506,7 @@ export default function AssetDetailPage() {
                       >
                         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                           <div className="flex gap-3">
-                            <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-sky-50 text-sky-700">
+                            <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-sky-50 dark:bg-sky-400/10 text-sky-700 dark:text-sky-200">
                               <UserRound className="size-4" />
                             </span>
                             <div>
@@ -522,8 +522,8 @@ export default function AssetDetailPage() {
                             variant="outline"
                             className={
                               assignment.returnedAt
-                                ? "border-slate-200 bg-slate-50 text-slate-700"
-                                : "border-sky-200 bg-sky-50 text-sky-800"
+                                ? "border-slate-200 dark:border-slate-400/25 bg-slate-50 dark:bg-slate-400/10 text-slate-700 dark:text-slate-200"
+                                : "border-sky-200 dark:border-sky-400/25 bg-sky-50 dark:bg-sky-400/10 text-sky-800 dark:text-sky-200"
                             }
                           >
                             {assignment.returnedAt
@@ -573,7 +573,7 @@ export default function AssetDetailPage() {
             <CardContent className="pt-0">
               {asset.assignedTo ? (
                 <div className="flex gap-3">
-                  <span className="grid size-11 shrink-0 place-items-center rounded-lg bg-sky-50 text-sky-700">
+                  <span className="grid size-11 shrink-0 place-items-center rounded-lg bg-sky-50 dark:bg-sky-400/10 text-sky-700 dark:text-sky-200">
                     <UserRound className="size-5" />
                   </span>
                   <div className="min-w-0">
@@ -589,7 +589,7 @@ export default function AssetDetailPage() {
                       </p>
                     ) : null}
                     {currentAssignment ? (
-                      <p className="mt-3 text-xs font-medium text-sky-800">
+                      <p className="mt-3 text-xs font-medium text-sky-800 dark:text-sky-200">
                         Gán lúc{" "}
                         {formatAssetDate(currentAssignment.assignedAt, true)}
                       </p>
@@ -641,7 +641,7 @@ export default function AssetDetailPage() {
                   <>
                     <div className="relative">
                       <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-                      <Input
+                      <Input type="search" aria-label="Tìm tên, email, phòng ban"
                         value={userSearch}
                         onChange={(event) => setUserSearch(event.target.value)}
                         className="pl-9"
@@ -677,7 +677,7 @@ export default function AssetDetailPage() {
                         ) : null}
                       </SelectContent>
                     </Select>
-                    <div className="flex items-start gap-2 rounded-lg border border-sky-200/80 bg-sky-50/70 p-3 text-xs leading-5 text-sky-900">
+                    <div className="flex items-start gap-2 rounded-lg border border-sky-200/80 dark:border-sky-400/25 bg-sky-50/70 dark:bg-sky-400/10 p-3 text-xs leading-5 text-sky-900 dark:text-sky-200">
                       <MailCheck className="mt-0.5 size-3.5 shrink-0" />
                       <p>
                         Người nhận sẽ được gửi email cấp phát nếu tính năng
@@ -711,8 +711,8 @@ export default function AssetDetailPage() {
           ) : null}
 
           {allowManagement && asset.status === "ASSIGNED" ? (
-            <Card className="border-amber-200 bg-amber-50/40 shadow-sm motion-panel">
-              <CardHeader className="border-b border-amber-200">
+            <Card className="border-amber-200 dark:border-amber-400/25 bg-amber-50/40 dark:bg-amber-400/10 shadow-sm motion-panel">
+              <CardHeader className="border-b border-amber-200 dark:border-amber-400/25">
                 <CardTitle>Thu hồi tài sản</CardTitle>
                 <CardDescription>
                   Ghi chú tình trạng khi nhận lại nếu cần.
@@ -730,7 +730,7 @@ export default function AssetDetailPage() {
                     disabled={isReturning}
                   />
                 </div>
-                <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-white/70 p-3 text-xs leading-5 text-amber-950">
+                <div className="flex items-start gap-2 rounded-lg border border-amber-200 dark:border-amber-400/25 bg-card p-3 text-xs leading-5 text-amber-950 dark:text-amber-200">
                   <MailCheck className="mt-0.5 size-3.5 shrink-0" />
                   <p>
                     Người đang sử dụng sẽ được gửi email xác nhận thu hồi nếu
@@ -740,7 +740,7 @@ export default function AssetDetailPage() {
                 <Button
                   type="button"
                   variant="outline"
-                  className="border-amber-300 bg-white text-amber-900 hover:bg-amber-100"
+                  className="border-amber-300 dark:border-amber-400/25 bg-card text-amber-900 dark:text-amber-200 hover:bg-amber-100 dark:hover:bg-amber-400/10"
                   onClick={handleReturn}
                   disabled={isReturning}
                 >

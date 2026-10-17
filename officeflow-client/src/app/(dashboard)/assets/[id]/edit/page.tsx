@@ -1,6 +1,6 @@
 "use client";
 
-import { AlertCircle, ArrowLeft, Boxes, ShieldCheck } from "lucide-react";
+import { AlertCircle, ArrowLeft, ShieldCheck } from "lucide-react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useState } from "react";
@@ -173,10 +173,6 @@ export default function EditAssetPage() {
             Quay lại
           </Link>
         </Button>
-        <div className="mb-2 flex items-center gap-2 text-sm font-medium text-teal-800">
-          <Boxes className="size-4" />
-          {asset.assetTag}
-        </div>
         <h1 className="text-2xl font-semibold tracking-normal">
           Chỉnh sửa tài sản
         </h1>

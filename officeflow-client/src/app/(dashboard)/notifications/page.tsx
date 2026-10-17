@@ -104,7 +104,7 @@ function NotificationCard({
       type="button"
       className={cn(
         "motion-card w-full rounded-lg border bg-card p-4 text-left shadow-sm transition-colors hover:border-teal-200 hover:bg-teal-50/30",
-        !notification.isRead && "border-teal-200 bg-teal-50/45",
+        !notification.isRead && "border-teal-200 dark:border-teal-400/25 bg-teal-50/45 dark:bg-teal-400/10",
       )}
       style={{ "--motion-index": index } as CSSProperties}
       onClick={() => onOpen(notification)}
@@ -127,7 +127,7 @@ function NotificationCard({
               {!notification.isRead ? (
                 <Badge
                   variant="outline"
-                  className="motion-badge border-teal-200 bg-teal-50 text-teal-800"
+                  className="motion-badge border-teal-200 dark:border-teal-400/25 bg-teal-50 dark:bg-teal-400/10 text-teal-800 dark:text-teal-200"
                 >
                   Chưa đọc
                 </Badge>
@@ -293,10 +293,6 @@ export default function NotificationsPage() {
     <div className="grid gap-6 motion-enter">
       <section className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <div className="mb-2 inline-flex items-center gap-2 rounded-full border bg-muted/60 px-3 py-1 text-xs font-medium text-muted-foreground">
-            <CheckCheck className="size-3.5" />
-            Notification Center
-          </div>
           <h1 className="text-2xl font-semibold tracking-normal">
             Tất cả thông báo
           </h1>
@@ -432,7 +428,7 @@ export default function NotificationsPage() {
         <Card className="shadow-sm">
           <CardContent className="grid min-h-72 place-items-center px-4 text-center">
             <div className="max-w-md">
-              <div className="mx-auto mb-4 grid size-12 place-items-center rounded-xl bg-teal-50 text-teal-800">
+              <div className="mx-auto mb-4 grid size-12 place-items-center rounded-xl bg-teal-50 dark:bg-teal-400/10 text-teal-800 dark:text-teal-200">
                 <Inbox className="size-5" />
               </div>
               <p className="font-medium">Chưa có thông báo phù hợp</p>

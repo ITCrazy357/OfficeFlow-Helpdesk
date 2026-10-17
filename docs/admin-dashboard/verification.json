@@ -1,0 +1,115 @@
+{
+  "fixtureOnly": true,
+  "cases": [
+    {
+      "scenario": "populated",
+      "theme": "light",
+      "width": 1440,
+      "figures": 6,
+      "overflow": false
+    },
+    {
+      "scenario": "populated",
+      "theme": "light",
+      "width": 1024,
+      "figures": 6,
+      "overflow": false
+    },
+    {
+      "scenario": "populated",
+      "theme": "light",
+      "width": 768,
+      "figures": 6,
+      "overflow": false
+    },
+    {
+      "scenario": "populated",
+      "theme": "light",
+      "width": 390,
+      "figures": 6,
+      "overflow": false
+    },
+    {
+      "scenario": "populated",
+      "theme": "light",
+      "width": 320,
+      "figures": 6,
+      "overflow": false
+    },
+    {
+      "scenario": "populated",
+      "theme": "dark",
+      "width": 1440,
+      "figures": 6,
+      "overflow": false
+    },
+    {
+      "scenario": "populated",
+      "theme": "dark",
+      "width": 1024,
+      "figures": 6,
+      "overflow": false
+    },
+    {
+      "scenario": "populated",
+      "theme": "dark",
+      "width": 768,
+      "figures": 6,
+      "overflow": false
+    },
+    {
+      "scenario": "populated",
+      "theme": "dark",
+      "width": 390,
+      "figures": 6,
+      "overflow": false
+    },
+    {
+      "scenario": "populated",
+      "theme": "dark",
+      "width": 320,
+      "figures": 6,
+      "overflow": false
+    },
+    {
+      "scenario": "chart hover, expanded ranking and data table",
+      "passed": true
+    },
+    {
+      "scenario": "empty",
+      "passed": true
+    },
+    {
+      "scenario": "workload failure and retry",
+      "passed": true
+    },
+    {
+      "scenario": "EMPLOYEE retains dashboard without admin workload request",
+      "passed": true
+    },
+    {
+      "scenario": "MANAGER retains dashboard without admin workload request",
+      "passed": true
+    },
+    {
+      "scenario": "IT_STAFF retains dashboard without admin workload request",
+      "passed": true
+    },
+    {
+      "scenario": "reduced motion",
+      "passed": true
+    }
+  ],
+  "accessibility": [
+    {
+      "theme": "light",
+      "violations": []
+    },
+    {
+      "theme": "dark",
+      "violations": []
+    }
+  ],
+  "runtimeErrors": [],
+  "warnings": []
+}

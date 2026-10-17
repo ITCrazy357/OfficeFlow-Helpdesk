@@ -126,7 +126,7 @@ export default function ChangePasswordPage() {
     <main className="grid min-h-[100dvh] place-items-center bg-background px-4 py-10">
       <Card className="w-full max-w-lg">
         <CardHeader className="border-b">
-          <div className="mb-3 grid size-12 place-items-center rounded-xl bg-teal-50 text-teal-800">
+          <div className="mb-3 grid size-12 place-items-center rounded-xl bg-teal-50 dark:bg-teal-400/10 text-teal-800 dark:text-teal-200">
             {user.mustChangePassword ? (
               <ShieldCheck className="size-6" />
             ) : (
