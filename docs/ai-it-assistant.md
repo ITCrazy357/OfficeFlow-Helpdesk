@@ -40,6 +40,29 @@ Lease Redis hết hạn sau 120 giây; lỗi release có thể khiến người 
 Đây không phải hạn mức chi phí tháng: đặt budget/alert và giới hạn model trong
 OpenAI project theo nhu cầu vận hành.
 
+## Chạy local bằng Docker Compose
+
+Đặt các biến AI trong `officeflow-nest-server/.env`. Compose truyền chúng vào
+service `nest-api` qua phần `environment`. Sau khi thay đổi `.env`, tạo lại riêng
+container API để nhận giá trị mới (chạy trong `officeflow-nest-server`):
+
+```bash
+docker compose up -d --no-deps --force-recreate nest-api
+```
+
+Lệnh này dùng image hiện có, không build lại code và không tạo lại MySQL/Redis.
+Nếu cần cập nhật code trong image, build riêng API trước khi tạo lại container.
+
+Frontend local hiện dùng `NEXT_PUBLIC_API_URL=http://localhost:5001/api`; biến
+trên Render không áp dụng cho backend ở URL này. Nếu muốn frontend local gọi
+Render qua proxy, đặt `NEXT_PUBLIC_API_URL=/backend-api` và `API_PROXY_TARGET`
+thành URL backend Render có hậu tố `/api`, rồi khởi động lại frontend.
+
+Trên web deploy, kiểm tra Request URL và JSON của `/ai/status` trong Network.
+`DISABLED` là cấu hình AI chưa bật/đủ; `UNAVAILABLE` là Redis chưa sẵn sàng.
+Trên Render cần lưu biến ở đúng service backend và chọn **Save and deploy**;
+**Save only** chưa áp dụng biến vào tiến trình đang chạy.
+
 ## API và dữ liệu
 
 - `GET /api/ai/status`: trạng thái cấu hình và Redis, chỉ ADMIN/IT_STAFF.
