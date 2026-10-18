@@ -134,6 +134,76 @@ describe('AppController (e2e)', () => {
       });
   });
 
+  it('protects AI routes with real session guards and validates commands while disabled', async () => {
+    await request(httpServer).get('/api/ai/status').expect(401);
+    const session = {
+      userId: 91,
+      usedAt: null,
+      revokedAt: null,
+      expiresAt: new Date(Date.now() + 60000),
+      user: {
+        role: 'EMPLOYEE',
+        isActive: true,
+        isLocked: false,
+        mustChangePassword: false,
+      },
+    };
+    mockPrismaService.refreshToken.findUnique.mockResolvedValue(session);
+    const token = app.get(JwtService).sign(
+      { sub: 91, sid: 'ai-session' },
+      {
+        issuer: 'officeflow-api',
+        audience: 'officeflow-web',
+        expiresIn: '5m',
+      },
+    );
+    for (const role of ['EMPLOYEE', 'MANAGER']) {
+      session.user.role = role;
+      await request(httpServer)
+        .get('/api/ai/status')
+        .auth(token, { type: 'bearer' })
+        .expect(403);
+      await request(httpServer)
+        .post('/api/ai/tickets/1/draft')
+        .auth(token, { type: 'bearer' })
+        .send({ task: 'SUMMARY' })
+        .expect(403);
+    }
+    for (const role of ['ADMIN', 'IT_STAFF']) {
+      session.user.role = role;
+      const result = await request(httpServer)
+        .get('/api/ai/status')
+        .auth(token, { type: 'bearer' })
+        .expect(200);
+      expect((result.body as { data: unknown }).data).toMatchObject({
+        enabled: false,
+        reason: 'DISABLED',
+      });
+      await request(httpServer)
+        .post('/api/ai/tickets/1/draft')
+        .auth(token, { type: 'bearer' })
+        .send({ task: 'SUMMARY' })
+        .expect(503);
+    }
+    for (const input of [
+      {},
+      { task: 'UNKNOWN' },
+      { task: 'REPLY', prompt: 'override' },
+      { task: 'SUMMARY', model: 'override' },
+    ]) {
+      await request(httpServer)
+        .post('/api/ai/tickets/1/draft')
+        .auth(token, { type: 'bearer' })
+        .send(input)
+        .expect(400);
+    }
+    await request(httpServer)
+      .post('/api/ai/tickets/not-a-number/draft')
+      .auth(token, { type: 'bearer' })
+      .send({ task: 'SUMMARY' })
+      .expect(400);
+  });
+
   it('/api/db-health (GET)', () => {
     return request(httpServer)
       .get('/api/db-health')

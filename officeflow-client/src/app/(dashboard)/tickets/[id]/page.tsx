@@ -46,6 +46,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useMe } from "@/features/auth/hooks";
 import type { AuthUser } from "@/features/auth/types";
 import { TicketAssetPanel } from "@/features/assets/components/ticket-asset-panel";
+import { TicketAiAssistant } from "@/features/ai/components/ticket-ai-assistant";
 import { useSuggestKnowledgeArticles } from "@/features/knowledge/hooks";
 import { TicketResponseSla } from "@/features/sla/components/ticket-response-sla";
 import { TicketResult } from "@/features/tickets/components/ticket-result";
@@ -690,6 +691,25 @@ export default function TicketDetailPage() {
             </CardContent>
           </Card>
 
+          {canChangeStatus(user) ? (
+            <TicketAiAssistant
+              key={`ai-${ticket.id}`}
+              ticketId={ticket.id}
+              status={ticket.status}
+              commentPending={addComment.isPending}
+              onUseReply={(content) => {
+                const combined = commentContent
+                  ? `${commentContent}\n\n${content}`
+                  : content;
+                if (combined.trim().length > 15000)
+                  return "Bình luận sau khi thêm vượt quá 15.000 ký tự. Hãy rút gọn nội dung.";
+                setCommentContent(combined);
+                document.getElementById("ticket-comment-content")?.focus();
+                return null;
+              }}
+            />
+          ) : null}
+
           {allowDiscussion ? (
             <TicketAttachments
               ticketId={ticket.id}
@@ -718,6 +738,7 @@ export default function TicketDetailPage() {
               <CardContent className="pt-0">
                 <div className="grid gap-3">
                   <Textarea
+                    id="ticket-comment-content"
                     value={commentContent}
                     onChange={(event) => setCommentContent(event.target.value)}
                     placeholder="Nhập cập nhật xử lý, thông tin đã kiểm tra hoặc câu hỏi cần làm rõ"

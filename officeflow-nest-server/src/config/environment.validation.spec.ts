@@ -2,6 +2,57 @@ import { describe, expect, it } from '@jest/globals';
 import { validateEnvironment } from './environment.validation';
 
 describe('validateEnvironment', () => {
+  const base = {
+    DATABASE_URL: 'mysql://test:test@localhost/test',
+    JWT_ACCESS_SECRET: 'x'.repeat(32),
+  };
+  it('keeps AI optional with no implicit provider model', () => {
+    expect(validateEnvironment(base)).toMatchObject({
+      AI_ENABLED: false,
+      OPENAI_MODEL: '',
+      OPENAI_TIMEOUT_MS: 25000,
+    });
+  });
+  it('accepts explicit server-only AI configuration', () => {
+    expect(
+      validateEnvironment({
+        ...base,
+        AI_ENABLED: 'true',
+        OPENAI_API_KEY: 'test-only',
+        OPENAI_MODEL: 'test-model',
+      }),
+    ).toMatchObject({ AI_ENABLED: true, OPENAI_MODEL: 'test-model' });
+  });
+  it.each([
+    { AI_ENABLED: 'yes' },
+    { AI_ENABLED: true },
+    { AI_ENABLED: 'true' },
+    { AI_ENABLED: 'true', OPENAI_API_KEY: 'test-only' },
+    {
+      AI_ENABLED: 'true',
+      OPENAI_API_KEY: 'test\nonly',
+      OPENAI_MODEL: 'test-model',
+    },
+    {
+      AI_ENABLED: 'true',
+      OPENAI_API_KEY: 'test-only',
+      OPENAI_MODEL: 'https://untrusted.invalid',
+    },
+    { OPENAI_TIMEOUT_MS: '1000' },
+    { OPENAI_TIMEOUT_MS: '60001' },
+    { OPENAI_MAX_OUTPUT_TOKENS: '4001' },
+    { OPENAI_MAX_OUTPUT_TOKENS: '10.5' },
+  ])(
+    'rejects invalid AI configuration without leaking secrets %j',
+    (config) => {
+      expect(() => validateEnvironment({ ...base, ...config })).toThrow();
+      try {
+        validateEnvironment({ ...base, ...config });
+      } catch (error) {
+        expect(String(error)).not.toContain('test-only');
+      }
+    },
+  );
   it('converts PORT to a number', () => {
     const config = validateEnvironment({
       DATABASE_URL: 'mysql://test:test@localhost:3306/test',

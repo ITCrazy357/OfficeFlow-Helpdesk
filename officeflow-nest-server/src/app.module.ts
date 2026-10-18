@@ -34,6 +34,7 @@ import { RedisService } from './redis/redis.service';
 import { ConfigModule } from '@nestjs/config';
 import { validateEnvironment } from './config/environment.validation';
 import { MetricsModule } from './metrics/metrics.module';
+import { AiModule } from './ai/ai.module';
 
 @Module({
   imports: [
@@ -104,6 +105,7 @@ import { MetricsModule } from './metrics/metrics.module';
     AuditLogsModule,
     MailModule,
     MetricsModule,
+    AiModule,
   ],
   controllers: [AppController],
   providers: [
