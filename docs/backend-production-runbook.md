@@ -42,6 +42,11 @@ allowance setup, legacy leave handling, and requester-only ticket confirmation.
 
 ## One-time GitHub configuration
 
+Optional IT assistance uses backend-only OpenAI credentials and requires healthy
+Redis. AI is disabled by default and adds no database migration. See
+[AI IT assistant](ai-it-assistant.md) for setup, model requirements, data handling,
+rate limits, manual fallback and the post-configuration smoke test.
+
 Under **Settings > Environments > production**, configure:
 
 - Secret `RENDER_DEPLOY_HOOK_URL`: the secret deploy hook copied from the Render

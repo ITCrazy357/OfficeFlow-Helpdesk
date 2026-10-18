@@ -35,6 +35,10 @@ import type { TicketSlaAlertEvent } from '../../src/notifications/events/ticket-
 import { LeavePlanningService } from '../../src/leave-requests/leave-planning.service';
 import { LeaveRequestService } from '../../src/leave-requests/leave-requests.service';
 import { TicketFeedbackService } from '../../src/tickets/ticket-feedback.service';
+import { AiService } from '../../src/ai/ai.service';
+import { AiProvider } from '../../src/ai/ai.provider';
+import { AiRequestLimiter } from '../../src/ai/ai-request-limiter';
+import { AiTask } from '../../src/ai/types/ai-draft.type';
 
 describe('Real MySQL/Redis integration (disposable containers only)', () => {
   const prisma = new PrismaService(
@@ -140,6 +144,134 @@ describe('Real MySQL/Redis integration (disposable containers only)', () => {
       },
       employee,
     );
+
+  it('generates a draft from real published knowledge without writing tickets, comments or articles', async () => {
+    const knowledge = new KnowledgeService(prisma, audit);
+    const topic = `vpn${randomUUID().replaceAll('-', '')}`;
+    const ticket = await tickets.create(
+      {
+        title: `${topic} connection`,
+        description: `${topic} connection error`,
+        priority: TicketPriority.MEDIUM,
+      },
+      employee,
+    );
+    const published = await knowledge.create(
+      {
+        title: `${topic} guide`,
+        content: 'Các bước kiểm tra và cấu hình kết nối VPN.',
+        isPublished: true,
+      },
+      admin,
+    );
+    await knowledge.create(
+      {
+        title: `${topic} private draft`,
+        content: 'CONFIDENTIAL_DRAFT_DO_NOT_EXPORT',
+        isPublished: false,
+      },
+      admin,
+    );
+    const provider = {
+      status: () => ({ enabled: true, model: 'test-model' }),
+      generate: jest.fn().mockResolvedValue({
+        draft: {
+          title: '',
+          summary: '',
+          content: 'Kiểm tra kết nối theo hướng dẫn.',
+          sourceIds: [published.id],
+        },
+        model: 'test-model',
+        inputTokens: 1,
+        outputTokens: 1,
+      }),
+    };
+    const ai = new AiService(
+      prisma,
+      knowledge,
+      provider as unknown as AiProvider,
+      new AiRequestLimiter(redis),
+      redis,
+    );
+    const before = await Promise.all([
+      prisma.ticketComment.count(),
+      prisma.knowledgeArticle.count(),
+      prisma.ticketHistory.count(),
+    ]);
+    const result = await ai.generate(ticket.id, AiTask.REPLY, admin);
+    expect(result.sources.map((source) => source.id)).toEqual([published.id]);
+    expect(JSON.stringify(provider.generate.mock.calls)).not.toContain(
+      'CONFIDENTIAL_DRAFT_DO_NOT_EXPORT',
+    );
+    expect(
+      await Promise.all([
+        prisma.ticketComment.count(),
+        prisma.knowledgeArticle.count(),
+        prisma.ticketHistory.count(),
+      ]),
+    ).toEqual(before);
+    expect(
+      await prisma.ticket.findUnique({ where: { id: ticket.id } }),
+    ).toMatchObject({ status: ticket.status, assignedToId: null });
+    provider.generate.mockImplementationOnce(async () => {
+      await prisma.knowledgeArticle.update({
+        where: { id: published.id },
+        data: { isPublished: false },
+      });
+      return {
+        draft: {
+          title: '',
+          summary: '',
+          content: 'Kiểm tra kết nối theo hướng dẫn.',
+          sourceIds: [published.id],
+        },
+        model: 'test-model',
+        inputTokens: 1,
+        outputTokens: 1,
+      };
+    });
+    await expect(
+      ai.generate(ticket.id, AiTask.REPLY, admin),
+    ).rejects.toMatchObject({ status: 409 });
+  });
+
+  it('coordinates AI limits across instances with real Redis atomic counters and leases', async () => {
+    const first = new AiRequestLimiter(redis);
+    const second = new AiRequestLimiter(redis);
+    const userId = 900000 + Math.floor(Math.random() * 100000);
+    let release!: () => void;
+    const pending = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    let started!: () => void;
+    const entered = new Promise<void>((resolve) => {
+      started = resolve;
+    });
+    const running = first.run(userId, async () => {
+      started();
+      await pending;
+    });
+    await entered;
+    try {
+      await expect(
+        second.run(userId, () => Promise.resolve('unused')),
+      ).rejects.toMatchObject({ status: 409 });
+    } finally {
+      release();
+      await running;
+    }
+    for (let count = 0; count < 4; count++)
+      await second.run(userId, () => Promise.resolve('draft'));
+    await expect(
+      first.run(userId, () => Promise.resolve('unused')),
+    ).rejects.toMatchObject({ status: 429 });
+    expect(
+      await redis.getClient().pTTL(redis.key('ai', 'requests', userId)),
+    ).toBeGreaterThan(0);
+    expect(
+      await redis.getClient().get(redis.key('ai', 'lease', userId)),
+    ).toBeNull();
+  });
 
   it('keeps maintenance history, exact VND and the asset assignment unchanged with concurrent completion', async () => {
     const asset = await createAsset();

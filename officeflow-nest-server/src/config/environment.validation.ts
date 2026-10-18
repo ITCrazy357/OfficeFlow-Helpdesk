@@ -57,6 +57,41 @@ export function validateEnvironment(
 
   const metricsToken = raw.METRICS_TOKEN;
 
+  const aiEnabled = raw.AI_ENABLED ?? 'false';
+  if (typeof aiEnabled !== 'string' || !['true', 'false'].includes(aiEnabled))
+    throw new Error('AI_ENABLED must be true or false');
+  const openaiKey =
+    typeof raw.OPENAI_API_KEY === 'string' ? raw.OPENAI_API_KEY.trim() : '';
+  const openaiModel =
+    typeof raw.OPENAI_MODEL === 'string' ? raw.OPENAI_MODEL.trim() : '';
+  if (
+    aiEnabled === 'true' &&
+    (!openaiKey ||
+      /[\r\n]/.test(openaiKey) ||
+      !/^[a-zA-Z0-9._:-]{1,100}$/.test(openaiModel))
+  )
+    throw new Error(
+      'Enabled AI requires OPENAI_API_KEY and a valid OPENAI_MODEL',
+    );
+  const aiInteger = (
+    name: string,
+    fallback: number,
+    min: number,
+    max: number,
+  ) => {
+    const input = raw[name] ?? String(fallback);
+    const value = Number(input);
+    if (
+      typeof input !== 'string' ||
+      !/^\d+$/.test(input) ||
+      !Number.isSafeInteger(value) ||
+      value < min ||
+      value > max
+    )
+      throw new Error(`${name} must be an integer between ${min} and ${max}`);
+    return value;
+  };
+
   if (
     metricsToken !== undefined &&
     (typeof metricsToken !== 'string' || !/^[a-f0-9]{64}$/.test(metricsToken))
@@ -71,5 +106,15 @@ export function validateEnvironment(
     PORT: port,
     JWT_ACCESS_SECRET: jwtAccessSecret,
     DATABASE_URL: databaseUrl,
+    AI_ENABLED: aiEnabled === 'true',
+    OPENAI_API_KEY: openaiKey,
+    OPENAI_MODEL: openaiModel,
+    OPENAI_TIMEOUT_MS: aiInteger('OPENAI_TIMEOUT_MS', 25_000, 5000, 60_000),
+    OPENAI_MAX_OUTPUT_TOKENS: aiInteger(
+      'OPENAI_MAX_OUTPUT_TOKENS',
+      2500,
+      500,
+      4000,
+    ),
   };
 }

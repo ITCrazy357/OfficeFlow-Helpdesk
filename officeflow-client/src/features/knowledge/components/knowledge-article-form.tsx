@@ -25,6 +25,7 @@ type KnowledgeArticleFormProps = {
   defaultValues?: Partial<KnowledgeArticleFormValues>;
   submitLabel: string;
   isSubmitting?: boolean;
+  draftOnly?: boolean;
   error?: string | null;
   onCancel?: () => void;
   onSubmit: (values: KnowledgeArticleFormValues) => Promise<void> | void;
@@ -34,6 +35,7 @@ export function KnowledgeArticleForm({
   defaultValues,
   submitLabel,
   isSubmitting = false,
+  draftOnly = false,
   error,
   onCancel,
   onSubmit,
@@ -45,7 +47,7 @@ export function KnowledgeArticleForm({
       summary: defaultValues?.summary ?? "",
       content: defaultValues?.content ?? "",
       tags: defaultValues?.tags ?? "",
-      isPublished: defaultValues?.isPublished ?? false,
+      isPublished: draftOnly ? false : (defaultValues?.isPublished ?? false),
     },
   });
 
@@ -138,31 +140,35 @@ export function KnowledgeArticleForm({
           <Label id="knowledge-published-label" htmlFor="knowledge-published">
             Trạng thái
           </Label>
-          <Controller
-            control={form.control}
-            name="isPublished"
-            render={({ field }) => (
-              <Select
-                value={field.value ? "true" : "false"}
-                onValueChange={(value) => field.onChange(value === "true")}
-                disabled={isSubmitting}
-              >
-                <SelectTrigger
-                  id="knowledge-published"
-                  aria-labelledby="knowledge-published-label"
-                  className="w-full"
-                  ref={field.ref}
-                  onBlur={field.onBlur}
+          {draftOnly ? (
+            <p className="rounded-lg border px-3 py-2 text-sm">Bản nháp</p>
+          ) : (
+            <Controller
+              control={form.control}
+              name="isPublished"
+              render={({ field }) => (
+                <Select
+                  value={field.value ? "true" : "false"}
+                  onValueChange={(value) => field.onChange(value === "true")}
+                  disabled={isSubmitting}
                 >
-                  <SelectValue placeholder="Chọn trạng thái" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="false">Bản nháp</SelectItem>
-                  <SelectItem value="true">Đã xuất bản</SelectItem>
-                </SelectContent>
-              </Select>
-            )}
-          />
+                  <SelectTrigger
+                    id="knowledge-published"
+                    aria-labelledby="knowledge-published-label"
+                    className="w-full"
+                    ref={field.ref}
+                    onBlur={field.onBlur}
+                  >
+                    <SelectValue placeholder="Chọn trạng thái" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="false">Bản nháp</SelectItem>
+                    <SelectItem value="true">Đã xuất bản</SelectItem>
+                  </SelectContent>
+                </Select>
+              )}
+            />
+          )}
         </div>
       </div>
 
