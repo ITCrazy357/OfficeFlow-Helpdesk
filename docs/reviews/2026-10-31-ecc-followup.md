@@ -39,3 +39,13 @@ Kết quả: trong 23 email phân biệt ở hai dump, có **18 tài khoản loc
 Đã hỏi người dùng về quyền truy cập ADMIN/URL bản thực tế để tiếp tục đúng business API. Không tạo mật khẩu mới hoặc sửa trực tiếp DB khi chưa có đường xác thực quản trị và kế hoạch bàn giao. Luồng hiện tại không cho ADMIN/IT reset một ADMIN, nên việc bảo vệ ADMIN phải dùng luồng đổi mật khẩu của chính người đó hoặc quy trình recovery phù hợp.
 
 Public liveness production trả 200 nhưng báo release cũ `cc46d0a` tại thời điểm kiểm tra. Chưa thể coi F2–F7 đã có hiệu lực production. Pipeline deploy trước đó bị skip vì security job thất bại; cần xem kết quả CI/deploy của commit tiếp theo.
+
+Người dùng đã cung cấp URL giao diện production. Trình duyệt kiểm tra được đưa về `/login`, không có phiên ADMIN. Để bảo vệ chính tài khoản ADMIN, chủ tài khoản có thể dùng [Đổi mật khẩu](https://office-flow-helpdesk.vercel.app/change-password) trong phiên của mình; luồng này thu hồi các phiên cũ. Chưa thực hiện thay đổi tài khoản production từ trình duyệt kiểm tra.
+
+## Gate Docker được phát hiện trên CI
+
+[Frontend CI của 7e2af88](https://github.com/ITCrazy357/OfficeFlow-Helpdesk/actions/runs/41099713571) thành công. Backend security đã qua Gitleaks nhưng Trivy phát hiện 3 High ở `undici 6.28.1` nằm trong npm của image, tách biệt với lockfile dependency ứng dụng.
+
+Đã cập nhật phần vá thư viện npm trong Dockerfile lên `undici 6.29.1`, cùng major 6. [Release chính thức](https://github.com/nodejs/undici/releases/tag/v6.29.1) xử lý các CVE mà gate báo: CVE-2026-109383, CVE-2026-109869 và CVE-2026-87018. Không đổi ngưỡng Trivy hoặc bỏ qua advisory. Kết quả image/CI sau bản sửa được xác minh riêng.
+
+Image local `officeflow-backend:ecc-remediation` đã build thành công. Smoke test với network bị tắt xác nhận bcrypt native hoạt động và thư viện undici thực tế nằm trong npm đúng phiên bản 6.29.1; không bootstrap app hoặc truy cập DB.
