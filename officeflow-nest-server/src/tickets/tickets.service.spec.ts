@@ -286,7 +286,7 @@ describe('TicketsService', () => {
   });
 
   it('should forbid a manager from updating a ticket outside their department', async () => {
-    mockPrismaService.ticket.findUnique.mockResolvedValue({
+    mockTransaction.ticket.findUnique.mockResolvedValue({
       id: 5,
       title: 'VPN issue',
       description: 'Cannot connect to VPN',
@@ -304,7 +304,7 @@ describe('TicketsService', () => {
         departmentId: 2,
       },
     });
-    mockPrismaService.user.findUnique.mockResolvedValue({ departmentId: 1 });
+    mockTransaction.user.findUnique.mockResolvedValue({ departmentId: 1 });
 
     await expect(
       service.update(
@@ -314,7 +314,8 @@ describe('TicketsService', () => {
       ),
     ).rejects.toThrow('Forbidden');
 
-    expect(mockPrismaService.$transaction).not.toHaveBeenCalled();
+    expect(mockTransaction.ticket.updateMany).not.toHaveBeenCalled();
+    expect(mockAuditLogsService.create).not.toHaveBeenCalled();
   });
 
   it.each(Object.values(TicketStatus))(

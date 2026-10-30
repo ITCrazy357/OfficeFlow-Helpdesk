@@ -12,6 +12,9 @@ on:
       - "officeflow-nest-server/**"
       - ".github/workflows/backend-ci.yml"
       - ".gitleaksignore"
+      - ".gitignore"
+      - "**/*.sql"
+      - "**/*.sql.*"
 
   workflow_dispatch:
 
@@ -121,6 +124,10 @@ jobs:
       - name: Audit locked production dependencies
         working-directory: officeflow-nest-server
         run: npm audit --omit=dev --audit-level=high
+      - name: Reject tracked database exports
+        run: |
+          node --test officeflow-nest-server/scripts/check-tracked-data.test.cjs
+          node officeflow-nest-server/scripts/check-tracked-data.cjs
       - name: Scan all Git history for secrets (redacted output)
         run: >-
           docker run --rm --network none -v "$PWD:/repo:ro"

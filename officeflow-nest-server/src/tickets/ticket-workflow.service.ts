@@ -91,12 +91,15 @@ export class TicketWorkflowService {
     private readonly query: TicketQueryService,
     private readonly slaPolicies: SlaPolicyService,
   ) {}
-  private async ensureCategoryExists(categoryId?: number) {
+  private async ensureCategoryExists(
+    categoryId?: number,
+    database: Pick<Prisma.TransactionClient, 'ticketCategory'> = this.prisma,
+  ) {
     if (categoryId === undefined) {
       return;
     }
 
-    const category = await this.prisma.ticketCategory.findUnique({
+    const category = await database.ticketCategory.findUnique({
       where: {
         id: categoryId,
       },
@@ -187,80 +190,86 @@ export class TicketWorkflowService {
     updateTicketDto: UpdateTicketDto,
     currentUser: CurrentUserPayload,
   ) {
-    const ticket = await this.prisma.ticket.findUnique({
-      where: { id },
-      select: {
-        id: true,
-        title: true,
-        description: true,
-        status: true,
-        priority: true,
-        dueAt: true,
-        resolveAt: true,
-        isOverdue: true,
-        createdAt: true,
-        updatedAt: true,
-        createdById: true,
-        assignedToId: true,
-        categoryId: true,
-        createdBy: {
-          select: {
-            departmentId: true,
-          },
-        },
-      },
-    });
-
-    if (!ticket) throw new NotFoundException('Ticket not found');
-
     if (Object.keys(updateTicketDto).length === 0) {
       throw new BadRequestException('At least one field is required');
     }
 
-    if (currentUser.role === UserRole.MANAGER) {
-      const manager = await this.prisma.user.findUnique({
-        where: { id: currentUser.userId },
-        select: { departmentId: true },
-      });
-
-      if (
-        !manager?.departmentId ||
-        ticket.createdBy.departmentId !== manager.departmentId
-      ) {
-        throw new ForbiddenException('Forbidden');
-      }
-    }
-
-    if (currentUser.role === UserRole.EMPLOYEE) {
-      if (ticket.createdById !== currentUser.userId) {
-        throw new ForbiddenException('Forbidden');
-      }
-
-      if (ticket.status !== TicketStatus.OPEN) {
-        throw new BadRequestException('Ticket is not open');
-      }
-    }
-
-    if (
-      currentUser.role === UserRole.IT_STAFF &&
-      ticket.assignedToId !== null &&
-      ticket.assignedToId !== currentUser.userId
-    ) {
-      throw new ForbiddenException('Forbidden');
-    }
-
-    await this.ensureCategoryExists(updateTicketDto.categoryId);
-
-    const updatedTicket = await this.prisma.$transaction(
+    const { ticket, updatedTicket } = await runSerializableTransaction(
+      this.prisma,
       async (transaction) => {
-        const updatedTicket = await transaction.ticket.update({
+        // Authorization reads and the write share one serializable snapshot.
+        const ticket = await transaction.ticket.findUnique({
           where: { id },
+          select: {
+            id: true,
+            title: true,
+            status: true,
+            priority: true,
+            updatedAt: true,
+            createdById: true,
+            assignedToId: true,
+            categoryId: true,
+            createdBy: { select: { departmentId: true } },
+          },
+        });
+        if (!ticket) throw new NotFoundException('Ticket not found');
+
+        if (currentUser.role === UserRole.MANAGER) {
+          const manager = await transaction.user.findUnique({
+            where: { id: currentUser.userId },
+            select: { departmentId: true },
+          });
+          if (
+            !manager?.departmentId ||
+            ticket.createdBy.departmentId !== manager.departmentId
+          ) {
+            throw new ForbiddenException('Forbidden');
+          }
+        }
+
+        if (currentUser.role === UserRole.EMPLOYEE) {
+          if (ticket.createdById !== currentUser.userId) {
+            throw new ForbiddenException('Forbidden');
+          }
+          if (ticket.status !== TicketStatus.OPEN) {
+            throw new BadRequestException('Ticket is not open');
+          }
+        }
+
+        if (
+          currentUser.role === UserRole.IT_STAFF &&
+          ticket.assignedToId !== null &&
+          ticket.assignedToId !== currentUser.userId
+        ) {
+          throw new ForbiddenException('Forbidden');
+        }
+
+        await this.ensureCategoryExists(
+          updateTicketDto.categoryId,
+          transaction,
+        );
+
+        const claimed = await transaction.ticket.updateMany({
+          where: {
+            id,
+            status: ticket.status,
+            assignedToId: ticket.assignedToId,
+            updatedAt: ticket.updatedAt,
+          },
           data: {
             title: updateTicketDto.title,
             description: updateTicketDto.description,
             priority: updateTicketDto.priority,
             categoryId: updateTicketDto.categoryId,
           },
+        });
+        if (claimed.count !== 1) {
+          throw new ConflictException(
+            'Ticket changed concurrently. Please retry',
+          );
+        }
+        const updatedTicket = await transaction.ticket.findUniqueOrThrow({
+          where: { id },
           select: ticketStatusSelect,
         });
 
@@ -295,7 +304,7 @@ export class TicketWorkflowService {
           transaction,
         );
 
-        return updatedTicket;
+        return { ticket, updatedTicket };
       },
     );
 

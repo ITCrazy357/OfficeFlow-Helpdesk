@@ -1,7 +1,7 @@
 import { ConfigService } from '@nestjs/config';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { Test } from '@nestjs/testing';
-import { AssetType, TicketPriority, UserRole } from '@prisma/client';
+import { AssetType, Prisma, TicketPriority, UserRole } from '@prisma/client';
 import { randomUUID } from 'node:crypto';
 import { PrismaService } from '../../src/prisma/prisma.service';
 import { AuditLogsService } from '../../src/audit-logs/audit-logs.service';
@@ -144,6 +144,95 @@ describe('Real MySQL/Redis integration (disposable containers only)', () => {
       },
       employee,
     );
+
+  it('rechecks employee edit permissions when processing starts before its transaction', async () => {
+    const ticket = await createTicket();
+    let markPaused!: () => void;
+    let resume!: () => void;
+    const paused = new Promise<void>((resolve) => {
+      markPaused = resolve;
+    });
+    const released = new Promise<void>((resolve) => {
+      resume = resolve;
+    });
+    const delayedPrisma = {
+      ticket: prisma.ticket,
+      $transaction: async (
+        work: (tx: Prisma.TransactionClient) => Promise<unknown>,
+        options: { isolationLevel: Prisma.TransactionIsolationLevel },
+      ) => {
+        markPaused();
+        await released;
+        return prisma.$transaction(work, options);
+      },
+    } as unknown as PrismaService;
+    const workflow = new TicketWorkflowService(
+      delayedPrisma,
+      new EventEmitter2(),
+      audit,
+      outbox,
+      new TicketQueryService(prisma, new TicketAccessPolicyService(prisma)),
+      new SlaPolicyService(prisma, audit),
+    );
+    const edit = workflow.update(
+      ticket.id,
+      { title: 'Stale employee edit' },
+      employee,
+    );
+    // Attach a rejection handler immediately; the assertion awaits this below.
+    const outcome = edit.then(
+      (value) => ({ value }),
+      (error: unknown) => ({ error }),
+    );
+    try {
+      await paused;
+      await tickets.updateStatus(ticket.id, { status: 'IN_PROGRESS' }, admin);
+    } finally {
+      resume();
+    }
+    expect(await outcome).toHaveProperty('error.message', 'Ticket is not open');
+    expect(
+      await prisma.ticket.findUniqueOrThrow({ where: { id: ticket.id } }),
+    ).toMatchObject({ title: ticket.title, status: 'IN_PROGRESS' });
+    expect(
+      await prisma.ticketHistory.count({
+        where: { ticketId: ticket.id, action: 'UPDATE' },
+      }),
+    ).toBe(0);
+  });
+
+  it('lets a manager without a department read their own ticket and rejects another requester', async () => {
+    const manager = await prisma.user.create({
+      data: {
+        name: 'Manager fixture',
+        email: `${randomUUID()}@test.invalid`,
+        passwordHash: 'test-only',
+        role: 'MANAGER',
+      },
+    });
+    const actor = { userId: manager.id, role: UserRole.MANAGER };
+    const ticket = await tickets.create(
+      { title: randomUUID(), description: 'Manager ownership fixture' },
+      actor,
+    );
+    expect(
+      (await tickets.getTickets(actor, {})).items.map((item) => item.id),
+    ).toContain(ticket.id);
+    await expect(tickets.canGetById(ticket.id, actor)).resolves.toMatchObject({
+      id: ticket.id,
+    });
+    await expect(
+      tickets.addComment(
+        ticket.id,
+        { content: 'Additional information' },
+        actor,
+      ),
+    ).resolves.toMatchObject({ content: 'Additional information' });
+    const other = await createTicket();
+    await expect(tickets.canGetById(other.id, actor)).rejects.toThrow(
+      'Forbidden',
+    );
+  });
 
   it('generates a draft from real published knowledge without writing tickets, comments or articles', async () => {
     const knowledge = new KnowledgeService(prisma, audit);

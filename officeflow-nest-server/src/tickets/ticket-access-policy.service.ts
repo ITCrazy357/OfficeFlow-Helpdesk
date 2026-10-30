@@ -58,6 +58,13 @@ export class TicketAccessPolicyService {
     currentUser: CurrentUserPayload,
   ): Promise<void> {
     if (
+      currentUser.role === UserRole.MANAGER &&
+      ticket.createdById === currentUser.userId
+    ) {
+      return;
+    }
+
+    if (
       currentUser.role === UserRole.EMPLOYEE &&
       ticket.createdById !== currentUser.userId
     ) {
@@ -115,7 +122,8 @@ export class TicketAccessPolicyService {
     }
 
     if (
-      currentUser.role === UserRole.EMPLOYEE &&
+      (currentUser.role === UserRole.EMPLOYEE ||
+        currentUser.role === UserRole.MANAGER) &&
       ticket.createdById === currentUser.userId
     ) {
       return ticket;

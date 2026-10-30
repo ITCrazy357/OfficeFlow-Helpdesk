@@ -1,0 +1,5 @@
+# Local database exports may contain real accounts and private business data.
+/officeflow-nest-server/*.sql
+*.sql.gz
+*.sql.zip
+/.local-backups/

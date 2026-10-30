@@ -72,6 +72,25 @@ describe('TicketAccessPolicyService', () => {
     });
   });
 
+  it('lets a manager without a department open and discuss their own listed ticket', async () => {
+    const actor = { userId: 3, role: UserRole.MANAGER };
+    const ownTicket = {
+      id: 1,
+      createdById: actor.userId,
+      createdBy: { departmentId: null },
+    };
+    prisma.user.findUnique.mockResolvedValue({ departmentId: null });
+    prisma.ticket.findUnique.mockResolvedValue(ownTicket);
+    expect((await service.getScope(actor)).OR).toContainEqual({
+      createdById: actor.userId,
+    });
+    await expect(
+      service.assertCanView(ownTicket, actor),
+    ).resolves.toBeUndefined();
+    await expect(service.canAccessTicket(1, actor)).resolves.toEqual(ownTicket);
+    expect(prisma.ticket.count).not.toHaveBeenCalled();
+  });
+
   it('allows an assigned staff manager to read an explicitly escalated ticket only', async () => {
     prisma.user.findUnique.mockResolvedValue({ departmentId: 8 });
     prisma.ticket.count.mockResolvedValue(1);
