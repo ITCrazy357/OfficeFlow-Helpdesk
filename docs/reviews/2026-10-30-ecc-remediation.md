@@ -1,5 +1,7 @@
 # OfficeFlow — khắc phục ECC, 2026-10-30
 
+Tiến độ mới nhất: [xử lý tiếp ngày 2026-10-31](2026-10-31-ecc-followup.md). Nội dung bên dưới ghi lại đợt local ban đầu.
+
 Tham chiếu: [review tại cc46d0a](2026-10-30-ecc-review.md). Các thay đổi dưới đây đang ở working copy, chưa commit/push/deploy.
 
 ## Trạng thái theo từng phần

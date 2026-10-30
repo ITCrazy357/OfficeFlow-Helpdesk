@@ -26,6 +26,7 @@
     "test:redis": "node scripts/redis-smoke-test.js",
     "test:integration": "node scripts/test-integration.cjs",
     "test:integration:safety": "node --test scripts/integration-safety.test.cjs",
+    "test:prototype-safety": "node --test ../scripts/prototype-safety.test.cjs",
     "test:metrics:http": "npm run build:ci && node --test test/metrics.http.test.cjs",
     "test:watch": "node --experimental-vm-modules node_modules/jest/bin/jest.js --watch",
     "test:cov": "node --experimental-vm-modules node_modules/jest/bin/jest.js --coverage",

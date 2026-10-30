@@ -13,6 +13,7 @@ on:
       - ".github/workflows/backend-ci.yml"
       - ".gitleaksignore"
       - ".gitignore"
+      - "scripts/prototype-safety.test.cjs"
       - "**/*.sql"
       - "**/*.sql.*"
 
@@ -81,6 +82,8 @@ jobs:
 
       - name: Lint
         run: npm run lint
+      - name: Prototype safety for development tools
+        run: npm run test:prototype-safety
 
       - name: Unit tests and coverage gate
         run: npm run test:cov -- --runInBand

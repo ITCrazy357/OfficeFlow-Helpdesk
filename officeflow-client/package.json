@@ -8,6 +8,8 @@
     "start": "next start",
     "lint": "eslint",
     "test": "node --test tests/*.test.mjs",
+    "test:prototype-safety": "node --disable-proto=throw --test ../scripts/prototype-safety.test.cjs",
+    "ui": "node --disable-proto=throw node_modules/shadcn/dist/index.js",
     "test:ui": "playwright test"
   },
   "dependencies": {

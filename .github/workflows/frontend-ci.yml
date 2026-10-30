@@ -8,6 +8,7 @@ on:
     paths:
       - "officeflow-client/**"
       - ".github/workflows/frontend-ci.yml"
+      - "scripts/prototype-safety.test.cjs"
   workflow_dispatch:
 
 permissions:
@@ -44,6 +45,8 @@ jobs:
         run: npm audit --omit=dev --audit-level=high
       - name: Lint
         run: npm run lint
+      - name: Prototype safety for development tools
+        run: npm run test:prototype-safety
       - name: Type check
         run: |
           npx --no-install next typegen
