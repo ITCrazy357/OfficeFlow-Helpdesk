@@ -18,6 +18,7 @@ import { type CurrentUserPayload } from '../common/decorators/current-user.decor
 import { OUTBOX_EVENT_TYPES } from '../outbox/outbox.constants';
 import { OutboxService } from '../outbox/outbox.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { runSerializableTransaction } from '../common/database/serializable-transaction.util';
 
 import { ChangeMyPasswordDto } from './dto/change-my-password.dto';
 import { ResetUserPasswordDto } from './dto/reset-user-password.dto';
@@ -61,6 +62,27 @@ export class AccountService {
     private readonly auditLogsService: AuditLogsService,
     private readonly outboxService: OutboxService,
   ) {}
+
+  private async assertCurrentOperator(
+    transaction: Prisma.TransactionClient,
+    actorId: number,
+  ) {
+    const actor = await transaction.user.findFirst({
+      where: {
+        id: actorId,
+        role: { in: [UserRole.ADMIN, UserRole.IT_STAFF] },
+        isActive: true,
+        isLocked: false,
+        mustChangePassword: false,
+      },
+      select: { id: true },
+    });
+    if (!actor) {
+      throw new ForbiddenException(
+        'Account management access is no longer available',
+      );
+    }
+  }
 
   private assertCanManageAccount(
     actor: CurrentUserPayload,
@@ -126,13 +148,19 @@ export class AccountService {
 
     this.assertCanManageAccount(actor, target, 'lock');
 
-    if (target.isLocked) {
-      return target;
-    }
-
     const lockedAt = new Date();
 
-    return this.prisma.$transaction(async (transaction) => {
+    return runSerializableTransaction(this.prisma, async (transaction) => {
+      await this.assertCurrentOperator(transaction, actor.userId);
+      if (target.isLocked) {
+        return this.resolveConcurrentTransition(
+          transaction,
+          actor,
+          targetUserId,
+          true,
+          'lock',
+        );
+      }
       const result = await transaction.user.updateMany({
         where: {
           id: targetUserId,
@@ -224,13 +252,19 @@ export class AccountService {
 
     this.assertCanManageAccount(actor, target, 'unlock');
 
-    if (!target.isLocked) {
-      return target;
-    }
-
     const unlockedAt = new Date();
 
-    return this.prisma.$transaction(async (transaction) => {
+    return runSerializableTransaction(this.prisma, async (transaction) => {
+      await this.assertCurrentOperator(transaction, actor.userId);
+      if (!target.isLocked) {
+        return this.resolveConcurrentTransition(
+          transaction,
+          actor,
+          targetUserId,
+          false,
+          'unlock',
+        );
+      }
       const result = await transaction.user.updateMany({
         where: {
           id: targetUserId,
@@ -307,94 +341,98 @@ export class AccountService {
     const passwordHash = await bcrypt.hash(resetUserPasswordDto.password, 10);
     const now = new Date();
 
-    const updatedUser = await this.prisma.$transaction(async (transaction) => {
-      const result = await transaction.user.updateMany({
-        where: {
-          id,
-          role: {
-            in: MANAGEABLE_TARGET_ROLES,
+    const updatedUser = await runSerializableTransaction(
+      this.prisma,
+      async (transaction) => {
+        await this.assertCurrentOperator(transaction, currentUser.userId);
+        const result = await transaction.user.updateMany({
+          where: {
+            id,
+            role: {
+              in: MANAGEABLE_TARGET_ROLES,
+            },
           },
-        },
-        data: {
-          passwordHash,
-          mustChangePassword: true,
-        },
-      });
+          data: {
+            passwordHash,
+            mustChangePassword: true,
+          },
+        });
 
-      if (result.count !== 1) {
-        const currentTarget = await transaction.user.findUnique({
+        if (result.count !== 1) {
+          const currentTarget = await transaction.user.findUnique({
+            where: { id },
+            select: accountUserSelect,
+          });
+
+          if (!currentTarget) {
+            throw new NotFoundException('User not found');
+          }
+
+          this.assertCanManageAccount(
+            currentUser,
+            currentTarget,
+            'reset password',
+          );
+
+          throw new ConflictException(
+            'Account changed while resetting the password. Please retry',
+          );
+        }
+
+        const updatedUser = await transaction.user.findUnique({
           where: { id },
           select: accountUserSelect,
         });
 
-        if (!currentTarget) {
+        if (!updatedUser) {
           throw new NotFoundException('User not found');
         }
 
-        this.assertCanManageAccount(
-          currentUser,
-          currentTarget,
-          'reset password',
+        await transaction.refreshToken.updateMany({
+          where: {
+            userId: id,
+            revokedAt: null,
+          },
+          data: {
+            revokedAt: now,
+          },
+        });
+
+        await transaction.passwordResetToken.deleteMany({
+          where: {
+            userId: id,
+          },
+        });
+
+        await this.auditLogsService.create(
+          {
+            actorId: currentUser.userId,
+            entity: AuditLogEntity.USER,
+            entityId: user.id,
+            action: AuditLogAction.UPDATE,
+            description: `Reset password for user ${updatedUser.email}.`,
+            oldValues: {
+              mustChangePassword: user.mustChangePassword,
+            },
+            newValues: {
+              mustChangePassword: updatedUser.mustChangePassword,
+              sessionsRevoked: true,
+              passwordResetTokensInvalidated: true,
+            },
+            ipAddress: currentUser.ipAddress,
+            userAgent: currentUser.userAgent,
+          },
+          transaction,
         );
 
-        throw new ConflictException(
-          'Account changed while resetting the password. Please retry',
-        );
-      }
+        await this.outboxService.enqueue(transaction, {
+          type: OUTBOX_EVENT_TYPES.USER_PASSWORD_RESET,
+          payload: { userId: updatedUser.id },
+        });
 
-      const updatedUser = await transaction.user.findUnique({
-        where: { id },
-        select: accountUserSelect,
-      });
-
-      if (!updatedUser) {
-        throw new NotFoundException('User not found');
-      }
-
-      await transaction.refreshToken.updateMany({
-        where: {
-          userId: id,
-          revokedAt: null,
-        },
-        data: {
-          revokedAt: now,
-        },
-      });
-
-      await transaction.passwordResetToken.deleteMany({
-        where: {
-          userId: id,
-        },
-      });
-
-      await this.auditLogsService.create(
-        {
-          actorId: currentUser.userId,
-          entity: AuditLogEntity.USER,
-          entityId: user.id,
-          action: AuditLogAction.UPDATE,
-          description: `Reset password for user ${updatedUser.email}.`,
-          oldValues: {
-            mustChangePassword: user.mustChangePassword,
-          },
-          newValues: {
-            mustChangePassword: updatedUser.mustChangePassword,
-            sessionsRevoked: true,
-            passwordResetTokensInvalidated: true,
-          },
-          ipAddress: currentUser.ipAddress,
-          userAgent: currentUser.userAgent,
-        },
-        transaction,
-      );
-
-      await this.outboxService.enqueue(transaction, {
-        type: OUTBOX_EVENT_TYPES.USER_PASSWORD_RESET,
-        payload: { userId: updatedUser.id },
-      });
-
-      return updatedUser;
-    });
+        return updatedUser;
+      },
+    );
 
     return updatedUser;
   }

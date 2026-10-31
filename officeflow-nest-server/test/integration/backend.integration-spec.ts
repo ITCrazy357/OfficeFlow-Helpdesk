@@ -49,6 +49,7 @@ import { AiRequestLimiter } from '../../src/ai/ai-request-limiter';
 import { AiTask } from '../../src/ai/types/ai-draft.type';
 import { AuthService } from '../../src/auth/auth.service';
 import { AccountService } from '../../src/users/accounts.service';
+import { UsersService } from '../../src/users/users.service';
 
 describe('Real MySQL/Redis integration (disposable containers only)', () => {
   const prisma = new PrismaService(
@@ -347,6 +348,86 @@ describe('Real MySQL/Redis integration (disposable containers only)', () => {
       }),
     ).toBe(0);
   });
+
+  it.each(['demotion', 'lock'] as const)(
+    'rejects a pending password reset after the operator %s completes',
+    async (operation) => {
+      const makeUser = (role: UserRole) =>
+        prisma.user.create({
+          data: {
+            name: 'Account operator fixture',
+            email: `${randomUUID()}@test.invalid`,
+            passwordHash: 'original-fixture-hash',
+            role,
+          },
+        });
+      const operator = await makeUser(UserRole.IT_STAFF);
+      const target = await makeUser(UserRole.EMPLOYEE);
+      let markPaused!: () => void;
+      let resume!: () => void;
+      const paused = new Promise<void>((resolve) => {
+        markPaused = resolve;
+      });
+      const released = new Promise<void>((resolve) => {
+        resume = resolve;
+      });
+      const delayed = {
+        user: prisma.user,
+        $transaction: async (
+          work: (tx: Prisma.TransactionClient) => Promise<unknown>,
+          options: { isolationLevel: Prisma.TransactionIsolationLevel },
+        ) => {
+          markPaused();
+          await released;
+          return prisma.$transaction(work, options);
+        },
+      } as unknown as PrismaService;
+      const accounts = new AccountService(delayed, audit, outbox);
+      const outcome = accounts
+        .resetPassword(
+          target.id,
+          { password: randomUUID() },
+          { userId: operator.id, role: UserRole.IT_STAFF },
+        )
+        .then(
+          (value) => ({ value }),
+          (error: unknown) => ({ error }),
+        );
+      try {
+        await paused;
+        if (operation === 'demotion') {
+          await new UsersService(
+            prisma,
+            audit,
+            new EventEmitter2(),
+            outbox,
+          ).update(operator.id, { role: UserRole.EMPLOYEE }, admin);
+        } else {
+          await new AccountService(prisma, audit, outbox).lockUser(
+            admin,
+            operator.id,
+          );
+        }
+      } finally {
+        resume();
+      }
+      expect(await outcome).toHaveProperty('error.status', 403);
+      expect(
+        await prisma.user.findUniqueOrThrow({ where: { id: target.id } }),
+      ).toMatchObject({
+        passwordHash: target.passwordHash,
+        mustChangePassword: false,
+      });
+      expect(
+        await prisma.outboxEvent.count({
+          where: {
+            type: 'user.password-reset',
+            payload: { path: '$.userId', equals: target.id },
+          },
+        }),
+      ).toBe(0);
+    },
+  );
 
   it('rechecks employee edit permissions when processing starts before its transaction', async () => {
     const ticket = await createTicket();

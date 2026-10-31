@@ -28,6 +28,7 @@ const mockBcryptHash = bcrypt.hash as unknown as jest.Mock<
 >;
 
 const mockUserModel = {
+  findFirst: jest.fn<Promise<unknown>, [unknown]>(),
   findUnique: jest.fn<Promise<unknown>, [unknown]>(),
   updateMany: jest.fn<Promise<{ count: number }>, [unknown]>(),
 };
@@ -87,6 +88,7 @@ describe('AccountService', () => {
 
   beforeEach(async () => {
     jest.resetAllMocks();
+    mockUserModel.findFirst.mockResolvedValue({ id: 1 });
     mockUserModel.updateMany.mockResolvedValue({ count: 1 });
     mockRefreshTokenModel.updateMany.mockResolvedValue({ count: 1 });
     mockPasswordResetTokenModel.deleteMany.mockResolvedValue({ count: 1 });
@@ -227,7 +229,7 @@ describe('AccountService', () => {
     await expect(
       service.lockUser({ userId: 1, role: UserRole.ADMIN }, lockedUser.id),
     ).resolves.toEqual(lockedUser);
-    expect(mockPrismaService.$transaction).not.toHaveBeenCalled();
+    expect(mockPrismaService.$transaction).toHaveBeenCalled();
   });
 
   it('unlocks a user and records unlock metadata in the audit log', async () => {
@@ -374,6 +376,59 @@ describe('AccountService', () => {
         { userId: 1, role: UserRole.IT_STAFF },
       ),
     ).rejects.toThrow(ForbiddenException);
+  });
+
+  it.each(['lock', 'unlock', 'reset'] as const)(
+    'rejects %s when the actor loses account-management access before the transaction',
+    async (operation) => {
+      mockUserModel.findUnique.mockResolvedValue({
+        ...baseUser,
+        isLocked: operation === 'unlock',
+      });
+      mockUserModel.findFirst.mockResolvedValue(null);
+      const actor = { userId: 1, role: UserRole.IT_STAFF };
+      const request =
+        operation === 'reset'
+          ? service.resetPassword(
+              2,
+              { password: 'fixture-password-123' },
+              actor,
+            )
+          : operation === 'lock'
+            ? service.lockUser(actor, 2)
+            : service.unlockUser(actor, 2);
+      await expect(request).rejects.toThrow(ForbiddenException);
+      expect(mockUserModel.updateMany).not.toHaveBeenCalled();
+      expect(mockRefreshTokenModel.updateMany).not.toHaveBeenCalled();
+      expect(mockAuditLogsService.create).not.toHaveBeenCalled();
+      expect(mockOutboxService.enqueue).not.toHaveBeenCalled();
+    },
+  );
+
+  it('checks the actor after password hashing, including account state and forced change', async () => {
+    mockUserModel.findUnique.mockResolvedValue(baseUser);
+    mockBcryptHash.mockImplementation(() => {
+      mockUserModel.findFirst.mockResolvedValue(null);
+      return Promise.resolve('unused-hash');
+    });
+    await expect(
+      service.resetPassword(
+        2,
+        { password: 'fixture-password-123' },
+        { userId: 1, role: UserRole.IT_STAFF },
+      ),
+    ).rejects.toThrow(ForbiddenException);
+    expect(mockUserModel.findFirst).toHaveBeenCalledWith({
+      where: {
+        id: 1,
+        role: { in: [UserRole.ADMIN, UserRole.IT_STAFF] },
+        isActive: true,
+        isLocked: false,
+        mustChangePassword: false,
+      },
+      select: { id: true },
+    });
+    expect(mockUserModel.updateMany).not.toHaveBeenCalled();
   });
 
   it('changes the current password, clears the forced-change flag, and revokes sessions', async () => {
