@@ -14,6 +14,7 @@ import { CloudinaryService } from '../cloudinary/cloudinary.service';
 import { OutboxService } from '../outbox/outbox.service';
 import { OUTBOX_EVENT_TYPES } from '../outbox/outbox.constants';
 import type { CurrentUserPayload } from '../common/decorators/current-user.decorator';
+import { runSerializableTransaction } from '../common/database/serializable-transaction.util';
 import { TicketAccessPolicyService } from './ticket-access-policy.service';
 import { normalizeAttachmentFileName } from './ticket-attachment.util';
 import {
@@ -62,49 +63,53 @@ export class TicketAttachmentService {
     );
 
     try {
-      return await this.prisma.$transaction(async (transaction) => {
-        const attachment = await transaction.ticketAttachment.create({
-          data: {
-            ticketId,
-            uploadedById: currentUser.userId,
-            fileName,
-            fileType: file.mimetype,
-            fileSize: file.size,
-            fileUrl: uploadedFile.secureUrl,
-            publicId: uploadedFile.publicId,
-            resourceType: uploadedFile.resourceType,
-            deliveryType: uploadedFile.deliveryType,
-            format: uploadedFile.format,
-          },
-          select: {
-            id: true,
-            fileName: true,
-            fileUrl: true,
-            fileType: true,
-            fileSize: true,
-            createdAt: true,
-            uploadedBy: {
-              select: {
-                id: true,
-                name: true,
-                email: true,
-                role: true,
+      return await runSerializableTransaction(
+        this.prisma,
+        async (transaction) => {
+          await this.access.canAccessTicket(ticketId, currentUser, transaction);
+          const attachment = await transaction.ticketAttachment.create({
+            data: {
+              ticketId,
+              uploadedById: currentUser.userId,
+              fileName,
+              fileType: file.mimetype,
+              fileSize: file.size,
+              fileUrl: uploadedFile.secureUrl,
+              publicId: uploadedFile.publicId,
+              resourceType: uploadedFile.resourceType,
+              deliveryType: uploadedFile.deliveryType,
+              format: uploadedFile.format,
+            },
+            select: {
+              id: true,
+              fileName: true,
+              fileUrl: true,
+              fileType: true,
+              fileSize: true,
+              createdAt: true,
+              uploadedBy: {
+                select: {
+                  id: true,
+                  name: true,
+                  email: true,
+                  role: true,
+                },
               },
             },
-          },
-        });
+          });
 
-        await transaction.ticketHistory.create({
-          data: {
-            ticketId,
-            userId: currentUser.userId,
-            action: TicketHistoryAction.ATTACHMENT_ADDED,
-            newValue: attachment.fileName,
-          },
-        });
+          await transaction.ticketHistory.create({
+            data: {
+              ticketId,
+              userId: currentUser.userId,
+              action: TicketHistoryAction.ATTACHMENT_ADDED,
+              newValue: attachment.fileName,
+            },
+          });
 
-        return attachment;
-      });
+          return attachment;
+        },
+      );
     } catch (error) {
       try {
         await this.cloudinaryService.deleteFile(

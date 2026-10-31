@@ -1040,6 +1040,11 @@ describe('TicketsService', () => {
       secureUrl:
         'https://res.cloudinary.com/demo/video/upload/v1/recording.mp4',
     });
+    mockTransaction.ticket.findUnique.mockResolvedValue({
+      id: 5,
+      createdById: 2,
+      createdBy: { departmentId: 1 },
+    });
     mockTransaction.ticketAttachment.create.mockResolvedValue(
       createdAttachment,
     );
@@ -1175,6 +1180,11 @@ describe('TicketsService', () => {
     mockTransaction.ticketAttachment.create.mockResolvedValue({
       id: 20,
       fileName: '.._folder_report.pdf',
+    });
+    mockTransaction.ticket.findUnique.mockResolvedValue({
+      id: 5,
+      createdById: 2,
+      createdBy: { departmentId: 1 },
     });
     mockTransaction.ticketHistory.create.mockResolvedValue({ id: 100 });
 

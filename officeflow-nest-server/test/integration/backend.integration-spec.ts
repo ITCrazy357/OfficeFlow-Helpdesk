@@ -1,5 +1,9 @@
 import { ConfigService } from '@nestjs/config';
-import { ForbiddenException, UnauthorizedException } from '@nestjs/common';
+import {
+  ForbiddenException,
+  NotFoundException,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 import { EventEmitter2 } from '@nestjs/event-emitter';
@@ -1185,6 +1189,82 @@ describe('Real MySQL/Redis integration (disposable containers only)', () => {
       other.onApplicationShutdown();
     }
   });
+  it.each(['department', 'ticket_deleted'] as const)(
+    'does not save an uploaded asset after access changes: %s',
+    async (change) => {
+      const department = await prisma.department.create({
+        data: { name: randomUUID() },
+      });
+      const requester = await prisma.user.create({
+        data: {
+          name: 'Requester fixture',
+          email: `${randomUUID()}@test.invalid`,
+          passwordHash: 'test-only',
+          departmentId: department.id,
+        },
+      });
+      const manager = await prisma.user.create({
+        data: {
+          name: 'Manager fixture',
+          email: `${randomUUID()}@test.invalid`,
+          passwordHash: 'test-only',
+          role: UserRole.MANAGER,
+          departmentId: department.id,
+        },
+      });
+      const ticket = await tickets.create(
+        { title: randomUUID(), description: 'Upload authorization fixture' },
+        { userId: requester.id, role: requester.role },
+      );
+      const uploaded = {
+        publicId: randomUUID(),
+        resourceType: 'raw',
+        deliveryType: 'authenticated',
+        format: 'pdf',
+        secureUrl: 'https://res.cloudinary.com/test/raw/authenticated/test.pdf',
+      };
+      cloudinary.uploadFile.mockImplementationOnce(async () => {
+        if (change === 'department') {
+          await prisma.user.update({
+            where: { id: manager.id },
+            data: { departmentId: null },
+          });
+        } else {
+          await tickets.remove(ticket.id, admin);
+        }
+        return uploaded;
+      });
+      cloudinary.deleteFile.mockResolvedValueOnce(undefined);
+      const file = {
+        originalname: 'report.pdf',
+        mimetype: 'application/pdf',
+        size: 12,
+      } as Express.Multer.File;
+      await expect(
+        tickets.uploadAttachment(ticket.id, file, {
+          userId: manager.id,
+          role: manager.role,
+        }),
+      ).rejects.toThrow(
+        change === 'department' ? ForbiddenException : NotFoundException,
+      );
+      expect(
+        await prisma.ticketAttachment.count({ where: { ticketId: ticket.id } }),
+      ).toBe(0);
+      expect(
+        await prisma.ticketHistory.count({
+          where: { ticketId: ticket.id, action: 'ATTACHMENT_ADDED' },
+        }),
+      ).toBe(0);
+      expect(cloudinary.uploadFile).toHaveBeenCalledTimes(1);
+      expect(cloudinary.deleteFile).toHaveBeenCalledWith(
+        uploaded.publicId,
+        uploaded.resourceType,
+        uploaded.deliveryType,
+      );
+    },
+  );
+
   it('uses database authorization before signing or downloading an attachment', async () => {
     const ticket = await createTicket();
     const attachment = await prisma.ticketAttachment.create({
