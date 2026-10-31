@@ -1931,6 +1931,34 @@ describe('Real MySQL/Redis integration (disposable containers only)', () => {
     enqueue.mockRestore();
   });
 
+  it('uses the public ticket detail version to reopen and confirm the latest result', async () => {
+    const ticket = await createTicket();
+    await tickets.updateStatus(ticket.id, { status: 'IN_PROGRESS' }, admin);
+    await tickets.updateStatus(ticket.id, { status: 'RESOLVED' }, admin);
+    const first = await tickets.canGetById(ticket.id, employee);
+    expect(first.resolutionVersion).toBe(1);
+    expect(first.confirmedAt).toBeNull();
+    await feedback.reopen(
+      ticket.id,
+      {
+        resolutionVersion: first.resolutionVersion,
+        reason: 'Still unable to connect',
+      },
+      employee,
+    );
+    await tickets.updateStatus(ticket.id, { status: 'RESOLVED' }, admin);
+    const latest = await tickets.canGetById(ticket.id, employee);
+    expect(latest.resolutionVersion).toBe(2);
+    await feedback.confirm(
+      ticket.id,
+      { resolutionVersion: latest.resolutionVersion },
+      employee,
+    );
+    expect(
+      (await tickets.canGetById(ticket.id, employee)).confirmedAt,
+    ).toBeInstanceOf(Date);
+  });
+
   it('requires requester confirmation, rejects stale cycles, preserves original SLA and serializes competing responses', async () => {
     const ticket = await createTicket();
     await tickets.updateStatus(ticket.id, { status: 'IN_PROGRESS' }, admin);

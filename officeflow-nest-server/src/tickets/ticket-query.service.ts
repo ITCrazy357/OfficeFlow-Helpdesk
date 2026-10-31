@@ -344,6 +344,8 @@ export class TicketQueryService {
 
     return {
       id: ticket.id,
+      resolutionVersion: ticket.resolutionVersion,
+      confirmedAt: ticket.confirmedAt,
       title: ticket.title,
       description: ticket.description,
       status: ticket.status,
