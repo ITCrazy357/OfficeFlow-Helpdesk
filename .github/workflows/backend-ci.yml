@@ -14,6 +14,7 @@ on:
       - ".gitleaksignore"
       - ".gitignore"
       - "scripts/prototype-safety.test.cjs"
+      - "scripts/legacy-matcher.test.cjs"
       - "**/*.sql"
       - "**/*.sql.*"
 

@@ -6,6 +6,7 @@ RUN npm install --global npm@12.2.0
 WORKDIR /app
 
 COPY package*.json ./
+COPY vendor ./vendor
 
 RUN npm ci
 

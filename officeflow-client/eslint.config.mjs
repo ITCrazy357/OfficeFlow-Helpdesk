@@ -16,6 +16,8 @@ const eslintConfig = defineConfig([
     "coverage/**",
     "test-results/**",
     "playwright-report/**",
+    // Vendored dependency code has its own security/compatibility tests.
+    "vendor/**",
   ]),
 ]);
 

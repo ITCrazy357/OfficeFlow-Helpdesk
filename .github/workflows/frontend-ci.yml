@@ -9,6 +9,7 @@ on:
       - "officeflow-client/**"
       - ".github/workflows/frontend-ci.yml"
       - "scripts/prototype-safety.test.cjs"
+      - "scripts/legacy-matcher.test.cjs"
   workflow_dispatch:
 
 permissions:
