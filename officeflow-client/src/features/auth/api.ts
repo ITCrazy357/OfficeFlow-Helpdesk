@@ -1,4 +1,4 @@
-import { api, refreshAccessToken } from "@/lib/axios";
+import { api, requestSession } from "@/lib/axios";
 import type { ApiResponse } from "@/types/api";
 import type {
   AuthUser,
@@ -13,7 +13,11 @@ import type {
 } from "./types";
 
 export async function loginApi(input: LoginInput) {
-  const res = await api.post<ApiResponse<LoginResponse>>("/auth/login", input);
+  const res = await requestSession<ApiResponse<LoginResponse>>({
+    method: "post",
+    url: "/auth/login",
+    data: input,
+  });
   return res.data.data;
 }
 
@@ -23,15 +27,19 @@ export async function getMeApi() {
 }
 
 export async function restoreSessionApi() {
-  await refreshAccessToken();
-  return getMeApi();
+  const res = await requestSession<ApiResponse<AuthUser>>({
+    method: "get",
+    url: "/auth/me",
+  });
+  return res.data.data;
 }
 
 export async function changePasswordApi(input: ChangePasswordInput) {
-  const res = await api.patch<ApiResponse<ChangePasswordResponse>>(
-    "/users/me/password",
-    input,
-  );
+  const res = await requestSession<ApiResponse<ChangePasswordResponse>>({
+    method: "patch",
+    url: "/users/me/password",
+    data: input,
+  });
   return res.data.data;
 }
 
@@ -46,17 +54,16 @@ export async function forgotPasswordApi(input: ForgotPasswordInput) {
 export async function resetForgottenPasswordApi(
   input: ResetForgottenPasswordInput,
 ) {
-  const res = await api.post<ApiResponse<ResetForgottenPasswordResponse>>(
-    "/auth/reset-password",
-    input,
+  const res = await requestSession<ApiResponse<ResetForgottenPasswordResponse>>(
+    { method: "post", url: "/auth/reset-password", data: input },
   );
   return res.data.data;
 }
 
 export async function logoutApi() {
-  await api.post("/auth/logout");
+  await requestSession({ method: "post", url: "/auth/logout" });
 }
 
 export async function logoutAllApi() {
-  await api.post("/auth/logout-all");
+  await requestSession({ method: "post", url: "/auth/logout-all" });
 }

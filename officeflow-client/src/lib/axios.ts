@@ -1,6 +1,7 @@
 import axios from "axios";
-import type { InternalAxiosRequestConfig } from "axios";
+import type { AxiosResponse, InternalAxiosRequestConfig } from "axios";
 import { getAccessToken, removeAccessToken, setAccessToken } from "./token";
+import { assertRefreshCoordination, withSessionLock } from "./session-lock";
 import type { ApiErrorResponse, ApiResponse } from "@/types/api";
 
 const DEFAULT_API_TIMEOUT_MS = 70000;
@@ -30,8 +31,6 @@ type RetryableRequestConfig = InternalAxiosRequestConfig & {
   _retry?: boolean;
 };
 
-let refreshRequest: Promise<string> | null = null;
-
 export function isUnauthorizedError(error: unknown) {
   return axios.isAxiosError(error) && error.response?.status === 401;
 }
@@ -39,32 +38,83 @@ export function isUnauthorizedError(error: unknown) {
 function isRefreshExcludedEndpoint(url?: string) {
   const path = url?.split("?")[0];
 
-  return ["/auth/login", "/auth/refresh", "/auth/logout"].includes(path ?? "");
+  return [
+    "/auth/login",
+    "/auth/refresh",
+    "/auth/logout",
+    "/auth/forgot-password",
+    "/auth/reset-password",
+  ].includes(path ?? "");
 }
 
-export function refreshAccessToken(): Promise<string> {
-  if (!refreshRequest) {
-    refreshRequest = authApi
-      .post<ApiResponse<RefreshAccessTokenResponse>>("/auth/refresh")
-      .then((response) => {
-        const token = response.data.data.accessToken;
-        setAccessToken(token);
-        return token;
-      })
-      .catch((error: unknown) => {
-        if (isUnauthorizedError(error)) {
-          removeAccessToken();
-        }
-        throw error;
-      })
-      .finally(() => {
-        refreshRequest = null;
-      });
+// Called only while the shared session lock is held.
+async function refreshAccessTokenUnlocked(): Promise<string> {
+  assertRefreshCoordination();
+  try {
+    const response =
+      await authApi.post<ApiResponse<RefreshAccessTokenResponse>>(
+        "/auth/refresh",
+      );
+    const token = response.data.data.accessToken;
+    setAccessToken(token);
+    return token;
+  } catch (error) {
+    if (isUnauthorizedError(error)) removeAccessToken();
+    throw error;
   }
-
-  return refreshRequest;
 }
 
+async function recoverSession<T>(
+  failedAuthorization: unknown,
+  send: (token: string) => Promise<T>,
+): Promise<T> {
+  const current = getAccessToken();
+  // A preceding request in this tab may already have refreshed the session.
+  if (current && `Bearer ${current}` !== failedAuthorization) {
+    try {
+      return await send(current);
+    } catch (error) {
+      if (!isUnauthorizedError(error)) throw error;
+    }
+  }
+  const token = await refreshAccessTokenUnlocked();
+  try {
+    return await send(token);
+  } catch (error) {
+    if (isUnauthorizedError(error)) removeAccessToken();
+    throw error;
+  }
+}
+
+type SessionRequest = {
+  method: "get" | "post" | "patch";
+  url: string;
+  data?: unknown;
+};
+
+// Cookie-changing auth requests and restoration share the same cross-tab lock.
+export function requestSession<T>(
+  config: SessionRequest,
+): Promise<AxiosResponse<T>> {
+  return withSessionLock(async () => {
+    const token = getAccessToken();
+    const send = (accessToken: string | null) =>
+      authApi.request<T>({
+        ...config,
+        headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : {},
+      });
+    try {
+      return await send(token);
+    } catch (error) {
+      if (!isUnauthorizedError(error)) throw error;
+      if (isRefreshExcludedEndpoint(config.url)) {
+        removeAccessToken();
+        throw error;
+      }
+      return recoverSession(token ? `Bearer ${token}` : undefined, send);
+    }
+  });
+}
 api.interceptors.request.use((config) => {
   const token = getAccessToken();
 
@@ -102,13 +152,15 @@ api.interceptors.response.use(
 
     originalRequest._retry = true;
 
-    try {
-      const token = await refreshAccessToken();
-      originalRequest.headers.set("Authorization", `Bearer ${token}`);
-      return api.request(originalRequest);
-    } catch (refreshError) {
-      return Promise.reject(refreshError);
-    }
+    const failedAuthorization = originalRequest.headers.get("Authorization");
+    return withSessionLock(() =>
+      recoverSession(failedAuthorization, (token) => {
+        originalRequest.headers.set("Authorization", `Bearer ${token}`);
+        // Keep the lock through the retry; another tab must not rotate this token
+        // before the retried request reaches the backend session guard.
+        return authApi.request(originalRequest);
+      }),
+    );
   },
 );
 
