@@ -1,0 +1,9 @@
+{
+  "name": "@officeflow/minimatch-compat",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Callable legacy export backed by patched minimatch 11",
+  "main": "index.cjs",
+  "license": "MIT",
+  "peerDependencies": { "minimatch-modern": "11.0.1" }
+}

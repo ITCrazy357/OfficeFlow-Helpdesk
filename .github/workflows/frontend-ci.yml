@@ -9,6 +9,7 @@ on:
       - "officeflow-client/**"
       - ".github/workflows/frontend-ci.yml"
       - "scripts/prototype-safety.test.cjs"
+      - "scripts/legacy-matcher.test.cjs"
   workflow_dispatch:
 
 permissions:
@@ -43,8 +44,8 @@ jobs:
         run: npm install --global npm@12.2.0 --ignore-scripts --no-audit --no-fund
       - name: Install dependencies
         run: npm ci
-      - name: Audit locked production dependencies
-        run: npm audit --omit=dev --audit-level=high
+      - name: Audit all locked dependencies including development tools
+        run: npm audit --audit-level=low
       - name: Lint
         run: npm run lint
       - name: Prototype safety for development tools

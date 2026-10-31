@@ -1,0 +1,9 @@
+{
+  "name": "@officeflow/glob-compat",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Legacy callable/callback and modern named exports backed by glob 14",
+  "main": "index.cjs",
+  "license": "MIT",
+  "peerDependencies": { "glob-modern": "14.0.2" }
+}

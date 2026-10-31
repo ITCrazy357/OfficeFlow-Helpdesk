@@ -9,7 +9,7 @@
     "start": "next start",
     "lint": "eslint",
     "test": "node --test tests/*.test.mjs",
-    "test:prototype-safety": "node --disable-proto=throw --test ../scripts/prototype-safety.test.cjs",
+    "test:prototype-safety": "node --test ../scripts/prototype-safety.test.cjs ../scripts/legacy-matcher.test.cjs",
     "ui": "node --disable-proto=throw node_modules/shadcn/dist/index.js",
     "test:ui": "playwright test"
   },
@@ -33,6 +33,11 @@
     "zod": "^4.6.7"
   },
   "devDependencies": {
+    "deepmerge": "file:./vendor/deepmerge-safe",
+    "glob": "file:./vendor/glob-compat",
+    "glob-modern": "npm:glob@14.0.2",
+    "minimatch-modern": "npm:minimatch@11.0.1",
+    "minimatch": "file:./vendor/minimatch-compat",
     "@playwright/test": "^1.64.1",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
@@ -45,8 +50,9 @@
     "typescript": "^5"
   },
   "overrides": {
-    "glob@>=9.0.0 <14.0.2": "14.0.2",
-    "minimatch@>=9.0.0 <11.0.1": "11.0.1",
+    "deepmerge": "$deepmerge",
+    "minimatch": "$minimatch",
+    "glob": "$glob",
     "postcss": "8.5.25",
     "sharp": "0.35.5"
   }

@@ -27,7 +27,7 @@
     "test:redis": "node scripts/redis-smoke-test.js",
     "test:integration": "node scripts/test-integration.cjs",
     "test:integration:safety": "node --test scripts/integration-safety.test.cjs",
-    "test:prototype-safety": "node --test ../scripts/prototype-safety.test.cjs",
+    "test:prototype-safety": "node --test ../scripts/prototype-safety.test.cjs ../scripts/legacy-matcher.test.cjs",
     "test:metrics:http": "npm run build:ci && node --test test/metrics.http.test.cjs",
     "test:watch": "node --experimental-vm-modules node_modules/jest/bin/jest.js --watch",
     "test:cov": "node --experimental-vm-modules node_modules/jest/bin/jest.js --coverage",
@@ -67,6 +67,11 @@
     "swagger-ui-express": "^5.0.1"
   },
   "devDependencies": {
+    "deepmerge": "file:./vendor/deepmerge-safe",
+    "glob": "file:./vendor/glob-compat",
+    "glob-modern": "npm:glob@14.0.2",
+    "minimatch-modern": "npm:minimatch@11.0.1",
+    "minimatch": "file:./vendor/minimatch-compat",
     "@eslint/eslintrc": "^3.2.0",
     "@eslint/js": "^9.18.0",
     "@nestjs/cli": "^11.0.0",
@@ -99,8 +104,9 @@
     "typescript-eslint": "^8.20.0"
   },
   "overrides": {
-    "glob@>=9.0.0 <14.0.2": "14.0.2",
-    "minimatch@>=9.0.0 <11.0.1": "11.0.1",
+    "deepmerge": "$deepmerge",
+    "minimatch": "$minimatch",
+    "glob": "$glob",
     "body-parser": "2.4.0",
     "fast-uri": "3.1.9",
     "qs": "6.17.1",
