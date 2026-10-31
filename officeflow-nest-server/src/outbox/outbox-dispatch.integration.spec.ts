@@ -10,6 +10,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { CloudinaryCleanupListener } from './cloudinary-cleanup.listener';
 import { OutboxProcessor } from './outbox.processor';
 import { MetricsService } from '../metrics/metrics.service';
+import { TicketAccessPolicyService } from '../tickets/ticket-access-policy.service';
 
 // Jest matchers return any; keep nested expected values explicitly unknown.
 function objectContaining(value: Record<string, unknown>): unknown {
@@ -29,7 +30,9 @@ describe('Outbox dispatch through real Nest event subscribers', () => {
   let processor: OutboxProcessor;
   const database = {
     outboxEvent: { findMany: jest.fn(), updateMany: jest.fn() },
-    user: { findUnique: jest.fn() },
+    user: { findUnique: jest.fn(), findMany: jest.fn() },
+    ticket: { findUnique: jest.fn() },
+    $transaction: jest.fn(),
     notification: { createMany: jest.fn() },
   };
   const cloudinary = { deleteFile: jest.fn() };
@@ -64,6 +67,17 @@ describe('Outbox dispatch through real Nest event subscribers', () => {
       email: 'it@example.com',
       isActive: true,
     });
+    database.user.findMany.mockResolvedValue([
+      { id: 7, name: 'IT Staff', email: 'it@example.com', role: 'IT_STAFF' },
+    ]);
+    database.ticket.findUnique.mockResolvedValue({
+      id: 42,
+      createdById: 99,
+      createdBy: { departmentId: 1 },
+    });
+    database.$transaction.mockImplementation(
+      (work: (tx: typeof database) => Promise<unknown>) => work(database),
+    );
     database.notification.createMany.mockResolvedValue({ count: 1 });
     cloudinary.deleteFile.mockResolvedValue(undefined);
     mail.sendEmail.mockResolvedValue(undefined);
@@ -76,6 +90,7 @@ describe('Outbox dispatch through real Nest event subscribers', () => {
         TicketEmailListener,
         NotificationsListener,
         NotificationsService,
+        TicketAccessPolicyService,
         { provide: PrismaService, useValue: database },
         { provide: CloudinaryService, useValue: cloudinary },
         { provide: MailService, useValue: mail },

@@ -29,7 +29,7 @@ export class NotificationsListener {
         : event.kind === 'ESCALATED'
           ? 'Ticket cần quản lý hỗ trợ'
           : 'Ticket quá hạn phản hồi';
-    await this.notificationsService.createdMany({
+    await this.notificationsService.createdManyForTicket(event.ticketId, {
       userIds: event.recipientIds,
       type:
         event.kind === 'ESCALATED'
@@ -48,8 +48,8 @@ export class NotificationsListener {
   async handleTicketAssignedEvent(
     event: TicketAssignedEvent & OutboxDispatchedEvent,
   ) {
-    await this.notificationsService.create({
-      userId: event.assignedToId,
+    await this.notificationsService.createdManyForTicket(event.ticketId, {
+      userIds: [event.assignedToId],
       type: NotificationType.TICKET_ASSIGNED,
       title: 'New ticket assigned',
       message: `${event.assignedByName} assigned ticket "${event.ticketTitle}" to you`,
@@ -66,7 +66,7 @@ export class NotificationsListener {
       (id) => id !== event.commentAuthorId,
     );
 
-    await this.notificationsService.createdMany({
+    await this.notificationsService.createdManyForTicket(event.ticketId, {
       userIds: recipientIds,
       type: NotificationType.TICKET_COMMENTED,
       title: 'New ticket comment',
@@ -84,7 +84,7 @@ export class NotificationsListener {
       (id) => id !== event.changedById,
     );
 
-    await this.notificationsService.createdMany({
+    await this.notificationsService.createdManyForTicket(event.ticketId, {
       userIds: recipientIds,
       type: NotificationType.TICKET_STATUS_CHANGED,
       title: 'Ticket status changed',
@@ -98,7 +98,7 @@ export class NotificationsListener {
   async handleTicketOverdueEvent(
     event: TicketOverdueEvent & OutboxDispatchedEvent,
   ) {
-    await this.notificationsService.createdMany({
+    await this.notificationsService.createdManyForTicket(event.ticketId, {
       userIds: event.recipientIds,
       type: NotificationType.TICKET_OVERDUE,
       title: 'Ticket overdue',

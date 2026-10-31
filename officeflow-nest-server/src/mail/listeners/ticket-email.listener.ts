@@ -14,6 +14,7 @@ import { ticketOverdueEmailTemplate } from '../templates/ticket-overdue-email.te
 import { ticketResolvedEmailTemplate } from '../templates/ticket-resolved-email.template';
 import type { TicketSlaAlertEvent } from '../../notifications/events/ticket-sla-alert.event';
 import { ticketSlaAlertEmailTemplate } from '../templates/ticket-sla-alert-email.template';
+import { TicketAccessPolicyService } from '../../tickets/ticket-access-policy.service';
 
 @Injectable()
 export class TicketEmailListener {
@@ -22,21 +23,19 @@ export class TicketEmailListener {
   constructor(
     private readonly prisma: PrismaService,
     private readonly mailService: MailService,
+    private readonly ticketAccess: TicketAccessPolicyService,
   ) {}
 
   @OnEvent('ticket.sla_alert', { suppressErrors: false })
   async handleTicketSlaAlert(event: TicketSlaAlertEvent) {
     if (!this.mailService.isEnabled()) return;
-    const recipients = await this.prisma.user.findMany({
-      where: {
-        id: { in: [...new Set(event.recipientIds)] },
-        isActive: true,
-        isLocked: false,
-      },
-      select: { id: true, name: true, email: true },
-    });
     const failures: number[] = [];
-    for (const recipient of recipients) {
+    for (const id of new Set(event.recipientIds)) {
+      const [recipient] = await this.ticketAccess.getRecipients(
+        event.ticketId,
+        [id],
+      );
+      if (!recipient) continue;
       const email = ticketSlaAlertEmailTemplate(
         event,
         recipient.name,
@@ -123,18 +122,12 @@ export class TicketEmailListener {
     }
 
     try {
-      const assignedTo = await this.prisma.user.findUnique({
-        where: {
-          id: event.assignedToId,
-        },
-        select: {
-          name: true,
-          email: true,
-          isActive: true,
-        },
-      });
+      const [assignedTo] = await this.ticketAccess.getRecipients(
+        event.ticketId,
+        [event.assignedToId],
+      );
 
-      if (!assignedTo?.email || !assignedTo.isActive) {
+      if (!assignedTo?.email) {
         this.logger.warn(
           `Cannot send assigned email: assignee ${event.assignedToId} has no active email`,
         );
@@ -239,23 +232,14 @@ export class TicketEmailListener {
         return;
       }
 
-      const recipients = await this.prisma.user.findMany({
-        where: {
-          id: {
-            in: recipientIds,
-          },
-          isActive: true,
-        },
-        select: {
-          id: true,
-          name: true,
-          email: true,
-        },
-      });
-
       const failedRecipientIds: number[] = [];
 
-      for (const recipient of recipients) {
+      for (const id of recipientIds) {
+        const [recipient] = await this.ticketAccess.getRecipients(
+          event.ticketId,
+          [id],
+        );
+        if (!recipient) continue;
         const email = ticketOverdueEmailTemplate({
           recipientName: recipient.name || 'User',
           ticketId: event.ticketId,

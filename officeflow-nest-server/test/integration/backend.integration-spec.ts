@@ -50,6 +50,8 @@ import { AiTask } from '../../src/ai/types/ai-draft.type';
 import { AuthService } from '../../src/auth/auth.service';
 import { AccountService } from '../../src/users/accounts.service';
 import { UsersService } from '../../src/users/users.service';
+import { TicketEmailListener } from '../../src/mail/listeners/ticket-email.listener';
+import type { MailService } from '../../src/mail/mail.service';
 
 describe('Real MySQL/Redis integration (disposable containers only)', () => {
   const prisma = new PrismaService(
@@ -960,7 +962,7 @@ describe('Real MySQL/Redis integration (disposable containers only)', () => {
     expect(payload.recipientIds).not.toContain(employee.userId);
     const listener = new AssetWarrantyNotificationListener(
       prisma,
-      new NotificationsService(prisma),
+      new NotificationsService(prisma, new TicketAccessPolicyService(prisma)),
     );
     await listener.handle({ ...payload, outboxEventId: event.id });
     await listener.handle({ ...payload, outboxEventId: event.id });
@@ -1876,7 +1878,7 @@ describe('Real MySQL/Redis integration (disposable containers only)', () => {
       expect.arrayContaining([admin.userId, manager.userId]),
     );
     const listener = new NotificationsListener(
-      new NotificationsService(prisma),
+      new NotificationsService(prisma, new TicketAccessPolicyService(prisma)),
     );
     await listener.handleTicketSlaAlert({
       ...payload,
@@ -1908,6 +1910,92 @@ describe('Real MySQL/Redis integration (disposable containers only)', () => {
       'Forbidden',
     );
   });
+
+  it.each(['demotion', 'department transfer'] as const)(
+    'does not disclose delayed SLA alerts after recipient %s',
+    async (operation) => {
+      const department = await prisma.department.create({
+        data: { name: randomUUID() },
+      });
+      const other = await prisma.department.create({
+        data: { name: randomUUID() },
+      });
+      const requester = await prisma.user.create({
+        data: {
+          name: 'Requester fixture',
+          email: `${randomUUID()}@test.invalid`,
+          passwordHash: 'test-only',
+          role: UserRole.EMPLOYEE,
+          departmentId: department.id,
+        },
+      });
+      const recipient = await prisma.user.create({
+        data: {
+          name: 'Former recipient fixture',
+          email: `${randomUUID()}@test.invalid`,
+          passwordHash: 'test-only',
+          role: operation === 'demotion' ? UserRole.ADMIN : UserRole.MANAGER,
+          departmentId: department.id,
+        },
+      });
+      const ticket = await tickets.create(
+        { title: 'Private SLA fixture', description: 'Confidential fixture' },
+        { userId: requester.id, role: UserRole.EMPLOYEE },
+      );
+      const event: TicketSlaAlertEvent = {
+        ticketId: ticket.id,
+        ticketTitle: ticket.title,
+        milestone: 'RESPONSE',
+        kind: 'ESCALATED',
+        dueAt: new Date().toISOString(),
+        recipientIds: [recipient.id, admin.userId, requester.id],
+        outboxEventId: randomUUID(),
+      };
+      const access = new TicketAccessPolicyService(prisma);
+      await access.canAccessTicket(ticket.id, {
+        userId: recipient.id,
+        role: recipient.role,
+      });
+      await new UsersService(prisma, audit, new EventEmitter2(), outbox).update(
+        recipient.id,
+        operation === 'demotion'
+          ? { role: UserRole.EMPLOYEE }
+          : { departmentId: other.id },
+        admin,
+      );
+      await expect(
+        access.canAccessTicket(ticket.id, {
+          userId: recipient.id,
+          role: operation === 'demotion' ? UserRole.EMPLOYEE : UserRole.MANAGER,
+        }),
+      ).rejects.toThrow(ForbiddenException);
+      const notifications = new NotificationsService(prisma, access);
+      await new NotificationsListener(notifications).handleTicketSlaAlert(
+        event,
+      );
+      expect(
+        (await notifications.findMine(recipient.id, {})).items,
+      ).toHaveLength(0);
+      expect(
+        await prisma.notification.count({
+          where: { sourceEventId: event.outboxEventId },
+        }),
+      ).toBe(2);
+      const mail = {
+        isEnabled: () => true,
+        sendEmail: jest.fn().mockResolvedValue({}),
+      };
+      await new TicketEmailListener(
+        prisma,
+        mail as unknown as MailService,
+        access,
+      ).handleTicketSlaAlert(event);
+      expect(mail.sendEmail).toHaveBeenCalledTimes(2);
+      expect(mail.sendEmail).not.toHaveBeenCalledWith(
+        expect.objectContaining({ to: recipient.email }),
+      );
+    },
+  );
 
   it('rolls back a warning marker when its outbox event cannot be persisted', async () => {
     const ticket = await createTicket();

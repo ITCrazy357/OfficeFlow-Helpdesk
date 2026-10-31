@@ -1,11 +1,11 @@
-import { UserRole } from '@prisma/client';
+import { UserRole, type Prisma } from '@prisma/client';
 import { TicketAccessPolicyService } from './ticket-access-policy.service';
 import type { PrismaService } from '../prisma/prisma.service';
 
 describe('TicketAccessPolicyService', () => {
   const prisma = {
     ticket: { findUnique: jest.fn(), count: jest.fn() },
-    user: { findUnique: jest.fn() },
+    user: { findUnique: jest.fn(), findMany: jest.fn() },
   };
   const service = new TicketAccessPolicyService(
     prisma as unknown as PrismaService,
@@ -16,6 +16,79 @@ describe('TicketAccessPolicyService', () => {
     prisma.ticket.findUnique.mockResolvedValue(ticket);
     prisma.user.findUnique.mockResolvedValue({ departmentId: 7 });
     prisma.ticket.count.mockResolvedValue(0);
+  });
+
+  it('filters delayed recipients using current roles, ownership and manager scope', async () => {
+    const candidates = [
+      {
+        id: 2,
+        name: 'Owner',
+        email: 'owner@test.invalid',
+        role: UserRole.EMPLOYEE,
+      },
+      {
+        id: 3,
+        name: 'Former admin',
+        email: 'former@test.invalid',
+        role: UserRole.EMPLOYEE,
+      },
+      {
+        id: 9,
+        name: 'Admin',
+        email: 'admin@test.invalid',
+        role: UserRole.ADMIN,
+      },
+      {
+        id: 4,
+        name: 'Manager',
+        email: 'manager@test.invalid',
+        role: UserRole.MANAGER,
+      },
+    ];
+    prisma.user.findMany.mockResolvedValue(candidates);
+    const transaction = prisma as unknown as Prisma.TransactionClient;
+    expect(
+      (await service.getRecipients(1, [2, 3, 9, 4, 2], transaction)).map(
+        (user) => user.id,
+      ),
+    ).toEqual([2, 9, 4]);
+    expect(prisma.user.findMany).toHaveBeenCalledWith({
+      where: {
+        id: { in: [2, 3, 9, 4] },
+        isActive: true,
+        isLocked: false,
+        mustChangePassword: false,
+      },
+      select: { id: true, name: true, email: true, role: true },
+    });
+    prisma.user.findUnique.mockResolvedValue({ departmentId: 8 });
+    expect(
+      (await service.getRecipients(1, [2, 3, 9, 4], transaction)).map(
+        (user) => user.id,
+      ),
+    ).toEqual([2, 9]);
+  });
+
+  it('skips a deleted ticket but propagates database failures for outbox retry', async () => {
+    prisma.user.findMany.mockResolvedValue([
+      {
+        id: 3,
+        name: 'Former admin',
+        email: 'former@test.invalid',
+        role: UserRole.EMPLOYEE,
+      },
+    ]);
+    const transaction = prisma as unknown as Prisma.TransactionClient;
+    prisma.ticket.findUnique.mockResolvedValue(null);
+    await expect(service.getRecipients(1, [3], transaction)).resolves.toEqual(
+      [],
+    );
+    prisma.ticket.findUnique.mockRejectedValue(
+      new Error('fixture database outage'),
+    );
+    await expect(service.getRecipients(1, [3], transaction)).rejects.toThrow(
+      'fixture database outage',
+    );
   });
   it.each([UserRole.ADMIN, UserRole.IT_STAFF])(
     'allows %s to access a ticket without a department lookup',
