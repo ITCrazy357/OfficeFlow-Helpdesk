@@ -1,5 +1,11 @@
 # OfficeFlow — các phần còn lại sau 64.1
 
+Cập nhật phần 73–75: cảnh báo bảo mật dev legacy đã được xử lý bằng engine
+glob/minimatch đã vá và fork deepmerge có kiểm thử payload; audit đầy đủ hai
+ứng dụng bằng 0. Xem [bằng chứng và trạng thái F1 mới nhất](2026-10-31-dependency-closure.md).
+Các số audit ở phần 71 dưới đây là kết quả tại thời điểm đó. F1 vẫn chờ xử lý
+tài khoản production và xác nhận purge của GitHub Support.
+
 | Phần | Thay đổi | Bằng chứng |
 | --- | --- | --- |
 | 65 | Trả `resolutionVersion` và `confirmedAt` trong chi tiết ticket | Unit thất bại trước sửa; MySQL đọc chi tiết, reopen và confirm bằng phiên bản trả về đạt |

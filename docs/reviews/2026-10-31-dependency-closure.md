@@ -63,6 +63,20 @@ Vercel deployment của commit merge phần 72 cũng đã được xác nhận s
 GitHub status và deployment environment Production. Chưa dùng điều này làm
 bằng chứng đã deploy phần 73–74.
 
+## 75 — đồng bộ cài dependency trên Vercel
+
+`officeflow-client/vercel.json` chạy `npx --yes --package=npm@12.2.0 -- npm ci`,
+để cùng phiên bản npm và lockfile với CI/Docker. Không dựa riêng vào trường
+packageManager vì [Vercel chỉ dùng trường đó khi có Corepack](https://vercel.com/docs/package-managers).
+Không sửa thiết lập môi trường hay bí mật trên Vercel.
+
+Chạy đúng installCommand trong Linux sạch rồi qua 8 dependency safety test,
+lint, typegen/TypeScript, 38 regression test và production build. Test đối chiếu
+25 trạng thái ticket có mount đúng contract backend chỉ đọc. CLI shadcn cũng
+khởi động và trả phiên bản thành công với workaround bảo vệ prototype đang có.
+Hai workflow YAML parse hợp lệ; các bản vendor ở hai ứng dụng giống nhau.
+Quét toàn lịch sử tới phần 74: 145 commit, không phát hiện leak mới.
+
 ## F1 — trạng thái vận hành
 
 Chưa có phiên ADMIN production hợp lệ để xác minh đổi/reset mật khẩu và thu hồi
