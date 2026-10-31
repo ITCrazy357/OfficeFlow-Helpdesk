@@ -4,11 +4,12 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
-import type { UserRole } from '@prisma/client';
+import type { Prisma, UserRole } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
 
 import { PrismaService } from '../prisma/prisma.service';
+import { runSerializableTransaction } from '../common/database/serializable-transaction.util';
 import { LoginDto } from './dto/login.dto';
 import { REFRESH_TOKEN_TTL_MS } from './auth-cookie';
 
@@ -56,6 +57,7 @@ export class AuthService {
   }
 
   private async createRefreshSession(
+    transaction: Prisma.TransactionClient,
     userId: number,
     metadata: RequestMetadata,
   ) {
@@ -63,7 +65,7 @@ export class AuthService {
     const expiresAt = new Date(Date.now() + REFRESH_TOKEN_TTL_MS);
     const id = randomUUID();
 
-    await this.prisma.refreshToken.create({
+    await transaction.refreshToken.create({
       data: {
         id,
         tokenHash: hashRefreshToken(token),
@@ -94,21 +96,47 @@ export class AuthService {
       throw new UnauthorizedException('Invalid email or password');
     }
 
-    const session = await this.createRefreshSession(user.id, metadata);
-    const accessToken = this.signAccessToken(user, session.id);
+    // Password verification is expensive, so keep it outside the transaction.
+    // The serializable read orders session creation against password/account
+    // changes, whose transactions also revoke all existing sessions.
+    const { session, currentUser } = await runSerializableTransaction(
+      this.prisma,
+      async (transaction) => {
+        const currentUser = await transaction.user.findUnique({
+          where: { id: user.id },
+        });
+
+        if (
+          !currentUser ||
+          currentUser.passwordHash !== user.passwordHash ||
+          !currentUser.isActive ||
+          currentUser.isLocked
+        ) {
+          throw new UnauthorizedException('Invalid email or password');
+        }
+
+        const session = await this.createRefreshSession(
+          transaction,
+          currentUser.id,
+          metadata,
+        );
+        return { session, currentUser };
+      },
+    );
+    const accessToken = this.signAccessToken(currentUser, session.id);
 
     return {
       accessToken,
       refreshToken: session.token,
       refreshTokenExpiresAt: session.expiresAt,
       user: {
-        id: user.id,
-        name: user.name,
-        email: user.email,
-        role: user.role,
-        isActive: user.isActive,
-        isLocked: user.isLocked,
-        mustChangePassword: user.mustChangePassword,
+        id: currentUser.id,
+        name: currentUser.name,
+        email: currentUser.email,
+        role: currentUser.role,
+        isActive: currentUser.isActive,
+        isLocked: currentUser.isLocked,
+        mustChangePassword: currentUser.mustChangePassword,
       },
     };
   }

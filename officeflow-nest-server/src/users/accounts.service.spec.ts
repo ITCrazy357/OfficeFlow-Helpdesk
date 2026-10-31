@@ -401,6 +401,8 @@ describe('AccountService', () => {
       where: {
         id: 1,
         passwordHash: 'current-password-hash',
+        isActive: true,
+        isLocked: false,
       },
       data: {
         passwordHash: 'new-password-hash',

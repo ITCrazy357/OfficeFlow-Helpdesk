@@ -26,6 +26,7 @@ const mockTransaction = {
   user: { findUnique: jest.fn() },
   ticket: {
     findMany: jest.fn(),
+    count: jest.fn(),
     update: jest.fn(),
     delete: jest.fn(),
     findUnique: jest.fn(),
@@ -34,8 +35,11 @@ const mockTransaction = {
   },
   ticketComment: {
     create: jest.fn(),
+    findMany: jest.fn(),
   },
   ticketAttachment: {
+    findMany: jest.fn(),
+    findUnique: jest.fn(),
     create: jest.fn(),
     deleteMany: jest.fn(),
   },
@@ -88,6 +92,17 @@ describe('TicketsService', () => {
 
   beforeEach(async () => {
     jest.clearAllMocks();
+    mockTransaction.ticket.findUnique.mockReset().mockResolvedValue({
+      id: 5,
+      createdById: 1,
+      createdBy: { departmentId: 1 },
+    });
+    mockTransaction.ticket.findMany = mockPrismaService.ticket.findMany;
+    mockTransaction.ticket.count = mockPrismaService.ticket.count;
+    mockTransaction.ticketAttachment.findMany =
+      mockPrismaService.ticketAttachment.findMany;
+    mockTransaction.ticketAttachment.findUnique =
+      mockPrismaService.ticketAttachment.findUnique;
     mockTransaction.user.findUnique.mockReset().mockResolvedValue({
       id: 3,
       name: 'Admin',
@@ -782,7 +797,7 @@ describe('TicketsService', () => {
         role: UserRole.ADMIN,
       },
     };
-    mockPrismaService.ticket.findUnique.mockResolvedValueOnce({
+    mockTransaction.ticket.findUnique.mockResolvedValueOnce({
       id: 5,
       createdById: 2,
       createdBy: { departmentId: 1 },
@@ -1039,6 +1054,11 @@ describe('TicketsService', () => {
       secureUrl:
         'https://res.cloudinary.com/demo/video/upload/v1/recording.mp4',
     });
+    mockTransaction.ticket.findUnique.mockResolvedValue({
+      id: 5,
+      createdById: 2,
+      createdBy: { departmentId: 1 },
+    });
     mockTransaction.ticketAttachment.create.mockResolvedValue(
       createdAttachment,
     );
@@ -1175,6 +1195,11 @@ describe('TicketsService', () => {
       id: 20,
       fileName: '.._folder_report.pdf',
     });
+    mockTransaction.ticket.findUnique.mockResolvedValue({
+      id: 5,
+      createdById: 2,
+      createdBy: { departmentId: 1 },
+    });
     mockTransaction.ticketHistory.create.mockResolvedValue({ id: 100 });
 
     await service.uploadAttachment(5, file, currentUser);
@@ -1243,6 +1268,11 @@ describe('TicketsService', () => {
     };
 
     mockPrismaService.ticket.findUnique.mockResolvedValue({
+      id: 5,
+      createdById: 10,
+      createdBy: { departmentId: 1 },
+    });
+    mockTransaction.ticket.findUnique.mockResolvedValue({
       id: 5,
       createdById: 10,
       createdBy: { departmentId: 1 },
@@ -1357,6 +1387,12 @@ describe('TicketsService', () => {
       createdBy: { departmentId: 7 },
     });
     mockPrismaService.user.findUnique.mockResolvedValue({ departmentId: 7 });
+    mockTransaction.user.findUnique.mockResolvedValue({ departmentId: 7 });
+    mockTransaction.ticket.findUnique.mockResolvedValue({
+      id: 5,
+      createdById: 2,
+      createdBy: { departmentId: 7 },
+    });
     mockPrismaService.ticketAttachment.findUnique.mockResolvedValue({
       fileName: 'report.pdf',
       fileUrl: 'https://res.cloudinary.com/demo/raw/upload/v1/report.pdf',
@@ -1370,6 +1406,7 @@ describe('TicketsService', () => {
       'Forbidden',
     );
     expect(mockCloudinaryService.deleteFile).not.toHaveBeenCalled();
-    expect(mockPrismaService.$transaction).not.toHaveBeenCalled();
+    expect(mockTransaction.ticketAttachment.deleteMany).not.toHaveBeenCalled();
+    expect(mockOutboxService.enqueue).not.toHaveBeenCalled();
   });
 });

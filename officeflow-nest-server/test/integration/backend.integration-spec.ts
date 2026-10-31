@@ -1,4 +1,12 @@
 import { ConfigService } from '@nestjs/config';
+import {
+  ForbiddenException,
+  ConflictException,
+  NotFoundException,
+  UnauthorizedException,
+} from '@nestjs/common';
+import { JwtService } from '@nestjs/jwt';
+import * as bcrypt from 'bcrypt';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { Test } from '@nestjs/testing';
 import { AssetType, Prisma, TicketPriority, UserRole } from '@prisma/client';
@@ -39,6 +47,8 @@ import { AiService } from '../../src/ai/ai.service';
 import { AiProvider } from '../../src/ai/ai.provider';
 import { AiRequestLimiter } from '../../src/ai/ai-request-limiter';
 import { AiTask } from '../../src/ai/types/ai-draft.type';
+import { AuthService } from '../../src/auth/auth.service';
+import { AccountService } from '../../src/users/accounts.service';
 
 describe('Real MySQL/Redis integration (disposable containers only)', () => {
   const prisma = new PrismaService(
@@ -145,6 +155,199 @@ describe('Real MySQL/Redis integration (disposable containers only)', () => {
       employee,
     );
 
+  it.each(['reset', 'change', 'lock'] as const)(
+    'rejects a pending login after account %s completes',
+    async (operation) => {
+      const password = randomUUID();
+      const user = await prisma.user.create({
+        data: {
+          name: 'Login race fixture',
+          email: `${randomUUID()}@test.invalid`,
+          passwordHash: await bcrypt.hash(password, 4),
+          role: UserRole.EMPLOYEE,
+        },
+      });
+      let markPaused!: () => void;
+      let resume!: () => void;
+      const paused = new Promise<void>((resolve) => {
+        markPaused = resolve;
+      });
+      const released = new Promise<void>((resolve) => {
+        resume = resolve;
+      });
+      const delayedPrisma = {
+        user: {
+          findUnique: async () => {
+            const snapshot = await prisma.user.findUniqueOrThrow({
+              where: { id: user.id },
+            });
+            markPaused();
+            await released;
+            return snapshot;
+          },
+        },
+        refreshToken: prisma.refreshToken,
+        $transaction: (
+          work: (tx: Prisma.TransactionClient) => Promise<unknown>,
+          options: { isolationLevel: Prisma.TransactionIsolationLevel },
+        ) => prisma.$transaction(work, options),
+      } as unknown as PrismaService;
+      const auth = new AuthService(
+        delayedPrisma,
+        new JwtService({ secret: randomUUID() }),
+      );
+      const accounts = new AccountService(prisma, audit, outbox);
+      const outcome = auth.login({ email: user.email, password }).then(
+        (value) => ({ value }),
+        (error: unknown) => ({ error }),
+      );
+      try {
+        await paused;
+        if (operation === 'reset') {
+          await accounts.resetPassword(
+            user.id,
+            { password: randomUUID() },
+            admin,
+          );
+        } else if (operation === 'change') {
+          await accounts.changeOwnPassword(
+            { currentPassword: password, newPassword: randomUUID() },
+            { userId: user.id, role: user.role },
+          );
+        } else {
+          await accounts.lockUser(admin, user.id);
+        }
+      } finally {
+        resume();
+      }
+      const result = await outcome;
+      expect(result).toHaveProperty('error');
+      if ('error' in result) {
+        expect(result.error).toBeInstanceOf(UnauthorizedException);
+      }
+      expect(
+        await prisma.refreshToken.count({ where: { userId: user.id } }),
+      ).toBe(0);
+    },
+  );
+
+  it.each(['locked', 'inactive'] as const)(
+    'rejects a pending password change after the account becomes %s',
+    async (state) => {
+      const password = randomUUID();
+      const user = await prisma.user.create({
+        data: {
+          name: 'Password transition fixture',
+          email: `${randomUUID()}@test.invalid`,
+          passwordHash: await bcrypt.hash(password, 4),
+          mustChangePassword: true,
+        },
+      });
+      let markPaused!: () => void;
+      let resume!: () => void;
+      const paused = new Promise<void>((resolve) => {
+        markPaused = resolve;
+      });
+      const released = new Promise<void>((resolve) => {
+        resume = resolve;
+      });
+      const delayedPrisma = {
+        user: prisma.user,
+        $transaction: async (
+          work: (tx: Prisma.TransactionClient) => Promise<unknown>,
+        ) => {
+          markPaused();
+          await released;
+          return prisma.$transaction(work);
+        },
+      } as unknown as PrismaService;
+      const pending = new AccountService(
+        delayedPrisma,
+        audit,
+        outbox,
+      ).changeOwnPassword(
+        { currentPassword: password, newPassword: randomUUID() },
+        { userId: user.id, role: user.role },
+      );
+      const outcome = pending.then(
+        (value) => ({ value }),
+        (error: unknown) => ({ error }),
+      );
+      try {
+        await paused;
+        if (state === 'locked')
+          await new AccountService(prisma, audit, outbox).lockUser(
+            admin,
+            user.id,
+          );
+        else
+          await prisma.user.update({
+            where: { id: user.id },
+            data: { isActive: false },
+          });
+      } finally {
+        resume();
+      }
+      const result = await outcome;
+      expect(result).toHaveProperty('error');
+      if ('error' in result)
+        expect(result.error).toBeInstanceOf(ConflictException);
+      expect(
+        await prisma.user.findUniqueOrThrow({ where: { id: user.id } }),
+      ).toMatchObject({
+        passwordHash: user.passwordHash,
+        mustChangePassword: true,
+      });
+      expect(
+        await prisma.auditLog.count({
+          where: {
+            entity: 'USER',
+            entityId: user.id,
+            description: 'Changed own password.',
+          },
+        }),
+      ).toBe(0);
+    },
+  );
+
+  it('revokes a login committed before an administrative password reset', async () => {
+    const password = randomUUID();
+    const user = await prisma.user.create({
+      data: {
+        name: 'Session revocation fixture',
+        email: `${randomUUID()}@test.invalid`,
+        passwordHash: await bcrypt.hash(password, 4),
+        role: UserRole.EMPLOYEE,
+      },
+    });
+    const auth = new AuthService(
+      prisma,
+      new JwtService({ secret: randomUUID() }),
+    );
+    const session = await auth.login({ email: user.email, password });
+    expect(session.user.id).toBe(user.id);
+    expect(
+      await prisma.refreshToken.count({
+        where: { userId: user.id, revokedAt: null },
+      }),
+    ).toBe(1);
+
+    await new AccountService(prisma, audit, outbox).resetPassword(
+      user.id,
+      { password: randomUUID() },
+      admin,
+    );
+
+    await expect(auth.refresh(session.refreshToken)).rejects.toThrow(
+      UnauthorizedException,
+    );
+    expect(
+      await prisma.refreshToken.count({
+        where: { userId: user.id, revokedAt: null },
+      }),
+    ).toBe(0);
+  });
+
   it('rechecks employee edit permissions when processing starts before its transaction', async () => {
     const ticket = await createTicket();
     let markPaused!: () => void;
@@ -233,6 +436,174 @@ describe('Real MySQL/Redis integration (disposable containers only)', () => {
       'Forbidden',
     );
   });
+
+  it.each([
+    'add',
+    'read',
+    'list',
+    'detail',
+    'history',
+    'attachments',
+    'url',
+    'download',
+    'feedback',
+  ] as const)(
+    'rechecks ticket %s access if the manager changes departments before the transaction',
+    async (operation) => {
+      const department = await prisma.department.create({
+        data: { name: randomUUID() },
+      });
+      const otherDepartment = await prisma.department.create({
+        data: { name: randomUUID() },
+      });
+      const requester = await prisma.user.create({
+        data: {
+          name: 'Requester fixture',
+          email: `${randomUUID()}@test.invalid`,
+          passwordHash: 'test-only',
+          departmentId: department.id,
+        },
+      });
+      const manager = await prisma.user.create({
+        data: {
+          name: 'Manager fixture',
+          email: `${randomUUID()}@test.invalid`,
+          passwordHash: 'test-only',
+          role: UserRole.MANAGER,
+          departmentId: department.id,
+        },
+      });
+      const ticket = await tickets.create(
+        {
+          title: randomUUID(),
+          description: 'Discussion authorization fixture',
+        },
+        { userId: requester.id, role: requester.role },
+      );
+      await tickets.addComment(
+        ticket.id,
+        { content: 'Private discussion' },
+        { userId: requester.id, role: requester.role },
+      );
+      const attachment = await prisma.ticketAttachment.create({
+        data: {
+          ticketId: ticket.id,
+          uploadedById: requester.id,
+          fileName: 'private.pdf',
+          fileUrl:
+            'https://res.cloudinary.com/test/raw/authenticated/private.pdf',
+          publicId: randomUUID(),
+          resourceType: 'raw',
+          deliveryType: 'authenticated',
+          format: 'pdf',
+        },
+      });
+      let markPaused!: () => void;
+      let resume!: () => void;
+      const paused = new Promise<void>((resolve) => {
+        markPaused = resolve;
+      });
+      const released = new Promise<void>((resolve) => {
+        resume = resolve;
+      });
+      const delayedPrisma = {
+        user: prisma.user,
+        ticket: prisma.ticket,
+        ticketComment: prisma.ticketComment,
+        ticketHistory: prisma.ticketHistory,
+        ticketAttachment: prisma.ticketAttachment,
+        ticketFeedback: prisma.ticketFeedback,
+        $transaction: async (
+          work: (tx: Prisma.TransactionClient) => Promise<unknown>,
+          options: { isolationLevel: Prisma.TransactionIsolationLevel },
+        ) => {
+          markPaused();
+          await released;
+          return prisma.$transaction(work, options);
+        },
+      } as unknown as PrismaService;
+      const comments = new TicketCommentService(
+        delayedPrisma,
+        outbox,
+        new TicketAccessPolicyService(delayedPrisma),
+      );
+      const actor = { userId: manager.id, role: manager.role };
+      const access = new TicketAccessPolicyService(delayedPrisma);
+      const query = new TicketQueryService(delayedPrisma, access);
+      const files = new TicketAttachmentService(
+        delayedPrisma,
+        cloudinary,
+        outbox,
+        access,
+      );
+      const ratings = new TicketFeedbackService(
+        delayedPrisma,
+        access,
+        audit,
+        outbox,
+        new EventEmitter2(),
+      );
+      const operations: Record<typeof operation, () => Promise<unknown>> = {
+        add: () =>
+          comments.addComment(
+            ticket.id,
+            { content: 'Stale manager comment' },
+            actor,
+          ),
+        read: () => comments.getComments(ticket.id, actor),
+        list: () => query.getTickets(actor, {}),
+        detail: () => query.canGetById(ticket.id, actor),
+        history: () => query.getHistory(ticket.id, actor),
+        attachments: () => files.getAttachments(ticket.id, actor),
+        url: () =>
+          files.getAttachmentAccessUrl(ticket.id, attachment.id, actor, false),
+        download: () =>
+          files.downloadAttachment(ticket.id, attachment.id, actor),
+        feedback: () => ratings.get(ticket.id, actor),
+      };
+      const pending = operations[operation]();
+      const outcome = pending.then(
+        (value: unknown) => ({ value }),
+        (error: unknown) => ({ error }),
+      );
+      try {
+        await paused;
+        await prisma.user.update({
+          where: { id: manager.id },
+          data: { departmentId: otherDepartment.id },
+        });
+      } finally {
+        resume();
+      }
+      const result = await outcome;
+      if (operation === 'list') {
+        expect(result).toHaveProperty('value.items', []);
+        expect(result).toHaveProperty('value.pagination.totalItems', 0);
+      } else {
+        expect(result).toHaveProperty('error');
+        if ('error' in result)
+          expect(result.error).toBeInstanceOf(ForbiddenException);
+      }
+      expect(cloudinary.createPrivateDownloadUrl).not.toHaveBeenCalled();
+      expect(cloudinary.downloadFile).not.toHaveBeenCalled();
+      expect(
+        await prisma.ticketComment.count({ where: { ticketId: ticket.id } }),
+      ).toBe(1);
+      expect(
+        await prisma.ticketHistory.count({
+          where: { ticketId: ticket.id, action: 'COMMENTED' },
+        }),
+      ).toBe(1);
+      expect(
+        await prisma.outboxEvent.count({
+          where: {
+            type: 'ticket.commented',
+            payload: { path: '$.ticketId', equals: ticket.id },
+          },
+        }),
+      ).toBe(1);
+    },
+  );
 
   it('generates a draft from real published knowledge without writing tickets, comments or articles', async () => {
     const knowledge = new KnowledgeService(prisma, audit);
@@ -957,6 +1328,103 @@ describe('Real MySQL/Redis integration (disposable containers only)', () => {
       other.onApplicationShutdown();
     }
   });
+  it.each(['department', 'ticket_deleted', 'cleanup_retry'] as const)(
+    'does not save an uploaded asset after access changes: %s',
+    async (change) => {
+      const department = await prisma.department.create({
+        data: { name: randomUUID() },
+      });
+      const requester = await prisma.user.create({
+        data: {
+          name: 'Requester fixture',
+          email: `${randomUUID()}@test.invalid`,
+          passwordHash: 'test-only',
+          departmentId: department.id,
+        },
+      });
+      const manager = await prisma.user.create({
+        data: {
+          name: 'Manager fixture',
+          email: `${randomUUID()}@test.invalid`,
+          passwordHash: 'test-only',
+          role: UserRole.MANAGER,
+          departmentId: department.id,
+        },
+      });
+      const ticket = await tickets.create(
+        { title: randomUUID(), description: 'Upload authorization fixture' },
+        { userId: requester.id, role: requester.role },
+      );
+      const uploaded = {
+        publicId: randomUUID(),
+        resourceType: 'raw',
+        deliveryType: 'authenticated',
+        format: 'pdf',
+        secureUrl: 'https://res.cloudinary.com/test/raw/authenticated/test.pdf',
+      };
+      cloudinary.uploadFile.mockImplementationOnce(async () => {
+        if (change !== 'ticket_deleted') {
+          await prisma.user.update({
+            where: { id: manager.id },
+            data: { departmentId: null },
+          });
+        } else {
+          await tickets.remove(ticket.id, admin);
+        }
+        return uploaded;
+      });
+      if (change === 'cleanup_retry') {
+        cloudinary.deleteFile.mockRejectedValueOnce(
+          new Error('Temporary fixture storage outage'),
+        );
+      } else {
+        cloudinary.deleteFile.mockResolvedValueOnce(undefined);
+      }
+      const file = {
+        originalname: 'report.pdf',
+        mimetype: 'application/pdf',
+        size: 12,
+      } as Express.Multer.File;
+      await expect(
+        tickets.uploadAttachment(ticket.id, file, {
+          userId: manager.id,
+          role: manager.role,
+        }),
+      ).rejects.toThrow(
+        change === 'ticket_deleted' ? NotFoundException : ForbiddenException,
+      );
+      expect(
+        await prisma.ticketAttachment.count({ where: { ticketId: ticket.id } }),
+      ).toBe(0);
+      expect(
+        await prisma.ticketHistory.count({
+          where: { ticketId: ticket.id, action: 'ATTACHMENT_ADDED' },
+        }),
+      ).toBe(0);
+      expect(cloudinary.uploadFile).toHaveBeenCalledTimes(1);
+      expect(cloudinary.deleteFile).toHaveBeenCalledWith(
+        uploaded.publicId,
+        uploaded.resourceType,
+        uploaded.deliveryType,
+      );
+      if (change === 'cleanup_retry') {
+        const cleanup = await prisma.outboxEvent.findFirstOrThrow({
+          where: {
+            type: 'cloudinary.asset.delete',
+            payload: { path: '$.publicId', equals: uploaded.publicId },
+          },
+        });
+        expect(cleanup.status).toBe('PENDING');
+        expect(cleanup.deduplicationKey.length).toBeLessThanOrEqual(191);
+        expect(cleanup.payload).toMatchObject({
+          publicId: uploaded.publicId,
+          resourceType: 'raw',
+          deliveryType: 'authenticated',
+        });
+      }
+    },
+  );
+
   it('uses database authorization before signing or downloading an attachment', async () => {
     const ticket = await createTicket();
     const attachment = await prisma.ticketAttachment.create({
@@ -1043,6 +1511,45 @@ describe('Real MySQL/Redis integration (disposable containers only)', () => {
       deliveryType: 'authenticated',
       resourceType: 'raw',
     });
+    expect(cloudinary.deleteFile).not.toHaveBeenCalled();
+  });
+
+  it('commits exactly one deletion history and cleanup job for concurrent attachment deletion', async () => {
+    const ticket = await createTicket();
+    const attachment = await prisma.ticketAttachment.create({
+      data: {
+        ticketId: ticket.id,
+        uploadedById: employee.userId,
+        fileName: 'delete-once.pdf',
+        fileUrl: 'https://res.cloudinary.com/test/raw/authenticated/test.pdf',
+        publicId: randomUUID(),
+        resourceType: 'raw',
+        deliveryType: 'authenticated',
+        format: 'pdf',
+      },
+    });
+    const results = await Promise.allSettled([
+      tickets.deleteAttachment(ticket.id, attachment.id, employee),
+      tickets.deleteAttachment(ticket.id, attachment.id, employee),
+    ]);
+    expect(
+      results.filter((result) => result.status === 'fulfilled'),
+    ).toHaveLength(1);
+    expect(
+      results.filter((result) => result.status === 'rejected'),
+    ).toHaveLength(1);
+    expect(
+      await prisma.ticketHistory.count({
+        where: { ticketId: ticket.id, action: 'ATTACHMENT_DELETED' },
+      }),
+    ).toBe(1);
+    expect(
+      await prisma.outboxEvent.count({
+        where: {
+          deduplicationKey: `cloudinary-delete:ticket:${ticket.id}:attachment:${attachment.id}`,
+        },
+      }),
+    ).toBe(1);
     expect(cloudinary.deleteFile).not.toHaveBeenCalled();
   });
 
@@ -1621,6 +2128,34 @@ describe('Real MySQL/Redis integration (disposable containers only)', () => {
       }),
     ).toBe(0);
     enqueue.mockRestore();
+  });
+
+  it('uses the public ticket detail version to reopen and confirm the latest result', async () => {
+    const ticket = await createTicket();
+    await tickets.updateStatus(ticket.id, { status: 'IN_PROGRESS' }, admin);
+    await tickets.updateStatus(ticket.id, { status: 'RESOLVED' }, admin);
+    const first = await tickets.canGetById(ticket.id, employee);
+    expect(first.resolutionVersion).toBe(1);
+    expect(first.confirmedAt).toBeNull();
+    await feedback.reopen(
+      ticket.id,
+      {
+        resolutionVersion: first.resolutionVersion,
+        reason: 'Still unable to connect',
+      },
+      employee,
+    );
+    await tickets.updateStatus(ticket.id, { status: 'RESOLVED' }, admin);
+    const latest = await tickets.canGetById(ticket.id, employee);
+    expect(latest.resolutionVersion).toBe(2);
+    await feedback.confirm(
+      ticket.id,
+      { resolutionVersion: latest.resolutionVersion },
+      employee,
+    );
+    expect(
+      (await tickets.canGetById(ticket.id, employee)).confirmedAt,
+    ).toBeInstanceOf(Date);
   });
 
   it('requires requester confirmation, rejects stale cycles, preserves original SLA and serializes competing responses', async () => {

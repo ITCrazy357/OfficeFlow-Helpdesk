@@ -298,6 +298,7 @@ describe('AppController (e2e)', () => {
       where: { email: 'missing@example.com' },
       select: {
         id: true,
+        passwordHash: true,
         isActive: true,
         isLocked: true,
       },

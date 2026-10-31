@@ -6,6 +6,7 @@ import { TicketQueue, TicketSlaFilter } from './dto/get-tickets-query.dto';
 
 describe('Ticket queue queries', () => {
   const prisma = {
+    $transaction: jest.fn(),
     user: { findUnique: jest.fn(), findMany: jest.fn() },
     ticket: {
       findMany: jest.fn<Promise<unknown[]>, [Prisma.TicketFindManyArgs]>(),
@@ -24,6 +25,9 @@ describe('Ticket queue queries', () => {
     jest.resetAllMocks();
     prisma.ticket.findMany.mockResolvedValue([]);
     prisma.ticket.count.mockResolvedValue(0);
+    prisma.$transaction.mockImplementation(
+      (work: (tx: typeof prisma) => Promise<unknown>) => work(prisma),
+    );
   });
 
   it('combines an unassigned queue with SLA, search and active status filters', async () => {

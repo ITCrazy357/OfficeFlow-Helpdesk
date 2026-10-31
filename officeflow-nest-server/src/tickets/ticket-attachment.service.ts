@@ -9,11 +9,13 @@ import {
 import { TicketHistoryAction, UserRole } from '@prisma/client';
 import type { Request } from 'express';
 import type {} from 'multer';
+import { createHash } from 'node:crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import { CloudinaryService } from '../cloudinary/cloudinary.service';
 import { OutboxService } from '../outbox/outbox.service';
 import { OUTBOX_EVENT_TYPES } from '../outbox/outbox.constants';
 import type { CurrentUserPayload } from '../common/decorators/current-user.decorator';
+import { runSerializableTransaction } from '../common/database/serializable-transaction.util';
 import { TicketAccessPolicyService } from './ticket-access-policy.service';
 import { normalizeAttachmentFileName } from './ticket-attachment.util';
 import {
@@ -62,49 +64,53 @@ export class TicketAttachmentService {
     );
 
     try {
-      return await this.prisma.$transaction(async (transaction) => {
-        const attachment = await transaction.ticketAttachment.create({
-          data: {
-            ticketId,
-            uploadedById: currentUser.userId,
-            fileName,
-            fileType: file.mimetype,
-            fileSize: file.size,
-            fileUrl: uploadedFile.secureUrl,
-            publicId: uploadedFile.publicId,
-            resourceType: uploadedFile.resourceType,
-            deliveryType: uploadedFile.deliveryType,
-            format: uploadedFile.format,
-          },
-          select: {
-            id: true,
-            fileName: true,
-            fileUrl: true,
-            fileType: true,
-            fileSize: true,
-            createdAt: true,
-            uploadedBy: {
-              select: {
-                id: true,
-                name: true,
-                email: true,
-                role: true,
+      return await runSerializableTransaction(
+        this.prisma,
+        async (transaction) => {
+          await this.access.canAccessTicket(ticketId, currentUser, transaction);
+          const attachment = await transaction.ticketAttachment.create({
+            data: {
+              ticketId,
+              uploadedById: currentUser.userId,
+              fileName,
+              fileType: file.mimetype,
+              fileSize: file.size,
+              fileUrl: uploadedFile.secureUrl,
+              publicId: uploadedFile.publicId,
+              resourceType: uploadedFile.resourceType,
+              deliveryType: uploadedFile.deliveryType,
+              format: uploadedFile.format,
+            },
+            select: {
+              id: true,
+              fileName: true,
+              fileUrl: true,
+              fileType: true,
+              fileSize: true,
+              createdAt: true,
+              uploadedBy: {
+                select: {
+                  id: true,
+                  name: true,
+                  email: true,
+                  role: true,
+                },
               },
             },
-          },
-        });
+          });
 
-        await transaction.ticketHistory.create({
-          data: {
-            ticketId,
-            userId: currentUser.userId,
-            action: TicketHistoryAction.ATTACHMENT_ADDED,
-            newValue: attachment.fileName,
-          },
-        });
+          await transaction.ticketHistory.create({
+            data: {
+              ticketId,
+              userId: currentUser.userId,
+              action: TicketHistoryAction.ATTACHMENT_ADDED,
+              newValue: attachment.fileName,
+            },
+          });
 
-        return attachment;
-      });
+          return attachment;
+        },
+      );
     } catch (error) {
       try {
         await this.cloudinaryService.deleteFile(
@@ -117,6 +123,33 @@ export class TicketAttachmentService {
           `Could not clean up Cloudinary asset ${uploadedFile.publicId}`,
           cleanupError instanceof Error ? cleanupError.stack : undefined,
         );
+        try {
+          const cleanupKey = createHash('sha256')
+            .update(
+              JSON.stringify([
+                uploadedFile.publicId,
+                uploadedFile.resourceType,
+                uploadedFile.deliveryType,
+              ]),
+            )
+            .digest('hex');
+          await this.prisma.$transaction((transaction) =>
+            this.outboxService.enqueue(transaction, {
+              type: OUTBOX_EVENT_TYPES.CLOUDINARY_ASSET_DELETE,
+              payload: {
+                publicId: uploadedFile.publicId,
+                resourceType: uploadedFile.resourceType,
+                deliveryType: uploadedFile.deliveryType,
+              },
+              deduplicationKey: `cloudinary-upload-cleanup:${cleanupKey}`,
+            }),
+          );
+        } catch (queueError) {
+          this.logger.error(
+            'Could not enqueue failed upload cleanup',
+            queueError instanceof Error ? queueError.stack : undefined,
+          );
+        }
       }
 
       throw error;
@@ -124,29 +157,29 @@ export class TicketAttachmentService {
   }
 
   async getAttachments(ticketId: number, currentUser: CurrentUserPayload) {
-    await this.access.canAccessTicket(ticketId, currentUser);
-
-    const attachments = await this.prisma.ticketAttachment.findMany({
-      where: { ticketId },
-      select: {
-        id: true,
-        fileName: true,
-        fileUrl: true,
-        fileType: true,
-        fileSize: true,
-        createdAt: true,
-        uploadedBy: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-            role: true,
+    return runSerializableTransaction(this.prisma, async (transaction) => {
+      await this.access.canAccessTicket(ticketId, currentUser, transaction);
+      return transaction.ticketAttachment.findMany({
+        where: { ticketId },
+        select: {
+          id: true,
+          fileName: true,
+          fileUrl: true,
+          fileType: true,
+          fileSize: true,
+          createdAt: true,
+          uploadedBy: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+              role: true,
+            },
           },
         },
-      },
-      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+        orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+      });
     });
-    return attachments;
   }
 
   private async getAttachmentDeliveryMetadata(
@@ -154,29 +187,31 @@ export class TicketAttachmentService {
     attachmentId: number,
     currentUser: CurrentUserPayload,
   ): Promise<AttachmentDeliveryMetadata> {
-    await this.access.canAccessTicket(ticketId, currentUser);
+    return runSerializableTransaction(this.prisma, async (transaction) => {
+      await this.access.canAccessTicket(ticketId, currentUser, transaction);
 
-    const attachment = await this.prisma.ticketAttachment.findUnique({
-      where: {
-        id: attachmentId,
-        ticketId,
-      },
-      select: {
-        fileName: true,
-        fileUrl: true,
-        fileType: true,
-        publicId: true,
-        resourceType: true,
-        deliveryType: true,
-        format: true,
-      },
+      const attachment = await transaction.ticketAttachment.findUnique({
+        where: {
+          id: attachmentId,
+          ticketId,
+        },
+        select: {
+          fileName: true,
+          fileUrl: true,
+          fileType: true,
+          publicId: true,
+          resourceType: true,
+          deliveryType: true,
+          format: true,
+        },
+      });
+
+      if (!attachment) {
+        throw new NotFoundException('Attachment not found');
+      }
+
+      return attachment;
     });
-
-    if (!attachment) {
-      throw new NotFoundException('Attachment not found');
-    }
-
-    return attachment;
   }
 
   private createAttachmentAccessUrl(
@@ -250,39 +285,39 @@ export class TicketAttachmentService {
     attachmentId: number,
     currentUser: CurrentUserPayload,
   ) {
-    await this.access.canAccessTicket(ticketId, currentUser);
+    return runSerializableTransaction(this.prisma, async (transaction) => {
+      await this.access.canAccessTicket(ticketId, currentUser, transaction);
 
-    const attachment = await this.prisma.ticketAttachment.findUnique({
-      where: {
-        id: attachmentId,
-        ticketId,
-      },
-      select: {
-        fileName: true,
-        fileUrl: true,
-        publicId: true,
-        resourceType: true,
-        deliveryType: true,
-        uploadedById: true,
-      },
-    });
+      const attachment = await transaction.ticketAttachment.findUnique({
+        where: {
+          id: attachmentId,
+          ticketId,
+        },
+        select: {
+          fileName: true,
+          fileUrl: true,
+          publicId: true,
+          resourceType: true,
+          deliveryType: true,
+          uploadedById: true,
+        },
+      });
 
-    if (!attachment) {
-      throw new NotFoundException('Attachment not found');
-    }
+      if (!attachment) {
+        throw new NotFoundException('Attachment not found');
+      }
 
-    if (currentUser.role === UserRole.MANAGER) {
-      throw new ForbiddenException('Forbidden');
-    }
+      if (currentUser.role === UserRole.MANAGER) {
+        throw new ForbiddenException('Forbidden');
+      }
 
-    if (
-      currentUser.role === UserRole.EMPLOYEE &&
-      attachment.uploadedById !== currentUser.userId
-    ) {
-      throw new ForbiddenException('Forbidden');
-    }
+      if (
+        currentUser.role === UserRole.EMPLOYEE &&
+        attachment.uploadedById !== currentUser.userId
+      ) {
+        throw new ForbiddenException('Forbidden');
+      }
 
-    await this.prisma.$transaction(async (transaction) => {
       const deleted = await transaction.ticketAttachment.deleteMany({
         where: {
           id: attachmentId,
@@ -319,8 +354,7 @@ export class TicketAttachmentService {
           deduplicationKey: `cloudinary-delete:ticket:${ticketId}:attachment:${attachmentId}`,
         });
       }
+      return { id: attachmentId };
     });
-
-    return { id: attachmentId };
   }
 }

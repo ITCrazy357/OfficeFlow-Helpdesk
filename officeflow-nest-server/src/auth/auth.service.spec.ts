@@ -15,10 +15,12 @@ const mockBcryptCompare = bcrypt.compare as unknown as jest.Mock<
   [string, string]
 >;
 
+const mockUserModel = {
+  findUnique: jest.fn<Promise<unknown>, [unknown]>(),
+};
+
 const mockPrismaService = {
-  user: {
-    findUnique: jest.fn<Promise<unknown>, [unknown]>(),
-  },
+  user: mockUserModel,
   refreshToken: {
     findUnique: jest.fn<Promise<unknown>, [unknown]>(),
     create: jest.fn<Promise<unknown>, [unknown]>(),
@@ -28,6 +30,7 @@ const mockPrismaService = {
     Promise<unknown>,
     [
       (transaction: {
+        user: typeof mockUserModel;
         refreshToken: {
           create: jest.Mock;
           updateMany: jest.Mock;
@@ -49,7 +52,10 @@ describe('AuthService', () => {
     mockPrismaService.refreshToken.create.mockResolvedValue({});
     mockPrismaService.refreshToken.updateMany.mockResolvedValue({ count: 1 });
     mockPrismaService.$transaction.mockImplementation((callback) =>
-      callback({ refreshToken: mockPrismaService.refreshToken }),
+      callback({
+        user: mockPrismaService.user,
+        refreshToken: mockPrismaService.refreshToken,
+      }),
     );
 
     const module: TestingModule = await Test.createTestingModule({
@@ -144,6 +150,36 @@ describe('AuthService', () => {
       );
       expect(mockJwtService.sign).not.toHaveBeenCalled();
     });
+
+    it.each([
+      { passwordHash: 'new-hash' },
+      { isLocked: true },
+      { isActive: false },
+    ])(
+      'rejects stale credentials after account state changes: %o',
+      async (change) => {
+        const user = {
+          id: 1,
+          name: 'Test User',
+          email: loginDto.email,
+          passwordHash: 'old-hash',
+          role: UserRole.EMPLOYEE,
+          isActive: true,
+          isLocked: false,
+          mustChangePassword: false,
+        };
+        mockPrismaService.user.findUnique
+          .mockResolvedValueOnce(user)
+          .mockResolvedValueOnce({ ...user, ...change });
+        mockBcryptCompare.mockResolvedValue(true);
+
+        await expect(service.login(loginDto)).rejects.toThrow(
+          UnauthorizedException,
+        );
+        expect(mockPrismaService.refreshToken.create).not.toHaveBeenCalled();
+        expect(mockJwtService.sign).not.toHaveBeenCalled();
+      },
+    );
 
     it('should return the same UnauthorizedException when account is inactive', async () => {
       mockPrismaService.user.findUnique.mockResolvedValue({

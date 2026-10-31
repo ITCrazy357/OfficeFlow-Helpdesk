@@ -7,6 +7,7 @@ import {
 import { TicketStatus, UserRole } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import type { CurrentUserPayload } from '../common/decorators/current-user.decorator';
+import { runSerializableTransaction } from '../common/database/serializable-transaction.util';
 import {
   GetTicketsQueryDto,
   TicketSlaFilter,
@@ -31,188 +32,190 @@ export class TicketQueryService {
     const limit = query.limit || 10;
     const skip = (page - 1) * limit;
 
-    const where = await this.access.getScope(currentUser);
+    return runSerializableTransaction(this.prisma, async (transaction) => {
+      const where = await this.access.getScope(currentUser, transaction);
 
-    if (query.queue && query.assignedToId) {
-      throw new BadRequestException('Use either queue or assignedToId');
-    }
-    if (query.activeOnly && query.status) {
-      throw new BadRequestException('Use either activeOnly or status');
-    }
+      if (query.queue && query.assignedToId) {
+        throw new BadRequestException('Use either queue or assignedToId');
+      }
+      if (query.activeOnly && query.status) {
+        throw new BadRequestException('Use either activeOnly or status');
+      }
 
-    if (query.queue === TicketQueue.MINE) {
-      where.assignedToId = currentUser.userId;
-    } else if (query.queue === TicketQueue.UNASSIGNED) {
-      where.assignedToId = null;
-    } else if (query.assignedToId) {
-      where.assignedToId = query.assignedToId;
-    }
+      if (query.queue === TicketQueue.MINE) {
+        where.assignedToId = currentUser.userId;
+      } else if (query.queue === TicketQueue.UNASSIGNED) {
+        where.assignedToId = null;
+      } else if (query.assignedToId) {
+        where.assignedToId = query.assignedToId;
+      }
 
-    if (query.activeOnly) {
-      where.status = { in: [TicketStatus.OPEN, TicketStatus.IN_PROGRESS] };
-    }
+      if (query.activeOnly) {
+        where.status = { in: [TicketStatus.OPEN, TicketStatus.IN_PROGRESS] };
+      }
 
-    if (query.status) {
-      where.status = query.status;
-    }
+      if (query.status) {
+        where.status = query.status;
+      }
 
-    if (query.priority) {
-      where.priority = query.priority;
-    }
+      if (query.priority) {
+        where.priority = query.priority;
+      }
 
-    if (query.categoryId) {
-      where.categoryId = query.categoryId;
-    }
+      if (query.categoryId) {
+        where.categoryId = query.categoryId;
+      }
 
-    if (query.slaState) {
-      const now = new Date();
+      if (query.slaState) {
+        const now = new Date();
 
-      if (query.slaState === TicketSlaFilter.OVERDUE) {
-        where.AND = {
-          OR: [
-            {
-              isOverdue: true,
-            },
-            {
-              isOverdue: false,
-              dueAt: {
-                lte: now,
+        if (query.slaState === TicketSlaFilter.OVERDUE) {
+          where.AND = {
+            OR: [
+              {
+                isOverdue: true,
               },
-              status: {
-                notIn: TERMINAL_TICKET_STATUSES,
+              {
+                isOverdue: false,
+                dueAt: {
+                  lte: now,
+                },
+                status: {
+                  notIn: TERMINAL_TICKET_STATUSES,
+                },
               },
+            ],
+          };
+        }
+
+        if (query.slaState === TicketSlaFilter.DUE_SOON) {
+          where.AND = {
+            isOverdue: false,
+            status: {
+              notIn: TERMINAL_TICKET_STATUSES,
             },
-          ],
-        };
+            dueAt: {
+              gt: now,
+            },
+            resolutionWarningAt: { lte: now },
+          };
+        }
+
+        if (query.slaState === TicketSlaFilter.ON_TRACK) {
+          where.AND = {
+            isOverdue: false,
+            status: {
+              notIn: TERMINAL_TICKET_STATUSES,
+            },
+            dueAt: {
+              gt: now,
+            },
+            OR: [
+              { resolutionWarningAt: null },
+              { resolutionWarningAt: { gt: now } },
+            ],
+          };
+        }
+      } else if (typeof query.isOverdue === 'boolean') {
+        where.isOverdue = query.isOverdue;
       }
 
-      if (query.slaState === TicketSlaFilter.DUE_SOON) {
-        where.AND = {
-          isOverdue: false,
-          status: {
-            notIn: TERMINAL_TICKET_STATUSES,
+      if (query.keyword) {
+        // Preserve manager escalation scope when search adds its own OR clause.
+        if (where.OR)
+          where.AND = [
+            ...(Array.isArray(where.AND)
+              ? where.AND
+              : where.AND
+                ? [where.AND]
+                : []),
+            { OR: where.OR },
+          ];
+        where.OR = [
+          {
+            title: {
+              contains: query.keyword,
+            },
           },
-          dueAt: {
-            gt: now,
+          {
+            description: {
+              contains: query.keyword,
+            },
           },
-          resolutionWarningAt: { lte: now },
-        };
-      }
-
-      if (query.slaState === TicketSlaFilter.ON_TRACK) {
-        where.AND = {
-          isOverdue: false,
-          status: {
-            notIn: TERMINAL_TICKET_STATUSES,
-          },
-          dueAt: {
-            gt: now,
-          },
-          OR: [
-            { resolutionWarningAt: null },
-            { resolutionWarningAt: { gt: now } },
-          ],
-        };
-      }
-    } else if (typeof query.isOverdue === 'boolean') {
-      where.isOverdue = query.isOverdue;
-    }
-
-    if (query.keyword) {
-      // Preserve manager escalation scope when search adds its own OR clause.
-      if (where.OR)
-        where.AND = [
-          ...(Array.isArray(where.AND)
-            ? where.AND
-            : where.AND
-              ? [where.AND]
-              : []),
-          { OR: where.OR },
         ];
-      where.OR = [
-        {
-          title: {
-            contains: query.keyword,
-          },
-        },
-        {
-          description: {
-            contains: query.keyword,
-          },
-        },
-      ];
-    }
+      }
 
-    const [tickets, totalItems] = await Promise.all([
-      this.prisma.ticket.findMany({
-        where,
-        skip,
-        take: limit,
-        orderBy: {
-          createdAt: 'desc',
-        },
-        select: {
-          id: true,
-          title: true,
-          description: true,
-          status: true,
-          priority: true,
-          dueAt: true,
-          resolveAt: true,
-          isOverdue: true,
-          firstResponseDueAt: true,
-          firstRespondedAt: true,
-          firstResponseOverdue: true,
-          resolutionWarningAt: true,
-          createdAt: true,
-          updatedAt: true,
-          createdBy: {
-            select: {
-              id: true,
-              name: true,
-              email: true,
+      const [tickets, totalItems] = await Promise.all([
+        transaction.ticket.findMany({
+          where,
+          skip,
+          take: limit,
+          orderBy: {
+            createdAt: 'desc',
+          },
+          select: {
+            id: true,
+            title: true,
+            description: true,
+            status: true,
+            priority: true,
+            dueAt: true,
+            resolveAt: true,
+            isOverdue: true,
+            firstResponseDueAt: true,
+            firstRespondedAt: true,
+            firstResponseOverdue: true,
+            resolutionWarningAt: true,
+            createdAt: true,
+            updatedAt: true,
+            createdBy: {
+              select: {
+                id: true,
+                name: true,
+                email: true,
+              },
+            },
+            assignedTo: {
+              select: {
+                id: true,
+                name: true,
+                email: true,
+              },
+            },
+            category: {
+              select: {
+                id: true,
+                name: true,
+              },
+            },
+            asset: {
+              select: {
+                id: true,
+                assetTag: true,
+                name: true,
+                type: true,
+                status: true,
+                brand: true,
+                model: true,
+                serialNumber: true,
+              },
             },
           },
-          assignedTo: {
-            select: {
-              id: true,
-              name: true,
-              email: true,
-            },
-          },
-          category: {
-            select: {
-              id: true,
-              name: true,
-            },
-          },
-          asset: {
-            select: {
-              id: true,
-              assetTag: true,
-              name: true,
-              type: true,
-              status: true,
-              brand: true,
-              model: true,
-              serialNumber: true,
-            },
-          },
-        },
-      }),
+        }),
 
-      this.prisma.ticket.count({ where }),
-    ]);
+        transaction.ticket.count({ where }),
+      ]);
 
-    return {
-      items: tickets,
-      pagination: {
-        page,
-        limit,
-        totalItems,
-        totalPages: Math.ceil(totalItems / limit),
-      },
-    };
+      return {
+        items: tickets,
+        pagination: {
+          page,
+          limit,
+          totalItems,
+          totalPages: Math.ceil(totalItems / limit),
+        },
+      };
+    });
   }
 
   async getWorkload(currentUser: CurrentUserPayload) {
@@ -282,118 +285,121 @@ export class TicketQueryService {
   }
 
   async canGetById(id: number, currentUser: CurrentUserPayload) {
-    const ticket = await this.prisma.ticket.findUnique({
-      where: { id },
-      select: {
-        resolutionVersion: true,
-        confirmedAt: true,
-        id: true,
-        title: true,
-        description: true,
-        status: true,
-        priority: true,
-        dueAt: true,
-        resolveAt: true,
-        isOverdue: true,
-        firstResponseDueAt: true,
-        firstRespondedAt: true,
-        firstResponseOverdue: true,
-        resolutionWarningAt: true,
-        createdById: true,
-        createdAt: true,
-        updatedAt: true,
+    return runSerializableTransaction(this.prisma, async (transaction) => {
+      const ticket = await transaction.ticket.findUnique({
+        where: { id },
+        select: {
+          resolutionVersion: true,
+          confirmedAt: true,
+          id: true,
+          title: true,
+          description: true,
+          status: true,
+          priority: true,
+          dueAt: true,
+          resolveAt: true,
+          isOverdue: true,
+          firstResponseDueAt: true,
+          firstRespondedAt: true,
+          firstResponseOverdue: true,
+          resolutionWarningAt: true,
+          createdById: true,
+          createdAt: true,
+          updatedAt: true,
+          createdBy: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+              departmentId: true,
+            },
+          },
+          assignedTo: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+            },
+          },
+          category: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
+          asset: {
+            select: {
+              id: true,
+              assetTag: true,
+              name: true,
+              type: true,
+              status: true,
+              brand: true,
+              model: true,
+              serialNumber: true,
+            },
+          },
+        },
+      });
+
+      if (!ticket) throw new NotFoundException('Ticket not found');
+
+      await this.access.assertCanView(ticket, currentUser, transaction);
+
+      return {
+        id: ticket.id,
+        resolutionVersion: ticket.resolutionVersion,
+        confirmedAt: ticket.confirmedAt,
+        title: ticket.title,
+        description: ticket.description,
+        status: ticket.status,
+        priority: ticket.priority,
+        dueAt: ticket.dueAt,
+        resolveAt: ticket.resolveAt,
+        isOverdue: ticket.isOverdue,
+        firstResponseDueAt: ticket.firstResponseDueAt,
+        firstRespondedAt: ticket.firstRespondedAt,
+        firstResponseOverdue: ticket.firstResponseOverdue,
+        resolutionWarningAt: ticket.resolutionWarningAt,
+        createdAt: ticket.createdAt,
+        updatedAt: ticket.updatedAt,
         createdBy: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-            departmentId: true,
-          },
+          id: ticket.createdBy.id,
+          name: ticket.createdBy.name,
+          email: ticket.createdBy.email,
+          departmentId: ticket.createdBy.departmentId,
         },
-        assignedTo: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-          },
-        },
-        category: {
-          select: {
-            id: true,
-            name: true,
-          },
-        },
-        asset: {
-          select: {
-            id: true,
-            assetTag: true,
-            name: true,
-            type: true,
-            status: true,
-            brand: true,
-            model: true,
-            serialNumber: true,
-          },
-        },
-      },
+        assignedTo: ticket.assignedTo,
+        category: ticket.category,
+        asset: ticket.asset,
+      };
     });
-
-    if (!ticket) throw new NotFoundException('Ticket not found');
-
-    await this.access.assertCanView(ticket, currentUser);
-
-    return {
-      id: ticket.id,
-      title: ticket.title,
-      description: ticket.description,
-      status: ticket.status,
-      priority: ticket.priority,
-      dueAt: ticket.dueAt,
-      resolveAt: ticket.resolveAt,
-      isOverdue: ticket.isOverdue,
-      firstResponseDueAt: ticket.firstResponseDueAt,
-      firstRespondedAt: ticket.firstRespondedAt,
-      firstResponseOverdue: ticket.firstResponseOverdue,
-      resolutionWarningAt: ticket.resolutionWarningAt,
-      createdAt: ticket.createdAt,
-      updatedAt: ticket.updatedAt,
-      createdBy: {
-        id: ticket.createdBy.id,
-        name: ticket.createdBy.name,
-        email: ticket.createdBy.email,
-        departmentId: ticket.createdBy.departmentId,
-      },
-      assignedTo: ticket.assignedTo,
-      category: ticket.category,
-      asset: ticket.asset,
-    };
   }
 
   async getHistory(ticketId: number, currentUser: CurrentUserPayload) {
-    await this.access.canAccessTicket(ticketId, currentUser);
-
-    const histories = await this.prisma.ticketHistory.findMany({
-      where: { ticketId },
-      orderBy: {
-        createdAt: 'asc',
-      },
-      select: {
-        id: true,
-        action: true,
-        oldValue: true,
-        newValue: true,
-        createdAt: true,
-        user: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-            role: true,
+    return runSerializableTransaction(this.prisma, async (transaction) => {
+      await this.access.canAccessTicket(ticketId, currentUser, transaction);
+      return transaction.ticketHistory.findMany({
+        where: { ticketId },
+        orderBy: {
+          createdAt: 'asc',
+        },
+        select: {
+          id: true,
+          action: true,
+          oldValue: true,
+          newValue: true,
+          createdAt: true,
+          user: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+              role: true,
+            },
           },
         },
-      },
+      });
     });
-
-    return histories;
   }
 }
