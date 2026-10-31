@@ -9,6 +9,7 @@
 | 69 | Câu ghi đổi mật khẩu kiểm tra cả active/unlocked | Hai ca MySQL thất bại trước sửa: khóa hoặc vô hiệu hóa trong lúc chờ; sau sửa hash/cờ bắt buộc đổi mật khẩu giữ nguyên |
 | 70 | Kiểm tra lại hash và trạng thái khi cấp token khôi phục | Ba unit tái hiện trước sửa; ba ca MySQL khóa/vô hiệu hóa/reset trong lúc chờ không tạo token hay phát sự kiện email |
 | 71 | Cập nhật có phạm vi glob/minimatch cho công cụ hiện đại | Override glob >=9 lên 14.0.2 và minimatch >=9 lên 11.0.1; giữ API legacy dùng bởi ESLint/coverage |
+| 71.1 | Đồng bộ npm trong CI với Docker | Runner npm 10.9.9 từ chối lockfile override; pin npm 12.2.0 trước clean install và khai báo packageManager |
 
 ## Phạm vi kiểm chứng
 
@@ -17,6 +18,12 @@ Trên lockfile cuối của phần 71: 76 suite / 821 unit test, coverage gate, 
 Frontend qua lint, typegen/TypeScript, 38 regression test, hai prototype-safety test và production build. Production audit trên npm registry: 0 advisory ở cả backend và frontend. Audit gồm devDependencies vẫn báo backend 30 Moderate/3 Low và frontend 15 Moderate/3 Low, do minimatch legacy và deepmerge; không ghi các kết quả này thành audit sạch toàn bộ.
 
 Image Docker đúng lockfile cuối build thành công; Trivy không có High/Critical. Smoke test với network bị tắt xác nhận đủ 24 migrations, bcrypt native, undici 6.29.1 và glob 14.0.2, đồng thời không có hai SQL export trong image. Kết quả CI từ GitHub phải được xác minh sau push; các bản sửa trên nhánh PR chưa được coi là đã deploy.
+
+## 71.1 — tái tạo clean install của CI
+
+Run backend của `559f3d5` thất bại ở `npm ci` trên runner Node 22.23.4/npm 10.9.9: npm yêu cầu glob 10.5.0 và một số node không nằm trong lockfile đã resolve theo override. Local npm 12.0.2 và image npm 12.2.0 đã cài thành công, nên kiểm tra trước đó chưa chứng minh tương thích với npm mặc định của runner.
+
+Hai workflow cài npm 12.2.0 trước `npm ci`, khớp bản pin trong Dockerfile; hai package khai báo `packageManager: npm@12.2.0`. Kiểm chứng lại bằng container Linux chỉ mount manifest/source/config và CA public đã tracked, không mount `.env` hoặc dùng DB ứng dụng. Backend qua clean install, build, lint, 821 unit test/coverage và 32 E2E; frontend qua clean install với cùng npm. Hai YAML workflow parse hợp lệ. Kết quả CI của commit tiếp theo cần được kiểm tra riêng.
 
 ## Advisory phát hiện khi kiểm tra lại registry
 

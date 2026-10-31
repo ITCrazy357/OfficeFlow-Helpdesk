@@ -4,6 +4,7 @@
   "description": "",
   "author": "",
   "private": true,
+  "packageManager": "npm@12.2.0",
   "license": "UNLICENSED",
   "engines": {
     "node": ">=22 <23"
