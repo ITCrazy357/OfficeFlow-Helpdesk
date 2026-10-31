@@ -51,6 +51,7 @@ export class PasswordRecoveryService {
 
   private async issuePasswordResetToken(
     userId: number,
+    expectedPasswordHash: string,
     tokenHash: string,
     issuedAt: Date,
     expiresAt: Date,
@@ -60,6 +61,17 @@ export class PasswordRecoveryService {
       try {
         return await this.prisma.$transaction(
           async (transaction) => {
+            const currentUser = await transaction.user.findUnique({
+              where: { id: userId },
+              select: { passwordHash: true, isActive: true, isLocked: true },
+            });
+            if (
+              !currentUser?.isActive ||
+              currentUser.isLocked ||
+              currentUser.passwordHash !== expectedPasswordHash
+            ) {
+              return false;
+            }
             const existingToken =
               await transaction.passwordResetToken.findUnique({
                 where: { userId },
@@ -153,6 +165,7 @@ export class PasswordRecoveryService {
         where: { email },
         select: {
           id: true,
+          passwordHash: true,
           isActive: true,
           isLocked: true,
         },
@@ -161,6 +174,7 @@ export class PasswordRecoveryService {
       if (user?.isActive && !user.isLocked) {
         const issued = await this.issuePasswordResetToken(
           user.id,
+          user.passwordHash,
           tokenHash,
           issuedAt,
           expiresAt,

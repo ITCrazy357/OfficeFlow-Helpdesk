@@ -68,6 +68,7 @@ const mockOutboxService = {
 
 const activeUser = {
   id: 7,
+  passwordHash: 'current-password-hash',
   isActive: true,
   isLocked: false,
 };
@@ -155,6 +156,7 @@ describe('PasswordRecoveryService', () => {
       where: { email: 'missing@example.com' },
       select: {
         id: true,
+        passwordHash: true,
         isActive: true,
         isLocked: true,
       },
@@ -209,6 +211,22 @@ describe('PasswordRecoveryService', () => {
     expect(
       JSON.stringify(mockAuditLogsService.create.mock.calls),
     ).not.toContain(emittedEvent.rawToken);
+  });
+
+  it.each([
+    { isLocked: true },
+    { isActive: false },
+    { passwordHash: 'changed-hash' },
+  ])('does not issue a token after the account changes: %o', async (change) => {
+    const user = { ...activeUser, passwordHash: 'original-hash' };
+    mockUserModel.findUnique
+      .mockResolvedValueOnce(user)
+      .mockResolvedValueOnce({ ...user, ...change });
+    await expect(resolveForgotPassword('user@example.com')).resolves.toEqual({
+      accepted: true,
+    });
+    expect(mockPasswordResetTokenModel.upsert).not.toHaveBeenCalled();
+    expect(mockEventEmitter.emit).not.toHaveBeenCalled();
   });
 
   it('suppresses duplicate requests during the per-account cooldown', async () => {
