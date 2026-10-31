@@ -93,7 +93,9 @@ describe('AccountService', () => {
     mockRefreshTokenModel.updateMany.mockResolvedValue({ count: 1 });
     mockPasswordResetTokenModel.deleteMany.mockResolvedValue({ count: 1 });
     mockAuditLogsService.create.mockResolvedValue({});
-    mockBcryptCompare.mockResolvedValue(true);
+    mockBcryptCompare.mockImplementation(() =>
+      Promise.resolve(mockBcryptCompare.mock.calls.length === 1),
+    );
     mockBcryptHash.mockResolvedValue('new-password-hash');
     mockPrismaService.$transaction.mockImplementation((callback) =>
       callback(mockTransactionClient),

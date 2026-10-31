@@ -1,5 +1,6 @@
 import { ConfigService } from '@nestjs/config';
 import {
+  BadRequestException,
   ForbiddenException,
   ConflictException,
   NotFoundException,
@@ -49,6 +50,7 @@ import { AiRequestLimiter } from '../../src/ai/ai-request-limiter';
 import { AiTask } from '../../src/ai/types/ai-draft.type';
 import { AuthService } from '../../src/auth/auth.service';
 import { AccountService } from '../../src/users/accounts.service';
+import { PasswordRecoveryService } from '../../src/password-recovery/password-recovery.service';
 import { UsersService } from '../../src/users/users.service';
 import { TicketEmailListener } from '../../src/mail/listeners/ticket-email.listener';
 import type { MailService } from '../../src/mail/mail.service';
@@ -157,6 +159,116 @@ describe('Real MySQL/Redis integration (disposable containers only)', () => {
       },
       employee,
     );
+
+  it('rejects oversized new passwords without changing credentials, tokens, outbox or users', async () => {
+    const password = 'á'.repeat(36) + '-legacy';
+    const hash = await bcrypt.hash(password, 4);
+    const user = await prisma.user.create({
+      data: {
+        name: 'Password boundary fixture',
+        email: `${randomUUID()}@test.invalid`,
+        passwordHash: hash,
+        role: UserRole.EMPLOYEE,
+      },
+    });
+    const token = await prisma.passwordResetToken.create({
+      data: {
+        userId: user.id,
+        tokenHash: randomUUID(),
+        expiresAt: new Date(Date.now() + 60000),
+      },
+    });
+    const accounts = new AccountService(prisma, audit, outbox);
+    const oversized = 'á'.repeat(40);
+    const usersBefore = await prisma.user.count();
+    const outboxBefore = await prisma.outboxEvent.count();
+    const calls = [
+      () =>
+        accounts.changeOwnPassword(
+          { currentPassword: password, newPassword: oversized },
+          { userId: user.id, role: UserRole.EMPLOYEE },
+        ),
+      () => accounts.resetPassword(user.id, { password: oversized }, admin),
+      () =>
+        new UsersService(prisma, audit, new EventEmitter2(), outbox).create(
+          {
+            name: 'Should not create',
+            email: `${randomUUID()}@test.invalid`,
+            password: oversized,
+            role: UserRole.EMPLOYEE,
+            departmentId: 1,
+          },
+          admin,
+        ),
+      () =>
+        new PasswordRecoveryService(
+          prisma,
+          audit,
+          new EventEmitter2(),
+          outbox,
+        ).resetPassword({
+          token: 'unused-invalid-token',
+          newPassword: oversized,
+        }),
+    ];
+    for (const call of calls)
+      await expect(call()).rejects.toThrow(BadRequestException);
+    expect(
+      (await prisma.user.findUniqueOrThrow({ where: { id: user.id } }))
+        .passwordHash,
+    ).toBe(hash);
+    expect(
+      (
+        await prisma.passwordResetToken.findUniqueOrThrow({
+          where: { id: token.id },
+        })
+      ).usedAt,
+    ).toBeNull();
+    expect(await prisma.user.count()).toBe(usersBefore);
+    expect(await prisma.outboxEvent.count()).toBe(outboxBefore);
+  });
+
+  it('lets a legacy long password rotate safely and invalidates the old password and session', async () => {
+    const prefix = 'á'.repeat(36);
+    const password = prefix + '-legacy';
+    const user = await prisma.user.create({
+      data: {
+        name: 'Legacy password fixture',
+        email: `${randomUUID()}@test.invalid`,
+        passwordHash: await bcrypt.hash(password, 4),
+        role: UserRole.EMPLOYEE,
+      },
+    });
+    const auth = new AuthService(
+      prisma,
+      new JwtService({ secret: randomUUID() }),
+    );
+    const session = await auth.login({ email: user.email, password });
+    const accounts = new AccountService(prisma, audit, outbox);
+    const actor = { userId: user.id, role: UserRole.EMPLOYEE };
+    await expect(
+      accounts.changeOwnPassword(
+        { currentPassword: password, newPassword: prefix },
+        actor,
+      ),
+    ).rejects.toThrow(BadRequestException);
+    const nextPassword = randomUUID();
+    await expect(
+      accounts.changeOwnPassword(
+        { currentPassword: password, newPassword: nextPassword },
+        actor,
+      ),
+    ).resolves.toMatchObject({ passwordChanged: true });
+    await expect(auth.login({ email: user.email, password })).rejects.toThrow(
+      UnauthorizedException,
+    );
+    await expect(
+      auth.login({ email: user.email, password: nextPassword }),
+    ).resolves.toMatchObject({ user: { id: user.id } });
+    await expect(auth.refresh(session.refreshToken)).rejects.toThrow(
+      UnauthorizedException,
+    );
+  });
 
   it.each(['reset', 'change', 'lock'] as const)(
     'rejects a pending login after account %s completes',

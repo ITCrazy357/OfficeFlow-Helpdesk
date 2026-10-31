@@ -5,6 +5,9 @@ Ngày review: 2026-10-31, Asia/Bangkok. HEAD local và remote main cùng là
 Áp dụng checklist ECC security-review và các bước verification phù hợp với repo.
 Không sửa mã ứng dụng, không commit/push/deploy trong lượt review này.
 
+Cập nhật xử lý ngày 2026-11-01: xem [các bản sửa 77–80 và kiểm chứng](2026-11-01-ecc-fixes.md).
+Báo cáo bên dưới giữ nguyên bằng chứng trước sửa tại `955a637`.
+
 ## Kết luận
 
 Các bản vá dependency, quyền ticket, race đăng nhập và CI trước đây đã có hiệu

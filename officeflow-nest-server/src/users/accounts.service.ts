@@ -12,6 +12,7 @@ import {
   UserRole,
 } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
+import { assertNewPasswordBytes } from '../common/security/password-policy';
 
 import { AuditLogsService } from '../audit-logs/audit-logs.service';
 import { type CurrentUserPayload } from '../common/decorators/current-user.decorator';
@@ -334,6 +335,7 @@ export class AccountService {
     resetUserPasswordDto: ResetUserPasswordDto,
     currentUser: CurrentUserPayload,
   ) {
+    assertNewPasswordBytes(resetUserPasswordDto.password);
     const user = await this.getUserOrThrow(id);
 
     this.assertCanManageAccount(currentUser, user, 'reset password');
@@ -438,6 +440,7 @@ export class AccountService {
   }
 
   async changeOwnPassword(dto: ChangeMyPasswordDto, actor: CurrentUserPayload) {
+    assertNewPasswordBytes(dto.newPassword);
     const user = await this.prisma.user.findUnique({
       where: {
         id: actor.userId,
@@ -463,7 +466,10 @@ export class AccountService {
       throw new BadRequestException('Current password is incorrect');
     }
 
-    if (dto.newPassword === dto.currentPassword) {
+    if (
+      dto.newPassword === dto.currentPassword ||
+      (await bcrypt.compare(dto.newPassword, user.passwordHash))
+    ) {
       throw new BadRequestException(
         'New password cannot be the same as the current password',
       );

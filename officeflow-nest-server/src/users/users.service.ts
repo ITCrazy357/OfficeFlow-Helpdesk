@@ -13,6 +13,7 @@ import {
   UserRole,
 } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
+import { assertNewPasswordBytes } from '../common/security/password-policy';
 
 import { AuditLogsService } from '../audit-logs/audit-logs.service';
 import { runSerializableTransaction } from '../common/database/serializable-transaction.util';
@@ -71,6 +72,7 @@ export class UsersService {
   ) {}
 
   async create(createUserDto: CreateUserDto, currentUser: CurrentUserPayload) {
+    assertNewPasswordBytes(createUserDto.password);
     const email = createUserDto.email.trim().toLowerCase();
     const [existedUser, department] = await Promise.all([
       this.prisma.user.findUnique({
