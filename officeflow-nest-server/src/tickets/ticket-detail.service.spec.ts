@@ -16,7 +16,11 @@ describe('Ticket result detail contract', () => {
       };
       const db = {
         ticket: { findUnique: jest.fn().mockResolvedValue(ticket) },
+        $transaction: jest.fn(),
       };
+      db.$transaction.mockImplementation(
+        (work: (tx: typeof db) => Promise<unknown>) => work(db),
+      );
       const prisma = db as unknown as PrismaService;
       const service = new TicketQueryService(
         prisma,

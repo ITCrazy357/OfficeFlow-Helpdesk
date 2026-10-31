@@ -357,8 +357,18 @@ describe('Real MySQL/Redis integration (disposable containers only)', () => {
     );
   });
 
-  it.each(['add', 'read'] as const)(
-    'rejects discussion %s if the manager changes departments before the transaction',
+  it.each([
+    'add',
+    'read',
+    'list',
+    'detail',
+    'history',
+    'attachments',
+    'url',
+    'download',
+    'feedback',
+  ] as const)(
+    'rechecks ticket %s access if the manager changes departments before the transaction',
     async (operation) => {
       const department = await prisma.department.create({
         data: { name: randomUUID() },
@@ -395,6 +405,19 @@ describe('Real MySQL/Redis integration (disposable containers only)', () => {
         { content: 'Private discussion' },
         { userId: requester.id, role: requester.role },
       );
+      const attachment = await prisma.ticketAttachment.create({
+        data: {
+          ticketId: ticket.id,
+          uploadedById: requester.id,
+          fileName: 'private.pdf',
+          fileUrl:
+            'https://res.cloudinary.com/test/raw/authenticated/private.pdf',
+          publicId: randomUUID(),
+          resourceType: 'raw',
+          deliveryType: 'authenticated',
+          format: 'pdf',
+        },
+      });
       let markPaused!: () => void;
       let resume!: () => void;
       const paused = new Promise<void>((resolve) => {
@@ -407,6 +430,9 @@ describe('Real MySQL/Redis integration (disposable containers only)', () => {
         user: prisma.user,
         ticket: prisma.ticket,
         ticketComment: prisma.ticketComment,
+        ticketHistory: prisma.ticketHistory,
+        ticketAttachment: prisma.ticketAttachment,
+        ticketFeedback: prisma.ticketFeedback,
         $transaction: async (
           work: (tx: Prisma.TransactionClient) => Promise<unknown>,
           options: { isolationLevel: Prisma.TransactionIsolationLevel },
@@ -422,14 +448,40 @@ describe('Real MySQL/Redis integration (disposable containers only)', () => {
         new TicketAccessPolicyService(delayedPrisma),
       );
       const actor = { userId: manager.id, role: manager.role };
-      const pending =
-        operation === 'add'
-          ? comments.addComment(
-              ticket.id,
-              { content: 'Stale manager comment' },
-              actor,
-            )
-          : comments.getComments(ticket.id, actor);
+      const access = new TicketAccessPolicyService(delayedPrisma);
+      const query = new TicketQueryService(delayedPrisma, access);
+      const files = new TicketAttachmentService(
+        delayedPrisma,
+        cloudinary,
+        outbox,
+        access,
+      );
+      const ratings = new TicketFeedbackService(
+        delayedPrisma,
+        access,
+        audit,
+        outbox,
+        new EventEmitter2(),
+      );
+      const operations: Record<typeof operation, () => Promise<unknown>> = {
+        add: () =>
+          comments.addComment(
+            ticket.id,
+            { content: 'Stale manager comment' },
+            actor,
+          ),
+        read: () => comments.getComments(ticket.id, actor),
+        list: () => query.getTickets(actor, {}),
+        detail: () => query.canGetById(ticket.id, actor),
+        history: () => query.getHistory(ticket.id, actor),
+        attachments: () => files.getAttachments(ticket.id, actor),
+        url: () =>
+          files.getAttachmentAccessUrl(ticket.id, attachment.id, actor, false),
+        download: () =>
+          files.downloadAttachment(ticket.id, attachment.id, actor),
+        feedback: () => ratings.get(ticket.id, actor),
+      };
+      const pending = operations[operation]();
       const outcome = pending.then(
         (value: unknown) => ({ value }),
         (error: unknown) => ({ error }),
@@ -444,9 +496,16 @@ describe('Real MySQL/Redis integration (disposable containers only)', () => {
         resume();
       }
       const result = await outcome;
-      expect(result).toHaveProperty('error');
-      if ('error' in result)
-        expect(result.error).toBeInstanceOf(ForbiddenException);
+      if (operation === 'list') {
+        expect(result).toHaveProperty('value.items', []);
+        expect(result).toHaveProperty('value.pagination.totalItems', 0);
+      } else {
+        expect(result).toHaveProperty('error');
+        if ('error' in result)
+          expect(result.error).toBeInstanceOf(ForbiddenException);
+      }
+      expect(cloudinary.createPrivateDownloadUrl).not.toHaveBeenCalled();
+      expect(cloudinary.downloadFile).not.toHaveBeenCalled();
       expect(
         await prisma.ticketComment.count({ where: { ticketId: ticket.id } }),
       ).toBe(1);

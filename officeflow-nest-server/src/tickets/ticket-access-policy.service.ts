@@ -20,6 +20,7 @@ export class TicketAccessPolicyService {
 
   async getScope(
     currentUser: CurrentUserPayload,
+    database: Pick<Prisma.TransactionClient, 'user'> = this.prisma,
   ): Promise<Prisma.TicketWhereInput> {
     const where: Prisma.TicketWhereInput = {};
 
@@ -28,7 +29,7 @@ export class TicketAccessPolicyService {
     }
 
     if (currentUser.role === UserRole.MANAGER) {
-      const manager = await this.prisma.user.findUnique({
+      const manager = await database.user.findUnique({
         where: { id: currentUser.userId },
         select: { departmentId: true },
       });
@@ -56,6 +57,7 @@ export class TicketAccessPolicyService {
       createdBy: { departmentId: number | null };
     },
     currentUser: CurrentUserPayload,
+    database: Pick<Prisma.TransactionClient, 'ticket' | 'user'> = this.prisma,
   ): Promise<void> {
     if (
       currentUser.role === UserRole.MANAGER &&
@@ -72,7 +74,7 @@ export class TicketAccessPolicyService {
     }
 
     if (currentUser.role === UserRole.MANAGER) {
-      const manager = await this.prisma.user.findUnique({
+      const manager = await database.user.findUnique({
         where: { id: currentUser.userId },
         select: { departmentId: true },
       });
@@ -83,7 +85,7 @@ export class TicketAccessPolicyService {
       ) {
         if (
           ticket.id &&
-          (await this.prisma.ticket.count({
+          (await database.ticket.count({
             where: {
               id: ticket.id,
               ...this.escalatedScope(currentUser.userId),

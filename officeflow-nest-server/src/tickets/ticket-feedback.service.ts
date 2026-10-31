@@ -48,10 +48,12 @@ export class TicketFeedbackService {
   ) {}
 
   async get(ticketId: number, actor: CurrentUserPayload) {
-    await this.access.canAccessTicket(ticketId, actor);
-    return this.prisma.ticketFeedback.findUnique({
-      where: { ticketId },
-      select: feedbackSelect,
+    return runSerializableTransaction(this.prisma, async (transaction) => {
+      await this.access.canAccessTicket(ticketId, actor, transaction);
+      return transaction.ticketFeedback.findUnique({
+        where: { ticketId },
+        select: feedbackSelect,
+      });
     });
   }
 

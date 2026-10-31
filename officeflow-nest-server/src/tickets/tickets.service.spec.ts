@@ -26,6 +26,7 @@ const mockTransaction = {
   user: { findUnique: jest.fn() },
   ticket: {
     findMany: jest.fn(),
+    count: jest.fn(),
     update: jest.fn(),
     delete: jest.fn(),
     findUnique: jest.fn(),
@@ -37,6 +38,8 @@ const mockTransaction = {
     findMany: jest.fn(),
   },
   ticketAttachment: {
+    findMany: jest.fn(),
+    findUnique: jest.fn(),
     create: jest.fn(),
     deleteMany: jest.fn(),
   },
@@ -89,6 +92,12 @@ describe('TicketsService', () => {
 
   beforeEach(async () => {
     jest.clearAllMocks();
+    mockTransaction.ticket.findMany = mockPrismaService.ticket.findMany;
+    mockTransaction.ticket.count = mockPrismaService.ticket.count;
+    mockTransaction.ticketAttachment.findMany =
+      mockPrismaService.ticketAttachment.findMany;
+    mockTransaction.ticketAttachment.findUnique =
+      mockPrismaService.ticketAttachment.findUnique;
     mockTransaction.user.findUnique.mockReset().mockResolvedValue({
       id: 3,
       name: 'Admin',

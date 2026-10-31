@@ -129,29 +129,29 @@ export class TicketAttachmentService {
   }
 
   async getAttachments(ticketId: number, currentUser: CurrentUserPayload) {
-    await this.access.canAccessTicket(ticketId, currentUser);
-
-    const attachments = await this.prisma.ticketAttachment.findMany({
-      where: { ticketId },
-      select: {
-        id: true,
-        fileName: true,
-        fileUrl: true,
-        fileType: true,
-        fileSize: true,
-        createdAt: true,
-        uploadedBy: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-            role: true,
+    return runSerializableTransaction(this.prisma, async (transaction) => {
+      await this.access.canAccessTicket(ticketId, currentUser, transaction);
+      return transaction.ticketAttachment.findMany({
+        where: { ticketId },
+        select: {
+          id: true,
+          fileName: true,
+          fileUrl: true,
+          fileType: true,
+          fileSize: true,
+          createdAt: true,
+          uploadedBy: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+              role: true,
+            },
           },
         },
-      },
-      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+        orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+      });
     });
-    return attachments;
   }
 
   private async getAttachmentDeliveryMetadata(
@@ -159,29 +159,31 @@ export class TicketAttachmentService {
     attachmentId: number,
     currentUser: CurrentUserPayload,
   ): Promise<AttachmentDeliveryMetadata> {
-    await this.access.canAccessTicket(ticketId, currentUser);
+    return runSerializableTransaction(this.prisma, async (transaction) => {
+      await this.access.canAccessTicket(ticketId, currentUser, transaction);
 
-    const attachment = await this.prisma.ticketAttachment.findUnique({
-      where: {
-        id: attachmentId,
-        ticketId,
-      },
-      select: {
-        fileName: true,
-        fileUrl: true,
-        fileType: true,
-        publicId: true,
-        resourceType: true,
-        deliveryType: true,
-        format: true,
-      },
+      const attachment = await transaction.ticketAttachment.findUnique({
+        where: {
+          id: attachmentId,
+          ticketId,
+        },
+        select: {
+          fileName: true,
+          fileUrl: true,
+          fileType: true,
+          publicId: true,
+          resourceType: true,
+          deliveryType: true,
+          format: true,
+        },
+      });
+
+      if (!attachment) {
+        throw new NotFoundException('Attachment not found');
+      }
+
+      return attachment;
     });
-
-    if (!attachment) {
-      throw new NotFoundException('Attachment not found');
-    }
-
-    return attachment;
   }
 
   private createAttachmentAccessUrl(
