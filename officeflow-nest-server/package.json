@@ -67,6 +67,7 @@
     "swagger-ui-express": "^5.0.1"
   },
   "devDependencies": {
+    "deepmerge": "file:./vendor/deepmerge-safe",
     "glob": "file:./vendor/glob-compat",
     "glob-modern": "npm:glob@14.0.2",
     "minimatch-modern": "npm:minimatch@11.0.1",
@@ -103,6 +104,7 @@
     "typescript-eslint": "^8.20.0"
   },
   "overrides": {
+    "deepmerge": "$deepmerge",
     "minimatch": "$minimatch",
     "glob": "$glob",
     "body-parser": "2.4.0",

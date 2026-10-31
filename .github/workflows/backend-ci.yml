@@ -128,9 +128,11 @@ jobs:
       - uses: actions/setup-node@v6
         with:
           node-version: 22
-      - name: Audit locked production dependencies
+      - name: Use the npm version pinned by the Docker image
+        run: npm install --global npm@12.2.0 --ignore-scripts --no-audit --no-fund
+      - name: Audit all locked dependencies including development tools
         working-directory: officeflow-nest-server
-        run: npm audit --omit=dev --audit-level=high
+        run: npm audit --audit-level=low
       - name: Reject tracked database exports
         run: |
           node --test officeflow-nest-server/scripts/check-tracked-data.test.cjs

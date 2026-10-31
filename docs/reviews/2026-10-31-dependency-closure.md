@@ -32,6 +32,37 @@ Audit gồm devDependencies sau phần 73: backend còn 8 Low, frontend còn 3 L
 Các dependency ngoài phạm vi được giữ nguyên phiên bản trong lockfile. Đây chưa
 phải audit sạch toàn bộ; phần deepmerge được xử lý riêng tiếp theo.
 
+## 74 — vá deepmerge và mở audit gate cho cả devDependencies
+
+Fork private `@officeflow/deepmerge-safe@1.0.0` giữ mã deepmerge 4.3.1, type và
+license MIT gốc. Hai thay đổi thuật toán bỏ qua khóa literal `__proto__` trước
+khi đọc/ghi ở cả vòng sao chép target và vòng merge source. README ghi SHA-256
+nguồn gốc và trách nhiệm đồng bộ hai bản fork. Đây là bản vá tự duy trì, không
+phải tuyên bố upstream đã phát hành patched version.
+
+Payload thực làm đối tượng kết quả của bản gốc bị đầu độc ở ba dạng target:
+null, null-prototype và có own `__proto__`. Cùng payload không đầu độc kết quả
+của fork. Gate còn kiểm tra target-copy, lồng object/array, getter bẫy, `.all`,
+symbols và các tùy chọn merge. Tiến trình con tắt NODE_OPTIONS và chứng minh
+setter `__proto__` vẫn hoạt động để xác nhận bản vá không dựa vào workaround.
+
+Audit đầy đủ qua npm registry của cả hai lockfile: **0 Info/Low/Moderate/High/
+Critical**, gồm devDependencies. Hai CI nâng gate thành `npm audit
+--audit-level=low`; security job cũng dùng npm 12.2.0. Không có audit ignore.
+
+Kiểm chứng cuối phần 74: clean Linux/npm 12.2.0 qua build/lint, 8 dependency
+safety test, 821 unit/coverage, 32 E2E, 7 isolation-safety và 9 metrics HTTP test.
+Frontend local qua 8 dependency safety, lint/type, 38 regression và build.
+61 integration test qua MySQL/Redis dùng riêng với migration từ DB rỗng.
+Image Docker build thành công, Trivy không có High/Critical; smoke test network
+none kiểm tra 24 migrations đúng byte, không chứa dump, bcrypt native và các
+engine/fork đúng bản. Các kết quả này là local; CI/deploy của PR mới phải được
+xác nhận sau push.
+
+Vercel deployment của commit merge phần 72 cũng đã được xác nhận success qua
+GitHub status và deployment environment Production. Chưa dùng điều này làm
+bằng chứng đã deploy phần 73–74.
+
 ## F1 — trạng thái vận hành
 
 Chưa có phiên ADMIN production hợp lệ để xác minh đổi/reset mật khẩu và thu hồi
