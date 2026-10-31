@@ -1,4 +1,7 @@
 import { ConfigService } from '@nestjs/config';
+import { UnauthorizedException } from '@nestjs/common';
+import { JwtService } from '@nestjs/jwt';
+import * as bcrypt from 'bcrypt';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { Test } from '@nestjs/testing';
 import { AssetType, Prisma, TicketPriority, UserRole } from '@prisma/client';
@@ -39,6 +42,8 @@ import { AiService } from '../../src/ai/ai.service';
 import { AiProvider } from '../../src/ai/ai.provider';
 import { AiRequestLimiter } from '../../src/ai/ai-request-limiter';
 import { AiTask } from '../../src/ai/types/ai-draft.type';
+import { AuthService } from '../../src/auth/auth.service';
+import { AccountService } from '../../src/users/accounts.service';
 
 describe('Real MySQL/Redis integration (disposable containers only)', () => {
   const prisma = new PrismaService(
@@ -144,6 +149,120 @@ describe('Real MySQL/Redis integration (disposable containers only)', () => {
       },
       employee,
     );
+
+  it.each(['reset', 'change', 'lock'] as const)(
+    'rejects a pending login after account %s completes',
+    async (operation) => {
+      const password = randomUUID();
+      const user = await prisma.user.create({
+        data: {
+          name: 'Login race fixture',
+          email: `${randomUUID()}@test.invalid`,
+          passwordHash: await bcrypt.hash(password, 4),
+          role: UserRole.EMPLOYEE,
+        },
+      });
+      let markPaused!: () => void;
+      let resume!: () => void;
+      const paused = new Promise<void>((resolve) => {
+        markPaused = resolve;
+      });
+      const released = new Promise<void>((resolve) => {
+        resume = resolve;
+      });
+      const delayedPrisma = {
+        user: {
+          findUnique: async () => {
+            const snapshot = await prisma.user.findUniqueOrThrow({
+              where: { id: user.id },
+            });
+            markPaused();
+            await released;
+            return snapshot;
+          },
+        },
+        refreshToken: prisma.refreshToken,
+        $transaction: (
+          work: (tx: Prisma.TransactionClient) => Promise<unknown>,
+          options: { isolationLevel: Prisma.TransactionIsolationLevel },
+        ) => prisma.$transaction(work, options),
+      } as unknown as PrismaService;
+      const auth = new AuthService(
+        delayedPrisma,
+        new JwtService({ secret: randomUUID() }),
+      );
+      const accounts = new AccountService(prisma, audit, outbox);
+      const outcome = auth.login({ email: user.email, password }).then(
+        (value) => ({ value }),
+        (error: unknown) => ({ error }),
+      );
+      try {
+        await paused;
+        if (operation === 'reset') {
+          await accounts.resetPassword(
+            user.id,
+            { password: randomUUID() },
+            admin,
+          );
+        } else if (operation === 'change') {
+          await accounts.changeOwnPassword(
+            { currentPassword: password, newPassword: randomUUID() },
+            { userId: user.id, role: user.role },
+          );
+        } else {
+          await accounts.lockUser(admin, user.id);
+        }
+      } finally {
+        resume();
+      }
+      const result = await outcome;
+      expect(result).toHaveProperty('error');
+      if ('error' in result) {
+        expect(result.error).toBeInstanceOf(UnauthorizedException);
+      }
+      expect(
+        await prisma.refreshToken.count({ where: { userId: user.id } }),
+      ).toBe(0);
+    },
+  );
+
+  it('revokes a login committed before an administrative password reset', async () => {
+    const password = randomUUID();
+    const user = await prisma.user.create({
+      data: {
+        name: 'Session revocation fixture',
+        email: `${randomUUID()}@test.invalid`,
+        passwordHash: await bcrypt.hash(password, 4),
+        role: UserRole.EMPLOYEE,
+      },
+    });
+    const auth = new AuthService(
+      prisma,
+      new JwtService({ secret: randomUUID() }),
+    );
+    const session = await auth.login({ email: user.email, password });
+    expect(session.user.id).toBe(user.id);
+    expect(
+      await prisma.refreshToken.count({
+        where: { userId: user.id, revokedAt: null },
+      }),
+    ).toBe(1);
+
+    await new AccountService(prisma, audit, outbox).resetPassword(
+      user.id,
+      { password: randomUUID() },
+      admin,
+    );
+
+    await expect(auth.refresh(session.refreshToken)).rejects.toThrow(
+      UnauthorizedException,
+    );
+    expect(
+      await prisma.refreshToken.count({
+        where: { userId: user.id, revokedAt: null },
+      }),
+    ).toBe(0);
+  });
 
   it('rechecks employee edit permissions when processing starts before its transaction', async () => {
     const ticket = await createTicket();

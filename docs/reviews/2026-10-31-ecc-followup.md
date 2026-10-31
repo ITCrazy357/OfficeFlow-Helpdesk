@@ -49,3 +49,15 @@ Người dùng đã cung cấp URL giao diện production. Trình duyệt kiểm
 Đã cập nhật phần vá thư viện npm trong Dockerfile lên `undici 6.29.1`, cùng major 6. [Release chính thức](https://github.com/nodejs/undici/releases/tag/v6.29.1) xử lý các CVE mà gate báo: CVE-2026-109383, CVE-2026-109869 và CVE-2026-87018. Không đổi ngưỡng Trivy hoặc bỏ qua advisory. Kết quả image/CI sau bản sửa được xác minh riêng.
 
 Image local `officeflow-backend:ecc-remediation` đã build thành công. Smoke test với network bị tắt xác nhận bcrypt native hoạt động và thư viện undici thực tế nằm trong npm đúng phiên bản 6.29.1; không bootstrap app hoặc truy cập DB.
+
+## Kết quả CI/deploy đã xác minh lại
+
+[Backend CI/CD d003a6d](https://github.com/ITCrazy357/OfficeFlow-Helpdesk/actions/runs/41101034533) đã thành công, gồm verify, Gitleaks, Trivy và job deploy Render. Job deploy đã chờ health endpoint trả đúng SHA d003a6d. Đây là bằng chứng của phiên bản đó; chưa bao gồm bản sửa đăng nhập bên dưới và chưa xác nhận mật khẩu thực đã được đổi.
+
+## F8 — đăng nhập đang xử lý vượt qua thời điểm thu hồi phiên
+
+Điểm lỗi: `AuthService.login()` đọc user và so sánh bcrypt, sau đó tạo refresh session ngoài transaction. Nếu đổi/reset mật khẩu hoàn tất giữa hai bước, bước thu hồi phiên chưa thấy session sắp được tạo; yêu cầu dùng mật khẩu cũ vẫn nhận phiên mới. Khóa tài khoản trong khoảng này cũng không ngăn tạo session, dù guard chặn sử dụng khi tài khoản còn bị khóa.
+
+Đã tái hiện bằng ba unit test trước khi sửa: thay hash, khóa hoặc vô hiệu hóa user sau lần đọc đầu đều vẫn tạo session. Sau sửa, kiểm tra lại hash/trạng thái và tạo session nằm trong cùng transaction Serializable, dùng helper retry sẵn có. Bcrypt vẫn chạy bên ngoài transaction để không giữ khóa trong lúc tính hash. Response dùng user vừa kiểm tra lại; không sửa chính sách quyền hay schema.
+
+Kiểm chứng local: 72 suite / 802 unit test, coverage gate, 32 E2E, lint và build đều đạt. Thêm bốn hồi quy MySQL: đăng nhập bị chậm rồi reset, tự đổi mật khẩu hoặc khóa tài khoản; và thứ tự ngược lại, đăng nhập thành công rồi reset phải thu hồi phiên. Chưa chạy được các ca MySQL mới trên máy này vì Docker daemon chưa hoạt động. Không dùng DB ứng dụng thay thế; cần kết quả CI của nhánh sửa trước khi merge/deploy.
