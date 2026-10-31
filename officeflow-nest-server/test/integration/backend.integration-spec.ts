@@ -1248,7 +1248,7 @@ describe('Real MySQL/Redis integration (disposable containers only)', () => {
       other.onApplicationShutdown();
     }
   });
-  it.each(['department', 'ticket_deleted'] as const)(
+  it.each(['department', 'ticket_deleted', 'cleanup_retry'] as const)(
     'does not save an uploaded asset after access changes: %s',
     async (change) => {
       const department = await prisma.department.create({
@@ -1283,7 +1283,7 @@ describe('Real MySQL/Redis integration (disposable containers only)', () => {
         secureUrl: 'https://res.cloudinary.com/test/raw/authenticated/test.pdf',
       };
       cloudinary.uploadFile.mockImplementationOnce(async () => {
-        if (change === 'department') {
+        if (change !== 'ticket_deleted') {
           await prisma.user.update({
             where: { id: manager.id },
             data: { departmentId: null },
@@ -1293,7 +1293,13 @@ describe('Real MySQL/Redis integration (disposable containers only)', () => {
         }
         return uploaded;
       });
-      cloudinary.deleteFile.mockResolvedValueOnce(undefined);
+      if (change === 'cleanup_retry') {
+        cloudinary.deleteFile.mockRejectedValueOnce(
+          new Error('Temporary fixture storage outage'),
+        );
+      } else {
+        cloudinary.deleteFile.mockResolvedValueOnce(undefined);
+      }
       const file = {
         originalname: 'report.pdf',
         mimetype: 'application/pdf',
@@ -1305,7 +1311,7 @@ describe('Real MySQL/Redis integration (disposable containers only)', () => {
           role: manager.role,
         }),
       ).rejects.toThrow(
-        change === 'department' ? ForbiddenException : NotFoundException,
+        change === 'ticket_deleted' ? NotFoundException : ForbiddenException,
       );
       expect(
         await prisma.ticketAttachment.count({ where: { ticketId: ticket.id } }),
@@ -1321,6 +1327,21 @@ describe('Real MySQL/Redis integration (disposable containers only)', () => {
         uploaded.resourceType,
         uploaded.deliveryType,
       );
+      if (change === 'cleanup_retry') {
+        const cleanup = await prisma.outboxEvent.findFirstOrThrow({
+          where: {
+            type: 'cloudinary.asset.delete',
+            payload: { path: '$.publicId', equals: uploaded.publicId },
+          },
+        });
+        expect(cleanup.status).toBe('PENDING');
+        expect(cleanup.deduplicationKey.length).toBeLessThanOrEqual(191);
+        expect(cleanup.payload).toMatchObject({
+          publicId: uploaded.publicId,
+          resourceType: 'raw',
+          deliveryType: 'authenticated',
+        });
+      }
     },
   );
 

@@ -9,6 +9,7 @@ import {
 import { TicketHistoryAction, UserRole } from '@prisma/client';
 import type { Request } from 'express';
 import type {} from 'multer';
+import { createHash } from 'node:crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import { CloudinaryService } from '../cloudinary/cloudinary.service';
 import { OutboxService } from '../outbox/outbox.service';
@@ -122,6 +123,33 @@ export class TicketAttachmentService {
           `Could not clean up Cloudinary asset ${uploadedFile.publicId}`,
           cleanupError instanceof Error ? cleanupError.stack : undefined,
         );
+        try {
+          const cleanupKey = createHash('sha256')
+            .update(
+              JSON.stringify([
+                uploadedFile.publicId,
+                uploadedFile.resourceType,
+                uploadedFile.deliveryType,
+              ]),
+            )
+            .digest('hex');
+          await this.prisma.$transaction((transaction) =>
+            this.outboxService.enqueue(transaction, {
+              type: OUTBOX_EVENT_TYPES.CLOUDINARY_ASSET_DELETE,
+              payload: {
+                publicId: uploadedFile.publicId,
+                resourceType: uploadedFile.resourceType,
+                deliveryType: uploadedFile.deliveryType,
+              },
+              deduplicationKey: `cloudinary-upload-cleanup:${cleanupKey}`,
+            }),
+          );
+        } catch (queueError) {
+          this.logger.error(
+            'Could not enqueue failed upload cleanup',
+            queueError instanceof Error ? queueError.stack : undefined,
+          );
+        }
       }
 
       throw error;

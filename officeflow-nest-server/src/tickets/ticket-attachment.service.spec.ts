@@ -1,8 +1,7 @@
-import { ForbiddenException } from '@nestjs/common';
+import { ForbiddenException, Logger } from '@nestjs/common';
 import { Prisma, UserRole } from '@prisma/client';
 import type { PrismaService } from '../prisma/prisma.service';
 import type { CloudinaryService } from '../cloudinary/cloudinary.service';
-import { OutboxService } from '../outbox/outbox.service';
 import { TicketAccessPolicyService } from './ticket-access-policy.service';
 import { TicketAttachmentService } from './ticket-attachment.service';
 
@@ -51,13 +50,16 @@ describe('TicketAttachmentService upload authorization', () => {
       deleteFile: jest.fn().mockResolvedValue(undefined),
     };
     const prisma = db as unknown as PrismaService;
+    const outbox = {
+      enqueue: jest.fn().mockResolvedValue({ id: 'cleanup-job' }),
+    };
     const service = new TicketAttachmentService(
       prisma,
       cloud as unknown as CloudinaryService,
-      new OutboxService(),
+      outbox,
       new TicketAccessPolicyService(prisma),
     );
-    return { service, tx, db, cloud };
+    return { service, tx, db, cloud, outbox };
   }
 
   it('rejects lost department access after upload and cleans up the uploaded asset', async () => {
@@ -99,5 +101,54 @@ describe('TicketAttachmentService upload authorization', () => {
     expect(cloud.uploadFile).toHaveBeenCalledTimes(1);
     expect(tx.ticketAttachment.create).toHaveBeenCalledTimes(1);
     expect(cloud.deleteFile).not.toHaveBeenCalled();
+  });
+
+  it('persists a cleanup job if immediate Cloudinary cleanup fails', async () => {
+    const log = jest
+      .spyOn(Logger.prototype, 'error')
+      .mockImplementation(() => undefined);
+    try {
+      const { service, tx, cloud, outbox } = setup();
+      cloud.deleteFile.mockRejectedValueOnce(
+        new Error('Temporary storage outage'),
+      );
+      await expect(
+        service.uploadAttachment(ticket.id, file, manager),
+      ).rejects.toThrow(ForbiddenException);
+      expect(outbox.enqueue).toHaveBeenCalledWith(
+        tx,
+        expect.objectContaining({
+          type: 'cloudinary.asset.delete',
+          payload: {
+            publicId: uploaded.publicId,
+            resourceType: uploaded.resourceType,
+            deliveryType: uploaded.deliveryType,
+          },
+        }),
+      );
+      expect(tx.ticketAttachment.create).not.toHaveBeenCalled();
+    } finally {
+      log.mockRestore();
+    }
+  });
+
+  it('preserves the original rejection if cleanup and its fallback queue both fail', async () => {
+    const log = jest
+      .spyOn(Logger.prototype, 'error')
+      .mockImplementation(() => undefined);
+    try {
+      const { service, cloud, outbox } = setup();
+      cloud.deleteFile.mockRejectedValueOnce(
+        new Error('Temporary storage outage'),
+      );
+      outbox.enqueue.mockRejectedValueOnce(
+        new Error('Temporary database outage'),
+      );
+      await expect(
+        service.uploadAttachment(ticket.id, file, manager),
+      ).rejects.toThrow(ForbiddenException);
+    } finally {
+      log.mockRestore();
+    }
   });
 });
