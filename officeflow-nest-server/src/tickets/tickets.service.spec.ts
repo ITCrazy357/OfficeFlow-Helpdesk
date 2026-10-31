@@ -34,6 +34,7 @@ const mockTransaction = {
   },
   ticketComment: {
     create: jest.fn(),
+    findMany: jest.fn(),
   },
   ticketAttachment: {
     create: jest.fn(),
@@ -782,7 +783,7 @@ describe('TicketsService', () => {
         role: UserRole.ADMIN,
       },
     };
-    mockPrismaService.ticket.findUnique.mockResolvedValueOnce({
+    mockTransaction.ticket.findUnique.mockResolvedValueOnce({
       id: 5,
       createdById: 2,
       createdBy: { departmentId: 1 },

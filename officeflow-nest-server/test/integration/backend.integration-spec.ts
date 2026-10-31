@@ -1,5 +1,5 @@
 import { ConfigService } from '@nestjs/config';
-import { UnauthorizedException } from '@nestjs/common';
+import { ForbiddenException, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 import { EventEmitter2 } from '@nestjs/event-emitter';
@@ -352,6 +352,115 @@ describe('Real MySQL/Redis integration (disposable containers only)', () => {
       'Forbidden',
     );
   });
+
+  it.each(['add', 'read'] as const)(
+    'rejects discussion %s if the manager changes departments before the transaction',
+    async (operation) => {
+      const department = await prisma.department.create({
+        data: { name: randomUUID() },
+      });
+      const otherDepartment = await prisma.department.create({
+        data: { name: randomUUID() },
+      });
+      const requester = await prisma.user.create({
+        data: {
+          name: 'Requester fixture',
+          email: `${randomUUID()}@test.invalid`,
+          passwordHash: 'test-only',
+          departmentId: department.id,
+        },
+      });
+      const manager = await prisma.user.create({
+        data: {
+          name: 'Manager fixture',
+          email: `${randomUUID()}@test.invalid`,
+          passwordHash: 'test-only',
+          role: UserRole.MANAGER,
+          departmentId: department.id,
+        },
+      });
+      const ticket = await tickets.create(
+        {
+          title: randomUUID(),
+          description: 'Discussion authorization fixture',
+        },
+        { userId: requester.id, role: requester.role },
+      );
+      await tickets.addComment(
+        ticket.id,
+        { content: 'Private discussion' },
+        { userId: requester.id, role: requester.role },
+      );
+      let markPaused!: () => void;
+      let resume!: () => void;
+      const paused = new Promise<void>((resolve) => {
+        markPaused = resolve;
+      });
+      const released = new Promise<void>((resolve) => {
+        resume = resolve;
+      });
+      const delayedPrisma = {
+        user: prisma.user,
+        ticket: prisma.ticket,
+        ticketComment: prisma.ticketComment,
+        $transaction: async (
+          work: (tx: Prisma.TransactionClient) => Promise<unknown>,
+          options: { isolationLevel: Prisma.TransactionIsolationLevel },
+        ) => {
+          markPaused();
+          await released;
+          return prisma.$transaction(work, options);
+        },
+      } as unknown as PrismaService;
+      const comments = new TicketCommentService(
+        delayedPrisma,
+        outbox,
+        new TicketAccessPolicyService(delayedPrisma),
+      );
+      const actor = { userId: manager.id, role: manager.role };
+      const pending =
+        operation === 'add'
+          ? comments.addComment(
+              ticket.id,
+              { content: 'Stale manager comment' },
+              actor,
+            )
+          : comments.getComments(ticket.id, actor);
+      const outcome = pending.then(
+        (value: unknown) => ({ value }),
+        (error: unknown) => ({ error }),
+      );
+      try {
+        await paused;
+        await prisma.user.update({
+          where: { id: manager.id },
+          data: { departmentId: otherDepartment.id },
+        });
+      } finally {
+        resume();
+      }
+      const result = await outcome;
+      expect(result).toHaveProperty('error');
+      if ('error' in result)
+        expect(result.error).toBeInstanceOf(ForbiddenException);
+      expect(
+        await prisma.ticketComment.count({ where: { ticketId: ticket.id } }),
+      ).toBe(1);
+      expect(
+        await prisma.ticketHistory.count({
+          where: { ticketId: ticket.id, action: 'COMMENTED' },
+        }),
+      ).toBe(1);
+      expect(
+        await prisma.outboxEvent.count({
+          where: {
+            type: 'ticket.commented',
+            payload: { path: '$.ticketId', equals: ticket.id },
+          },
+        }),
+      ).toBe(1);
+    },
+  );
 
   it('generates a draft from real published knowledge without writing tickets, comments or articles', async () => {
     const knowledge = new KnowledgeService(prisma, audit);
