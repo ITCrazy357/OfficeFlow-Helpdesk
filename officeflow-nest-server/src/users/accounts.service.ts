@@ -439,6 +439,8 @@ export class AccountService {
         where: {
           id: actor.userId,
           passwordHash: user.passwordHash,
+          isActive: true,
+          isLocked: false,
         },
         data: {
           passwordHash,
@@ -448,7 +450,7 @@ export class AccountService {
 
       if (result.count !== 1) {
         throw new ConflictException(
-          'Password changed in another request. Please sign in again',
+          'Account credentials or status changed. Please sign in again',
         );
       }
 

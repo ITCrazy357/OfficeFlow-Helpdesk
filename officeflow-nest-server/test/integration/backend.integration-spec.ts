@@ -1,6 +1,7 @@
 import { ConfigService } from '@nestjs/config';
 import {
   ForbiddenException,
+  ConflictException,
   NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
@@ -226,6 +227,85 @@ describe('Real MySQL/Redis integration (disposable containers only)', () => {
       }
       expect(
         await prisma.refreshToken.count({ where: { userId: user.id } }),
+      ).toBe(0);
+    },
+  );
+
+  it.each(['locked', 'inactive'] as const)(
+    'rejects a pending password change after the account becomes %s',
+    async (state) => {
+      const password = randomUUID();
+      const user = await prisma.user.create({
+        data: {
+          name: 'Password transition fixture',
+          email: `${randomUUID()}@test.invalid`,
+          passwordHash: await bcrypt.hash(password, 4),
+          mustChangePassword: true,
+        },
+      });
+      let markPaused!: () => void;
+      let resume!: () => void;
+      const paused = new Promise<void>((resolve) => {
+        markPaused = resolve;
+      });
+      const released = new Promise<void>((resolve) => {
+        resume = resolve;
+      });
+      const delayedPrisma = {
+        user: prisma.user,
+        $transaction: async (
+          work: (tx: Prisma.TransactionClient) => Promise<unknown>,
+        ) => {
+          markPaused();
+          await released;
+          return prisma.$transaction(work);
+        },
+      } as unknown as PrismaService;
+      const pending = new AccountService(
+        delayedPrisma,
+        audit,
+        outbox,
+      ).changeOwnPassword(
+        { currentPassword: password, newPassword: randomUUID() },
+        { userId: user.id, role: user.role },
+      );
+      const outcome = pending.then(
+        (value) => ({ value }),
+        (error: unknown) => ({ error }),
+      );
+      try {
+        await paused;
+        if (state === 'locked')
+          await new AccountService(prisma, audit, outbox).lockUser(
+            admin,
+            user.id,
+          );
+        else
+          await prisma.user.update({
+            where: { id: user.id },
+            data: { isActive: false },
+          });
+      } finally {
+        resume();
+      }
+      const result = await outcome;
+      expect(result).toHaveProperty('error');
+      if ('error' in result)
+        expect(result.error).toBeInstanceOf(ConflictException);
+      expect(
+        await prisma.user.findUniqueOrThrow({ where: { id: user.id } }),
+      ).toMatchObject({
+        passwordHash: user.passwordHash,
+        mustChangePassword: true,
+      });
+      expect(
+        await prisma.auditLog.count({
+          where: {
+            entity: 'USER',
+            entityId: user.id,
+            description: 'Changed own password.',
+          },
+        }),
       ).toBe(0);
     },
   );
