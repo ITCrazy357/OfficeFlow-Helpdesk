@@ -1413,6 +1413,45 @@ describe('Real MySQL/Redis integration (disposable containers only)', () => {
     expect(cloudinary.deleteFile).not.toHaveBeenCalled();
   });
 
+  it('commits exactly one deletion history and cleanup job for concurrent attachment deletion', async () => {
+    const ticket = await createTicket();
+    const attachment = await prisma.ticketAttachment.create({
+      data: {
+        ticketId: ticket.id,
+        uploadedById: employee.userId,
+        fileName: 'delete-once.pdf',
+        fileUrl: 'https://res.cloudinary.com/test/raw/authenticated/test.pdf',
+        publicId: randomUUID(),
+        resourceType: 'raw',
+        deliveryType: 'authenticated',
+        format: 'pdf',
+      },
+    });
+    const results = await Promise.allSettled([
+      tickets.deleteAttachment(ticket.id, attachment.id, employee),
+      tickets.deleteAttachment(ticket.id, attachment.id, employee),
+    ]);
+    expect(
+      results.filter((result) => result.status === 'fulfilled'),
+    ).toHaveLength(1);
+    expect(
+      results.filter((result) => result.status === 'rejected'),
+    ).toHaveLength(1);
+    expect(
+      await prisma.ticketHistory.count({
+        where: { ticketId: ticket.id, action: 'ATTACHMENT_DELETED' },
+      }),
+    ).toBe(1);
+    expect(
+      await prisma.outboxEvent.count({
+        where: {
+          deduplicationKey: `cloudinary-delete:ticket:${ticket.id}:attachment:${attachment.id}`,
+        },
+      }),
+    ).toBe(1);
+    expect(cloudinary.deleteFile).not.toHaveBeenCalled();
+  });
+
   it('commits status history and outbox without changing the HTTP-facing result shape', async () => {
     const ticket = await createTicket();
     const updated = await tickets.updateStatus(

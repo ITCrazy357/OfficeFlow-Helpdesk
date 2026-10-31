@@ -257,39 +257,39 @@ export class TicketAttachmentService {
     attachmentId: number,
     currentUser: CurrentUserPayload,
   ) {
-    await this.access.canAccessTicket(ticketId, currentUser);
+    return runSerializableTransaction(this.prisma, async (transaction) => {
+      await this.access.canAccessTicket(ticketId, currentUser, transaction);
 
-    const attachment = await this.prisma.ticketAttachment.findUnique({
-      where: {
-        id: attachmentId,
-        ticketId,
-      },
-      select: {
-        fileName: true,
-        fileUrl: true,
-        publicId: true,
-        resourceType: true,
-        deliveryType: true,
-        uploadedById: true,
-      },
-    });
+      const attachment = await transaction.ticketAttachment.findUnique({
+        where: {
+          id: attachmentId,
+          ticketId,
+        },
+        select: {
+          fileName: true,
+          fileUrl: true,
+          publicId: true,
+          resourceType: true,
+          deliveryType: true,
+          uploadedById: true,
+        },
+      });
 
-    if (!attachment) {
-      throw new NotFoundException('Attachment not found');
-    }
+      if (!attachment) {
+        throw new NotFoundException('Attachment not found');
+      }
 
-    if (currentUser.role === UserRole.MANAGER) {
-      throw new ForbiddenException('Forbidden');
-    }
+      if (currentUser.role === UserRole.MANAGER) {
+        throw new ForbiddenException('Forbidden');
+      }
 
-    if (
-      currentUser.role === UserRole.EMPLOYEE &&
-      attachment.uploadedById !== currentUser.userId
-    ) {
-      throw new ForbiddenException('Forbidden');
-    }
+      if (
+        currentUser.role === UserRole.EMPLOYEE &&
+        attachment.uploadedById !== currentUser.userId
+      ) {
+        throw new ForbiddenException('Forbidden');
+      }
 
-    await this.prisma.$transaction(async (transaction) => {
       const deleted = await transaction.ticketAttachment.deleteMany({
         where: {
           id: attachmentId,
@@ -326,8 +326,7 @@ export class TicketAttachmentService {
           deduplicationKey: `cloudinary-delete:ticket:${ticketId}:attachment:${attachmentId}`,
         });
       }
+      return { id: attachmentId };
     });
-
-    return { id: attachmentId };
   }
 }

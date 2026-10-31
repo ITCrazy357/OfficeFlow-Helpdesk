@@ -92,6 +92,11 @@ describe('TicketsService', () => {
 
   beforeEach(async () => {
     jest.clearAllMocks();
+    mockTransaction.ticket.findUnique.mockReset().mockResolvedValue({
+      id: 5,
+      createdById: 1,
+      createdBy: { departmentId: 1 },
+    });
     mockTransaction.ticket.findMany = mockPrismaService.ticket.findMany;
     mockTransaction.ticket.count = mockPrismaService.ticket.count;
     mockTransaction.ticketAttachment.findMany =
@@ -1267,6 +1272,11 @@ describe('TicketsService', () => {
       createdById: 10,
       createdBy: { departmentId: 1 },
     });
+    mockTransaction.ticket.findUnique.mockResolvedValue({
+      id: 5,
+      createdById: 10,
+      createdBy: { departmentId: 1 },
+    });
     mockPrismaService.ticketAttachment.findUnique.mockResolvedValue(attachment);
     mockCloudinaryService.deleteFile.mockResolvedValue(undefined);
     mockTransaction.ticketAttachment.deleteMany.mockResolvedValue({ count: 1 });
@@ -1377,6 +1387,12 @@ describe('TicketsService', () => {
       createdBy: { departmentId: 7 },
     });
     mockPrismaService.user.findUnique.mockResolvedValue({ departmentId: 7 });
+    mockTransaction.user.findUnique.mockResolvedValue({ departmentId: 7 });
+    mockTransaction.ticket.findUnique.mockResolvedValue({
+      id: 5,
+      createdById: 2,
+      createdBy: { departmentId: 7 },
+    });
     mockPrismaService.ticketAttachment.findUnique.mockResolvedValue({
       fileName: 'report.pdf',
       fileUrl: 'https://res.cloudinary.com/demo/raw/upload/v1/report.pdf',
@@ -1390,6 +1406,7 @@ describe('TicketsService', () => {
       'Forbidden',
     );
     expect(mockCloudinaryService.deleteFile).not.toHaveBeenCalled();
-    expect(mockPrismaService.$transaction).not.toHaveBeenCalled();
+    expect(mockTransaction.ticketAttachment.deleteMany).not.toHaveBeenCalled();
+    expect(mockOutboxService.enqueue).not.toHaveBeenCalled();
   });
 });
