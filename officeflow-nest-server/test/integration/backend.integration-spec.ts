@@ -228,6 +228,85 @@ describe('Real MySQL/Redis integration (disposable containers only)', () => {
     expect(await prisma.outboxEvent.count()).toBe(outboxBefore);
   });
 
+  it.each(['demotion', 'deactivation'] as const)(
+    'rejects pending administrator creation after operator %s commits',
+    async (scenario) => {
+      const operator = await prisma.user.create({
+        data: {
+          name: 'Pending create operator',
+          email: `${randomUUID()}@test.invalid`,
+          role: UserRole.ADMIN,
+          passwordHash: 'fixture-only',
+        },
+      });
+      const department = await prisma.department.create({
+        data: { name: randomUUID() },
+      });
+      const email = `${randomUUID()}@test.invalid`;
+      let pause!: () => void, resume!: () => void;
+      const paused = new Promise<void>((resolve) => {
+        pause = resolve;
+      });
+      const released = new Promise<void>((resolve) => {
+        resume = resolve;
+      });
+      const delayed = {
+        user: prisma.user,
+        department: prisma.department,
+        $transaction: async (
+          work: (tx: Prisma.TransactionClient) => Promise<unknown>,
+          options: { isolationLevel: Prisma.TransactionIsolationLevel },
+        ) => {
+          pause();
+          await released;
+          return prisma.$transaction(work, options);
+        },
+      } as unknown as PrismaService;
+      const pending = new UsersService(
+        delayed,
+        audit,
+        new EventEmitter2(),
+        outbox,
+      ).create(
+        {
+          name: 'Should not create admin',
+          email,
+          password: randomUUID(),
+          role: UserRole.ADMIN,
+          departmentId: department.id,
+        },
+        { userId: operator.id, role: UserRole.ADMIN },
+      );
+      const result = expect(pending).rejects.toThrow(ForbiddenException);
+      await paused;
+      try {
+        const users = new UsersService(
+          prisma,
+          audit,
+          new EventEmitter2(),
+          outbox,
+        );
+        if (scenario === 'demotion')
+          await users.update(operator.id, { role: UserRole.EMPLOYEE }, admin);
+        else
+          await users.changeActivationStatus(
+            operator.id,
+            { isActive: false },
+            admin,
+          );
+      } finally {
+        resume();
+      }
+      await result;
+      expect(await prisma.user.count({ where: { email } })).toBe(0);
+      expect(
+        await prisma.auditLog.count({
+          where: { actorId: operator.id, action: 'CREATE', entity: 'USER' },
+        }),
+      ).toBe(0);
+    },
+  );
+
   it('lets a legacy long password rotate safely and invalidates the old password and session', async () => {
     const prefix = 'á'.repeat(36);
     const password = prefix + '-legacy';

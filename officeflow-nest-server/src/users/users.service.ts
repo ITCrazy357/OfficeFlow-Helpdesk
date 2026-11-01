@@ -103,46 +103,50 @@ export class UsersService {
 
     const passwordHash = await bcrypt.hash(createUserDto.password, 10);
 
-    const user = await this.prisma.$transaction(async (transaction) => {
-      const user = await transaction.user.create({
-        data: {
-          name: createUserDto.name.trim(),
-          email,
-          passwordHash,
-          role: createUserDto.role,
-          departmentId: createUserDto.departmentId,
-        },
-        select: userSelect,
-      });
-
-      await this.auditLogsService.create(
-        {
-          actorId: currentUser.userId,
-          entity: AuditLogEntity.USER,
-          entityId: user.id,
-          action: AuditLogAction.CREATE,
-          description: `Created user ${user.email}.`,
-          newValues: {
-            name: user.name,
-            email: user.email,
-            role: user.role,
-            departmentId: user.departmentId,
-            isActive: user.isActive,
+    const user = await runSerializableTransaction(
+      this.prisma,
+      async (transaction) => {
+        await assertActiveAdmin(transaction, currentUser.userId);
+        const user = await transaction.user.create({
+          data: {
+            name: createUserDto.name.trim(),
+            email,
+            passwordHash,
+            role: createUserDto.role,
+            departmentId: createUserDto.departmentId,
           },
-          ipAddress: currentUser.ipAddress,
-          userAgent: currentUser.userAgent,
-        },
-        transaction,
-      );
+          select: userSelect,
+        });
 
-      await this.outboxService.enqueue(transaction, {
-        type: OUTBOX_EVENT_TYPES.USER_CREATED,
-        payload: { userId: user.id },
-        deduplicationKey: `user-created:${user.id}`,
-      });
+        await this.auditLogsService.create(
+          {
+            actorId: currentUser.userId,
+            entity: AuditLogEntity.USER,
+            entityId: user.id,
+            action: AuditLogAction.CREATE,
+            description: `Created user ${user.email}.`,
+            newValues: {
+              name: user.name,
+              email: user.email,
+              role: user.role,
+              departmentId: user.departmentId,
+              isActive: user.isActive,
+            },
+            ipAddress: currentUser.ipAddress,
+            userAgent: currentUser.userAgent,
+          },
+          transaction,
+        );
 
-      return user;
-    });
+        await this.outboxService.enqueue(transaction, {
+          type: OUTBOX_EVENT_TYPES.USER_CREATED,
+          payload: { userId: user.id },
+          deduplicationKey: `user-created:${user.id}`,
+        });
+
+        return user;
+      },
+    );
 
     return user;
   }
