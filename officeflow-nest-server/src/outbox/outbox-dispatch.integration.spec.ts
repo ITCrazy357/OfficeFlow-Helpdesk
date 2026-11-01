@@ -11,6 +11,7 @@ import { CloudinaryCleanupListener } from './cloudinary-cleanup.listener';
 import { OutboxProcessor } from './outbox.processor';
 import { MetricsService } from '../metrics/metrics.service';
 import { TicketAccessPolicyService } from '../tickets/ticket-access-policy.service';
+import { EmailDeliveryService } from '../mail/email-delivery.service';
 
 // Jest matchers return any; keep nested expected values explicitly unknown.
 function objectContaining(value: Record<string, unknown>): unknown {
@@ -34,6 +35,7 @@ describe('Outbox dispatch through real Nest event subscribers', () => {
     ticket: { findUnique: jest.fn() },
     $transaction: jest.fn(),
     notification: { createMany: jest.fn() },
+    emailDelivery: { findUnique: jest.fn(), upsert: jest.fn() },
   };
   const cloudinary = { deleteFile: jest.fn() };
   const mail = { isEnabled: () => true, sendEmail: jest.fn() };
@@ -91,6 +93,7 @@ describe('Outbox dispatch through real Nest event subscribers', () => {
         NotificationsListener,
         NotificationsService,
         TicketAccessPolicyService,
+        EmailDeliveryService,
         { provide: PrismaService, useValue: database },
         { provide: CloudinaryService, useValue: cloudinary },
         { provide: MailService, useValue: mail },

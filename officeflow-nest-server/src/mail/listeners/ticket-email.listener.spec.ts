@@ -6,6 +6,7 @@ import type { PrismaService } from '../../prisma/prisma.service';
 import type { MailService } from '../mail.service';
 import { TicketEmailListener } from './ticket-email.listener';
 import type { TicketAccessPolicyService } from '../../tickets/ticket-access-policy.service';
+import { EmailDeliveryService } from '../email-delivery.service';
 
 const mockTicketAccess = { getRecipients: jest.fn() };
 
@@ -45,6 +46,7 @@ describe('TicketEmailListener', () => {
       mockPrisma as unknown as PrismaService,
       mockMailService as unknown as MailService,
       mockTicketAccess as unknown as TicketAccessPolicyService,
+      new EmailDeliveryService(mockPrisma as unknown as PrismaService),
     );
   });
 

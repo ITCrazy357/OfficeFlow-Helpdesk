@@ -15,6 +15,8 @@ import { ticketResolvedEmailTemplate } from '../templates/ticket-resolved-email.
 import type { TicketSlaAlertEvent } from '../../notifications/events/ticket-sla-alert.event';
 import { ticketSlaAlertEmailTemplate } from '../templates/ticket-sla-alert-email.template';
 import { TicketAccessPolicyService } from '../../tickets/ticket-access-policy.service';
+import { EmailDeliveryService } from '../email-delivery.service';
+import type { OutboxDispatchedEvent } from '../../outbox/outbox.constants';
 
 @Injectable()
 export class TicketEmailListener {
@@ -24,6 +26,7 @@ export class TicketEmailListener {
     private readonly prisma: PrismaService,
     private readonly mailService: MailService,
     private readonly ticketAccess: TicketAccessPolicyService,
+    private readonly delivery: EmailDeliveryService,
   ) {}
 
   @OnEvent('ticket.sla_alert', { suppressErrors: false })
@@ -42,7 +45,9 @@ export class TicketEmailListener {
         this.getFrontendUrl(`/tickets/${event.ticketId}`),
       );
       try {
-        await this.mailService.sendEmail({ to: recipient.email, ...email });
+        await this.delivery.send(event.outboxEventId, recipient.id, () =>
+          this.mailService.sendEmail({ to: recipient.email, ...email }),
+        );
       } catch (error) {
         this.logError(`ticket-sla recipient ${recipient.id}`, error);
         failures.push(recipient.id);
@@ -55,7 +60,7 @@ export class TicketEmailListener {
   @OnEvent('ticket.created', {
     suppressErrors: false,
   })
-  async handleTicketCreated(event: TicketCreatedEvent) {
+  async handleTicketCreated(event: TicketCreatedEvent & OutboxDispatchedEvent) {
     if (!this.mailService.isEnabled()) {
       return;
     }
@@ -70,6 +75,7 @@ export class TicketEmailListener {
           title: true,
           createdBy: {
             select: {
+              id: true,
               name: true,
               email: true,
               isActive: true,
@@ -101,12 +107,14 @@ export class TicketEmailListener {
         ticketUrl: this.getFrontendUrl(`/tickets/${ticket.id}`),
       });
 
-      await this.mailService.sendEmail({
-        to: ticket.createdBy.email,
-        subject: email.subject,
-        text: email.text,
-        html: email.html,
-      });
+      await this.delivery.send(event.outboxEventId, ticket.createdBy.id, () =>
+        this.mailService.sendEmail({
+          to: ticket.createdBy.email,
+          subject: email.subject,
+          text: email.text,
+          html: email.html,
+        }),
+      );
     } catch (error: unknown) {
       this.logError('ticket-created', error);
       throw error;
@@ -116,7 +124,9 @@ export class TicketEmailListener {
   @OnEvent('ticket.assigned', {
     suppressErrors: false,
   })
-  async handleTicketAssigned(event: TicketAssignedEvent) {
+  async handleTicketAssigned(
+    event: TicketAssignedEvent & OutboxDispatchedEvent,
+  ) {
     if (!this.mailService.isEnabled()) {
       return;
     }
@@ -143,12 +153,14 @@ export class TicketEmailListener {
         ticketUrl: this.getFrontendUrl(`/tickets/${event.ticketId}`),
       });
 
-      await this.mailService.sendEmail({
-        to: assignedTo.email,
-        subject: email.subject,
-        text: email.text,
-        html: email.html,
-      });
+      await this.delivery.send(event.outboxEventId, assignedTo.id, () =>
+        this.mailService.sendEmail({
+          to: assignedTo.email,
+          subject: email.subject,
+          text: email.text,
+          html: email.html,
+        }),
+      );
     } catch (error: unknown) {
       this.logError('ticket-assigned', error);
       throw error;
@@ -158,7 +170,9 @@ export class TicketEmailListener {
   @OnEvent('ticket.resolved', {
     suppressErrors: false,
   })
-  async handleTicketResolved(event: TicketResolvedEvent) {
+  async handleTicketResolved(
+    event: TicketResolvedEvent & OutboxDispatchedEvent,
+  ) {
     if (!this.mailService.isEnabled()) {
       return;
     }
@@ -173,6 +187,7 @@ export class TicketEmailListener {
           title: true,
           createdBy: {
             select: {
+              id: true,
               name: true,
               email: true,
               isActive: true,
@@ -205,12 +220,14 @@ export class TicketEmailListener {
         resolvedByName: event.resolverName,
       });
 
-      await this.mailService.sendEmail({
-        to: ticket.createdBy.email,
-        subject: email.subject,
-        text: email.text,
-        html: email.html,
-      });
+      await this.delivery.send(event.outboxEventId, ticket.createdBy.id, () =>
+        this.mailService.sendEmail({
+          to: ticket.createdBy.email,
+          subject: email.subject,
+          text: email.text,
+          html: email.html,
+        }),
+      );
     } catch (error: unknown) {
       this.logError('ticket-resolved', error);
       throw error;
@@ -220,7 +237,7 @@ export class TicketEmailListener {
   @OnEvent('ticket.overdue', {
     suppressErrors: false,
   })
-  async handleTicketOverdue(event: TicketOverdueEvent) {
+  async handleTicketOverdue(event: TicketOverdueEvent & OutboxDispatchedEvent) {
     if (!this.mailService.isEnabled()) {
       return;
     }
@@ -248,12 +265,14 @@ export class TicketEmailListener {
         });
 
         try {
-          await this.mailService.sendEmail({
-            to: recipient.email,
-            subject: email.subject,
-            text: email.text,
-            html: email.html,
-          });
+          await this.delivery.send(event.outboxEventId, recipient.id, () =>
+            this.mailService.sendEmail({
+              to: recipient.email,
+              subject: email.subject,
+              text: email.text,
+              html: email.html,
+            }),
+          );
         } catch (error: unknown) {
           this.logError(`ticket-overdue recipient ${recipient.id}`, error);
           failedRecipientIds.push(recipient.id);

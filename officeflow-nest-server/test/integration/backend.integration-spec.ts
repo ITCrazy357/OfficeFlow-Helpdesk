@@ -54,6 +54,7 @@ import { PasswordRecoveryService } from '../../src/password-recovery/password-re
 import { UsersService } from '../../src/users/users.service';
 import { TicketEmailListener } from '../../src/mail/listeners/ticket-email.listener';
 import type { MailService } from '../../src/mail/mail.service';
+import { EmailDeliveryService } from '../../src/mail/email-delivery.service';
 
 describe('Real MySQL/Redis integration (disposable containers only)', () => {
   const prisma = new PrismaService(
@@ -348,6 +349,113 @@ describe('Real MySQL/Redis integration (disposable containers only)', () => {
       UnauthorizedException,
     );
   });
+
+  it.each(['sla', 'overdue'] as const)(
+    'retries only incomplete %s email recipients across worker restarts',
+    async (kind) => {
+      const ticket = await createTicket();
+      const first = await prisma.user.findUniqueOrThrow({
+        where: { id: admin.userId },
+      });
+      const second = await prisma.user.create({
+        data: {
+          name: 'Second email fixture',
+          email: `${randomUUID()}@test.invalid`,
+          passwordHash: 'fixture-only',
+          role: UserRole.ADMIN,
+        },
+      });
+      const event = {
+        outboxEventId: randomUUID(),
+        ticketId: ticket.id,
+        ticketTitle: ticket.title,
+        recipientIds: [first.id, second.id],
+        milestone: 'RESPONSE' as const,
+        kind: 'WARNING' as const,
+        dueAt: new Date().toISOString(),
+      };
+      let fail = true;
+      const accepted: string[] = [];
+      const mail = {
+        isEnabled: () => true,
+        sendEmail: jest.fn().mockImplementation(({ to }: { to: string }) => {
+          if (to === second.email && fail) {
+            fail = false;
+            return Promise.reject(new Error('Temporary SMTP fixture failure'));
+          }
+          accepted.push(to);
+          return Promise.resolve({ skipped: false });
+        }),
+      };
+      const listener = () =>
+        new TicketEmailListener(
+          prisma,
+          mail as unknown as MailService,
+          new TicketAccessPolicyService(prisma),
+          new EmailDeliveryService(prisma),
+        );
+      const dispatch = (handler: TicketEmailListener) =>
+        kind === 'sla'
+          ? handler.handleTicketSlaAlert(event)
+          : handler.handleTicketOverdue(event);
+      await expect(dispatch(listener())).rejects.toThrow();
+      expect(
+        await prisma.emailDelivery.count({
+          where: { outboxEventId: event.outboxEventId },
+        }),
+      ).toBe(1);
+      await dispatch(listener());
+      await dispatch(listener());
+      expect(accepted).toEqual([first.email, second.email]);
+      expect(mail.sendEmail).toHaveBeenCalledTimes(3);
+      expect(
+        await prisma.emailDelivery.count({
+          where: { outboxEventId: event.outboxEventId },
+        }),
+      ).toBe(2);
+    },
+  );
+
+  it.each(['created', 'assigned', 'resolved'] as const)(
+    'does not resend a completed single-recipient ticket %s event',
+    async (kind) => {
+      const ticket = await createTicket();
+      const event = {
+        outboxEventId: randomUUID(),
+        ticketId: ticket.id,
+        ticketTitle: ticket.title,
+        assignedToId: admin.userId,
+        assignedByName: 'Fixture admin',
+        resolverId: admin.userId,
+        resolverName: 'Fixture admin',
+        recipientIds: [employee.userId],
+      };
+      const mail = {
+        isEnabled: () => true,
+        sendEmail: jest.fn().mockResolvedValue({ skipped: false }),
+      };
+      const dispatch = () => {
+        const listener = new TicketEmailListener(
+          prisma,
+          mail as unknown as MailService,
+          new TicketAccessPolicyService(prisma),
+          new EmailDeliveryService(prisma),
+        );
+        if (kind === 'created') return listener.handleTicketCreated(event);
+        if (kind === 'assigned') return listener.handleTicketAssigned(event);
+        return listener.handleTicketResolved(event);
+      };
+      await dispatch();
+      await dispatch();
+      expect(mail.sendEmail).toHaveBeenCalledTimes(1);
+      const receipt = await prisma.emailDelivery.findFirstOrThrow({
+        where: { outboxEventId: event.outboxEventId },
+      });
+      expect(receipt.recipientId).toBe(
+        kind === 'assigned' ? admin.userId : employee.userId,
+      );
+    },
+  );
 
   it.each(['reset', 'change', 'lock'] as const)(
     'rejects a pending login after account %s completes',
@@ -2180,6 +2288,7 @@ describe('Real MySQL/Redis integration (disposable containers only)', () => {
         prisma,
         mail as unknown as MailService,
         access,
+        new EmailDeliveryService(prisma),
       ).handleTicketSlaAlert(event);
       expect(mail.sendEmail).toHaveBeenCalledTimes(2);
       expect(mail.sendEmail).not.toHaveBeenCalledWith(
