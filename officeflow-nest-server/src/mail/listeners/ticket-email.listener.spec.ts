@@ -5,6 +5,10 @@ import { TicketResolvedEvent } from '../../notifications/events/ticket-resolved.
 import type { PrismaService } from '../../prisma/prisma.service';
 import type { MailService } from '../mail.service';
 import { TicketEmailListener } from './ticket-email.listener';
+import type { TicketAccessPolicyService } from '../../tickets/ticket-access-policy.service';
+import { EmailDeliveryService } from '../email-delivery.service';
+
+const mockTicketAccess = { getRecipients: jest.fn() };
 
 const mockTicketModel = {
   findUnique: jest.fn(),
@@ -30,6 +34,7 @@ describe('TicketEmailListener', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    mockTicketAccess.getRecipients.mockResolvedValue([]);
     mockMailService.isEnabled.mockReturnValue(true);
     mockMailService.sendEmail.mockResolvedValue({
       skipped: false,
@@ -40,6 +45,8 @@ describe('TicketEmailListener', () => {
     listener = new TicketEmailListener(
       mockPrisma as unknown as PrismaService,
       mockMailService as unknown as MailService,
+      mockTicketAccess as unknown as TicketAccessPolicyService,
+      new EmailDeliveryService(mockPrisma as unknown as PrismaService),
     );
   });
 
@@ -74,11 +81,13 @@ describe('TicketEmailListener', () => {
   });
 
   it('should send ticket-assigned email to the new assignee', async () => {
-    mockUserModel.findUnique.mockResolvedValue({
-      name: 'IT Staff',
-      email: 'it@example.com',
-      isActive: true,
-    });
+    mockTicketAccess.getRecipients.mockResolvedValue([
+      {
+        id: 20,
+        name: 'IT Staff',
+        email: 'it@example.com',
+      },
+    ]);
 
     await listener.handleTicketAssigned(
       new TicketAssignedEvent(15, 'Cannot connect to VPN', 20, 'Admin'),
@@ -123,10 +132,14 @@ describe('TicketEmailListener', () => {
   });
 
   it('continues SLA delivery to other recipients and reports a failed email for retry', async () => {
-    mockUserModel.findMany.mockResolvedValue([
+    const recipients = [
       { id: 10, name: 'Admin', email: 'admin@test.invalid' },
       { id: 20, name: 'Manager', email: 'manager@test.invalid' },
-    ]);
+    ];
+    mockTicketAccess.getRecipients.mockImplementation(
+      (_ticketId: number, ids: number[]) =>
+        Promise.resolve(recipients.filter((user) => ids.includes(user.id))),
+    );
     mockMailService.sendEmail.mockRejectedValueOnce(new Error('smtp failed'));
     await expect(
       listener.handleTicketSlaAlert({
@@ -139,10 +152,10 @@ describe('TicketEmailListener', () => {
       }),
     ).rejects.toThrow('10');
     expect(mockMailService.sendEmail).toHaveBeenCalledTimes(2);
-    expect(mockUserModel.findMany).toHaveBeenCalledWith({
-      where: { id: { in: [10, 20] }, isActive: true, isLocked: false },
-      select: { id: true, name: true, email: true },
-    });
+    expect(mockTicketAccess.getRecipients.mock.calls).toEqual([
+      [15, [10]],
+      [15, [20]],
+    ]);
     const calls = mockMailService.sendEmail.mock.calls as Array<
       [{ html: string; text: string }]
     >;
@@ -151,7 +164,7 @@ describe('TicketEmailListener', () => {
   });
 
   it('should de-duplicate overdue recipients before sending email', async () => {
-    mockUserModel.findMany.mockResolvedValue([
+    const recipients = [
       {
         id: 10,
         name: 'Employee',
@@ -162,21 +175,56 @@ describe('TicketEmailListener', () => {
         name: 'IT Staff',
         email: 'it@example.com',
       },
-    ]);
+    ];
+    mockTicketAccess.getRecipients.mockImplementation(
+      (_ticketId: number, ids: number[]) =>
+        Promise.resolve(recipients.filter((user) => ids.includes(user.id))),
+    );
 
     await listener.handleTicketOverdue(
       new TicketOverdueEvent(15, 'Cannot connect to VPN', [10, 10, 20]),
     );
 
-    const findManyArgs = mockUserModel.findMany.mock.calls[0]?.[0] as {
-      where: {
-        id: {
-          in: number[];
-        };
-      };
-    };
-
-    expect(findManyArgs.where.id.in).toEqual([10, 20]);
+    expect(mockTicketAccess.getRecipients.mock.calls).toEqual([
+      [15, [10]],
+      [15, [20]],
+    ]);
     expect(mockMailService.sendEmail).toHaveBeenCalledTimes(2);
+  });
+
+  it('rechecks each recipient after a preceding SMTP call completes', async () => {
+    let revoked = false;
+    mockTicketAccess.getRecipients.mockImplementation(
+      (_ticketId: number, ids: number[]) =>
+        Promise.resolve(
+          ids[0] === 10
+            ? [{ id: 10, name: 'Admin', email: 'admin@test.invalid' }]
+            : revoked
+              ? []
+              : [
+                  {
+                    id: 20,
+                    name: 'Former admin',
+                    email: 'former@test.invalid',
+                  },
+                ],
+        ),
+    );
+    mockMailService.sendEmail.mockImplementation(() => {
+      revoked = true;
+      return Promise.resolve({});
+    });
+    await listener.handleTicketSlaAlert({
+      ticketId: 15,
+      ticketTitle: 'Private fixture',
+      dueAt: '2026-10-19T08:00:00Z',
+      milestone: 'RESPONSE',
+      kind: 'ESCALATED',
+      recipientIds: [10, 20],
+    });
+    expect(mockMailService.sendEmail).toHaveBeenCalledTimes(1);
+    expect(mockMailService.sendEmail).toHaveBeenCalledWith(
+      expect.objectContaining({ to: 'admin@test.invalid' }),
+    );
   });
 });

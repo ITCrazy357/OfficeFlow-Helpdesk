@@ -7,10 +7,24 @@ import { NotificationType, type Prisma } from '@prisma/client';
 
 import { PrismaService } from '../prisma/prisma.service';
 import { GetNotificationsQueryDto } from './dto/get-notifications-query.dto';
+import { TicketAccessPolicyService } from '../tickets/ticket-access-policy.service';
+import { runSerializableTransaction } from '../common/database/serializable-transaction.util';
+
+type NotificationBatch = {
+  userIds: number[];
+  type: NotificationType;
+  title: string;
+  message: string;
+  targetUrl: string;
+  sourceEventId?: string;
+};
 
 @Injectable()
 export class NotificationsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly ticketAccess: TicketAccessPolicyService,
+  ) {}
 
   async create(params: {
     userId: number;
@@ -56,21 +70,17 @@ export class NotificationsService {
     });
   }
 
-  async createdMany(params: {
-    userIds: number[];
-    type: NotificationType;
-    title: string;
-    message: string;
-    targetUrl: string;
-    sourceEventId?: string;
-  }) {
+  async createdMany(
+    params: NotificationBatch,
+    database: Pick<Prisma.TransactionClient, 'notification'> = this.prisma,
+  ) {
     const uniqueUserIds = [...new Set(params.userIds)];
 
     if (uniqueUserIds.length === 0) {
       return { count: 0 };
     }
 
-    return this.prisma.notification.createMany({
+    return database.notification.createMany({
       data: uniqueUserIds.map((userId) => ({
         userId,
         type: params.type,
@@ -80,6 +90,20 @@ export class NotificationsService {
         sourceEventId: params.sourceEventId,
       })),
       skipDuplicates: Boolean(params.sourceEventId),
+    });
+  }
+
+  async createdManyForTicket(ticketId: number, params: NotificationBatch) {
+    return runSerializableTransaction(this.prisma, async (transaction) => {
+      const recipients = await this.ticketAccess.getRecipients(
+        ticketId,
+        params.userIds,
+        transaction,
+      );
+      return this.createdMany(
+        { ...params, userIds: recipients.map((user) => user.id) },
+        transaction,
+      );
     });
   }
 

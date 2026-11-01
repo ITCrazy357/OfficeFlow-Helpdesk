@@ -1,4 +1,8 @@
 import { z } from "zod";
+import {
+  fitsNewPasswordBytes,
+  NEW_PASSWORD_BYTE_MESSAGE,
+} from "@/lib/password-policy";
 
 export const userFormSchema = z.object({
   name: z
@@ -15,7 +19,7 @@ export const userFormSchema = z.object({
   departmentId: z.string().min(1, "Vui lòng chọn phòng ban"),
   password: z
     .string()
-    .max(128, "Mật khẩu tối đa 128 ký tự")
+    .refine(fitsNewPasswordBytes, NEW_PASSWORD_BYTE_MESSAGE)
     .refine(
       (value) => value.length === 0 || value.length >= 12,
       "Mật khẩu ít nhất 12 ký tự",
@@ -29,7 +33,7 @@ export const resetPasswordSchema = z
     password: z
       .string()
       .min(12, "Mật khẩu ít nhất 12 ký tự")
-      .max(128, "Mật khẩu tối đa 128 ký tự"),
+      .refine(fitsNewPasswordBytes, NEW_PASSWORD_BYTE_MESSAGE),
     confirmPassword: z.string().min(1, "Vui lòng xác nhận mật khẩu"),
   })
   .refine((values) => values.password === values.confirmPassword, {

@@ -550,6 +550,17 @@ model OutboxEvent {
   @@map("Outbox_events")
 }
 
+// Receipts remain after outbox retention cleanup. Store identifiers only,
+// never email addresses, tokens or message contents.
+model EmailDelivery {
+  outboxEventId String   @db.Char(36)
+  recipientId   Int
+  deliveredAt   DateTime @default(now())
+
+  @@id([outboxEventId, recipientId])
+  @@map("Email_deliveries")
+}
+
 model Asset {
   id       Int         @id @default(autoincrement())
   assetTag String      @unique

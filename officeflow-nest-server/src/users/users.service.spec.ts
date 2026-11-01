@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   NotFoundException,
 } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
@@ -229,6 +230,44 @@ describe('UsersService', () => {
       ),
     ).rejects.toThrow(ConflictException);
   });
+
+  it.each([
+    { role: UserRole.EMPLOYEE },
+    { isActive: false },
+    { isLocked: true },
+    { mustChangePassword: true },
+  ])(
+    'rejects create when the administrator changes while hashing: %j',
+    async (change) => {
+      mockUserModel.findUnique.mockResolvedValue(null);
+      mockDepartmentModel.findUnique.mockResolvedValue({ id: 1 });
+      mockBcryptHash.mockImplementation(() => {
+        mockTransactionClient.user.findUnique.mockResolvedValue({
+          role: UserRole.ADMIN,
+          isActive: true,
+          isLocked: false,
+          mustChangePassword: false,
+          ...change,
+        });
+        return Promise.resolve('hashed-password');
+      });
+      await expect(
+        service.create(
+          {
+            name: 'Pending admin',
+            email: 'fixture@test.invalid',
+            password: 'fixture-new-password',
+            role: UserRole.ADMIN,
+            departmentId: 1,
+          },
+          currentUser,
+        ),
+      ).rejects.toThrow(ForbiddenException);
+      expect(mockUserModel.create).not.toHaveBeenCalled();
+      expect(mockAuditLogsService.create).not.toHaveBeenCalled();
+      expect(mockOutboxService.enqueue).not.toHaveBeenCalled();
+    },
+  );
 
   it('should reject an unknown department', async () => {
     mockPrismaService.user.findUnique.mockResolvedValue(null);
