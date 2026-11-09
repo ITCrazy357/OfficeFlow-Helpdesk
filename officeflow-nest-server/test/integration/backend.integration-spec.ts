@@ -13,48 +13,50 @@ import { Test } from '@nestjs/testing';
 import { AssetType, Prisma, TicketPriority, UserRole } from '@prisma/client';
 import { randomUUID } from 'node:crypto';
 import { PrismaService } from '../../src/prisma/prisma.service';
-import { AuditLogsService } from '../../src/audit-logs/audit-logs.service';
-import { OutboxService } from '../../src/outbox/outbox.service';
-import { AssetsService } from '../../src/assets/assets.service';
-import { TicketsService } from '../../src/tickets/tickets.service';
-import { CloudinaryService } from '../../src/cloudinary/cloudinary.service';
-import { RedisService } from '../../src/redis/redis.service';
-import { ResilientThrottlerStorage } from '../../src/redis/resilient-throttler.storage';
-import { MetricsService } from '../../src/metrics/metrics.service';
-import { TicketAccessPolicyService } from '../../src/tickets/ticket-access-policy.service';
-import { TicketQueryService } from '../../src/tickets/ticket-query.service';
-import { TicketWorkflowService } from '../../src/tickets/ticket-workflow.service';
-import { TicketAttachmentService } from '../../src/tickets/ticket-attachment.service';
-import { TicketCommentService } from '../../src/tickets/ticket-comment.service';
-import { SlaPolicyService } from '../../src/sla/sla-policy.service';
-import { SlaService } from '../../src/sla/sla.service';
-import { KnowledgeService } from '../../src/knowledge/knowledge.service';
-import { DEFAULT_SLA_POLICY } from '../../src/sla/sla-policy';
+import { AuditLogsService } from '../../src/modules/audit-logs/audit-logs.service';
+import { OutboxService } from '../../src/platform/outbox/outbox.service';
+import { AssetsService } from '../../src/modules/assets/assets.service';
+import { AssetAssignmentService } from '../../src/modules/assets/asset-assignment.service';
+import { TicketsService } from '../../src/modules/tickets/tickets.service';
+import { CloudinaryService } from '../../src/platform/cloudinary/cloudinary.service';
+import { RedisService } from '../../src/platform/redis/redis.service';
+import { ResilientThrottlerStorage } from '../../src/platform/redis/resilient-throttler.storage';
+import { MetricsService } from '../../src/platform/metrics/metrics.service';
+import { TicketAccessPolicyService } from '../../src/modules/tickets/ticket-access-policy.service';
+import { TicketQueryService } from '../../src/modules/tickets/ticket-query.service';
+import { TicketWorkflowService } from '../../src/modules/tickets/ticket-workflow.service';
+import { TicketAssignmentService } from '../../src/modules/tickets/ticket-assignment.service';
+import { TicketAttachmentService } from '../../src/modules/tickets/ticket-attachment.service';
+import { TicketCommentService } from '../../src/modules/tickets/ticket-comment.service';
+import { SlaPolicyService } from '../../src/modules/sla/sla-policy.service';
+import { SlaService } from '../../src/modules/sla/sla.service';
+import { KnowledgeService } from '../../src/modules/knowledge/knowledge.service';
+import { DEFAULT_SLA_POLICY } from '../../src/modules/sla/sla-policy';
 import { DateTime } from 'luxon';
-import { DashboardService } from '../../src/dashboard/dashboard.service';
-import { AssetMaintenanceService } from '../../src/assets/asset-maintenance.service';
+import { DashboardService } from '../../src/modules/dashboard/dashboard.service';
+import { AssetMaintenanceService } from '../../src/modules/assets/asset-maintenance.service';
 import {
   AssetWarrantyReminderService,
   AssetWarrantyNotificationListener,
-} from '../../src/assets/asset-warranty-reminder.service';
-import { assetCareDates } from '../../src/assets/asset-care.util';
-import { NotificationsService } from '../../src/notifications/notifications.service';
-import { NotificationsListener } from '../../src/notifications/notifications.listener';
-import type { TicketSlaAlertEvent } from '../../src/notifications/events/ticket-sla-alert.event';
-import { LeavePlanningService } from '../../src/leave-requests/leave-planning.service';
-import { LeaveRequestService } from '../../src/leave-requests/leave-requests.service';
-import { TicketFeedbackService } from '../../src/tickets/ticket-feedback.service';
-import { AiService } from '../../src/ai/ai.service';
-import { AiProvider } from '../../src/ai/ai.provider';
-import { AiRequestLimiter } from '../../src/ai/ai-request-limiter';
-import { AiTask } from '../../src/ai/types/ai-draft.type';
-import { AuthService } from '../../src/auth/auth.service';
-import { AccountService } from '../../src/users/accounts.service';
-import { PasswordRecoveryService } from '../../src/password-recovery/password-recovery.service';
-import { UsersService } from '../../src/users/users.service';
-import { TicketEmailListener } from '../../src/mail/listeners/ticket-email.listener';
-import type { MailService } from '../../src/mail/mail.service';
-import { EmailDeliveryService } from '../../src/mail/email-delivery.service';
+} from '../../src/modules/assets/asset-warranty-reminder.service';
+import { assetCareDates } from '../../src/modules/assets/asset-care.util';
+import { NotificationsService } from '../../src/modules/notifications/notifications.service';
+import { NotificationsListener } from '../../src/modules/notifications/notifications.listener';
+import type { TicketSlaAlertEvent } from '../../src/contracts/events/tickets/ticket-sla-alert.event';
+import { LeavePlanningService } from '../../src/modules/leave-requests/leave-planning.service';
+import { LeaveRequestService } from '../../src/modules/leave-requests/leave-requests.service';
+import { TicketFeedbackService } from '../../src/modules/tickets/ticket-feedback.service';
+import { AiService } from '../../src/modules/ai/ai.service';
+import { AiProvider } from '../../src/modules/ai/ai.provider';
+import { AiRequestLimiter } from '../../src/modules/ai/ai-request-limiter';
+import { AiTask } from '../../src/modules/ai/types/ai-draft.type';
+import { AuthService } from '../../src/modules/auth/auth.service';
+import { AccountService } from '../../src/modules/users/accounts.service';
+import { PasswordRecoveryService } from '../../src/modules/password-recovery/password-recovery.service';
+import { UsersService } from '../../src/modules/users/users.service';
+import { TicketEmailListener } from '../../src/modules/mail/listeners/ticket-email.listener';
+import type { MailService } from '../../src/modules/mail/mail.service';
+import { EmailDeliveryService } from '../../src/modules/mail/email-delivery.service';
 
 describe('Real MySQL/Redis integration (disposable containers only)', () => {
   const prisma = new PrismaService(
@@ -68,7 +70,11 @@ describe('Real MySQL/Redis integration (disposable containers only)', () => {
     deleteFile: jest.fn(),
     uploadFile: jest.fn(),
   };
-  const assets = new AssetsService(prisma, audit, outbox);
+  const assets = new AssetsService(
+    prisma,
+    audit,
+    new AssetAssignmentService(prisma, audit, outbox),
+  );
   const planning = new LeavePlanningService(
     prisma,
     new SlaPolicyService(prisma, audit),
@@ -119,6 +125,7 @@ describe('Real MySQL/Redis integration (disposable containers only)', () => {
         TicketAccessPolicyService,
         TicketQueryService,
         TicketWorkflowService,
+        TicketAssignmentService,
         TicketAttachmentService,
         TicketCommentService,
         SlaPolicyService,
@@ -758,6 +765,7 @@ describe('Real MySQL/Redis integration (disposable containers only)', () => {
       outbox,
       new TicketQueryService(prisma, new TicketAccessPolicyService(prisma)),
       new SlaPolicyService(prisma, audit),
+      new TicketAssignmentService(prisma, audit, outbox),
     );
     const edit = workflow.update(
       ticket.id,

@@ -56,9 +56,9 @@ jobs:
           npx --no-install tsc --noEmit
       - name: Regression tests
         run: npm test
-      - name: Install Chromium for cross-tab session checks
+      - name: Install Chromium for browser regression checks
         run: npx --no-install playwright install --with-deps chromium
-      - name: Browser session regression tests
-        run: npx --no-install playwright test tests/browser/session-refresh.spec.ts
+      - name: Browser regression tests
+        run: npx --no-install playwright test
       - name: Production build
         run: npm run build

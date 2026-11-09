@@ -7,9 +7,9 @@ import { Test } from '@nestjs/testing';
 import type { Server } from 'node:http';
 import cookieParser from 'cookie-parser';
 import request from 'supertest';
-import { AuthController } from '../src/auth/auth.controller';
-import { AuthService } from '../src/auth/auth.service';
-import { JwtAuthGuard } from '../src/auth/jwt-auth.guard';
+import { AuthController } from '../src/modules/auth/auth.controller';
+import { AuthService } from '../src/modules/auth/auth.service';
+import { JwtAuthGuard } from '../src/modules/auth/jwt-auth.guard';
 
 describe('Refresh cookie recovery through real HTTP controller', () => {
   let app: INestApplication;

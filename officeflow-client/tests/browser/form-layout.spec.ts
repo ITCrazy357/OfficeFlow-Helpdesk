@@ -4,7 +4,7 @@ const longCategory =
   "Kết nối mạng và quyền truy cập hệ thống nội bộ cho toàn bộ nhân viên làm việc từ xa tại văn phòng";
 const me = {
   id: 1,
-  name: "Quản trị kiểm thử",
+  name: "Quản trị kiểm thử tên dài của bộ phận vận hành",
   email: "admin@example.test",
   role: "ADMIN",
   isActive: true,
@@ -179,8 +179,18 @@ for (const theme of ["light", "dark"] as const) {
         });
         await priority.focus();
         await page.keyboard.press("Space");
+        const priorityMenu = page.getByRole("listbox");
+        await expect(priorityMenu).toBeVisible();
+        // Radix focuses the selected item after positioning, then defers End navigation.
+        await expect(
+          priorityMenu.getByRole("option", { name: "Trung bình", exact: true }),
+        ).toBeFocused();
         await page.keyboard.press("End");
+        await expect(
+          priorityMenu.getByRole("option", { name: "Khẩn cấp", exact: true }),
+        ).toBeFocused();
         await page.keyboard.press("Enter");
+        await expect(priorityMenu).toBeHidden();
         await expect(priority).toContainText("Khẩn cấp");
         const category = page.getByRole("combobox", {
           name: "Danh mục",

@@ -10,7 +10,7 @@ import { Prisma } from '@prisma/client';
 import type { Request, Response } from 'express';
 
 import type { ApiErrorResponse } from '../types/api-response.type';
-import type { MetricsService } from '../../metrics/metrics.service';
+import type { MetricsService } from '../../platform/metrics/metrics.service';
 import { observeSafely } from '../diagnostics/safe-observation';
 import {
   getRequestDiagnostics,

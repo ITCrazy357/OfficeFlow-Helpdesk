@@ -8,11 +8,11 @@ import { UserRole } from '@prisma/client';
 import type { Request } from 'express';
 import type { Server } from 'node:http';
 import request from 'supertest';
-import { JwtAuthGuard } from '../src/auth/jwt-auth.guard';
+import { JwtAuthGuard } from '../src/modules/auth/jwt-auth.guard';
 import { RolesGuard } from '../src/common/guards/roles.guard';
-import { AccountService } from '../src/users/accounts.service';
-import { UsersController } from '../src/users/users.controller';
-import { UsersService } from '../src/users/users.service';
+import { AccountService } from '../src/modules/users/accounts.service';
+import { UsersController } from '../src/modules/users/users.controller';
+import { UsersService } from '../src/modules/users/users.service';
 
 // HTTP routing, real RolesGuard and DTO validation; authentication and DB are mocked.
 describe('User handoff HTTP contract', () => {

@@ -1,0 +1,193 @@
+import { EventEmitterModule } from '@nestjs/event-emitter';
+import { Test, type TestingModule } from '@nestjs/testing';
+import { OutboxStatus } from '@prisma/client';
+import { CloudinaryService } from '../cloudinary/cloudinary.service';
+import { TicketEmailListener } from '../../modules/mail/listeners/ticket-email.listener';
+import { MailService } from '../../modules/mail/mail.service';
+import { NotificationsListener } from '../../modules/notifications/notifications.listener';
+import { NotificationsService } from '../../modules/notifications/notifications.service';
+import { PrismaService } from '../../prisma/prisma.service';
+import { CloudinaryCleanupListener } from './cloudinary-cleanup.listener';
+import { OutboxProcessor } from './outbox.processor';
+import { MetricsService } from '../metrics/metrics.service';
+import { TicketAccessPolicyService } from '../../modules/tickets/ticket-access-policy.service';
+import { EmailDeliveryService } from '../../modules/mail/email-delivery.service';
+
+// Jest matchers return any; keep nested expected values explicitly unknown.
+function objectContaining(value: Record<string, unknown>): unknown {
+  return expect.objectContaining(value);
+}
+
+function deferred() {
+  let resolve!: () => void;
+  const promise = new Promise<void>((done) => {
+    resolve = done;
+  });
+  return { promise, resolve };
+}
+
+describe('Outbox dispatch through real Nest event subscribers', () => {
+  let module: TestingModule;
+  let processor: OutboxProcessor;
+  const database = {
+    outboxEvent: { findMany: jest.fn(), updateMany: jest.fn() },
+    user: { findUnique: jest.fn(), findMany: jest.fn() },
+    ticket: { findUnique: jest.fn() },
+    $transaction: jest.fn(),
+    notification: { createMany: jest.fn() },
+    emailDelivery: { findUnique: jest.fn(), upsert: jest.fn() },
+  };
+  const cloudinary = { deleteFile: jest.fn() };
+  const mail = { isEnabled: () => true, sendEmail: jest.fn() };
+  const cleanup = {
+    id: '32fa383b-31af-47f6-bb5f-2f434efb5bc4',
+    type: 'cloudinary.asset.delete',
+    attempts: 0,
+    payload: {
+      publicId: 'test/report.pdf',
+      resourceType: 'raw',
+      deliveryType: 'authenticated',
+    },
+  };
+  const assignment = {
+    ...cleanup,
+    type: 'ticket.assigned',
+    payload: {
+      ticketId: 42,
+      ticketTitle: 'VPN issue',
+      assignedToId: 7,
+      assignedByName: 'Admin',
+    },
+  };
+
+  beforeEach(async () => {
+    jest.resetAllMocks();
+    database.outboxEvent.findMany.mockResolvedValue([cleanup]);
+    database.outboxEvent.updateMany.mockResolvedValue({ count: 1 });
+    database.user.findUnique.mockResolvedValue({
+      name: 'IT Staff',
+      email: 'it@example.com',
+      isActive: true,
+    });
+    database.user.findMany.mockResolvedValue([
+      { id: 7, name: 'IT Staff', email: 'it@example.com', role: 'IT_STAFF' },
+    ]);
+    database.ticket.findUnique.mockResolvedValue({
+      id: 42,
+      createdById: 99,
+      createdBy: { departmentId: 1 },
+    });
+    database.$transaction.mockImplementation(
+      (work: (tx: typeof database) => Promise<unknown>) => work(database),
+    );
+    database.notification.createMany.mockResolvedValue({ count: 1 });
+    cloudinary.deleteFile.mockResolvedValue(undefined);
+    mail.sendEmail.mockResolvedValue(undefined);
+    module = await Test.createTestingModule({
+      imports: [EventEmitterModule.forRoot()],
+      providers: [
+        OutboxProcessor,
+        MetricsService,
+        CloudinaryCleanupListener,
+        TicketEmailListener,
+        NotificationsListener,
+        NotificationsService,
+        TicketAccessPolicyService,
+        EmailDeliveryService,
+        { provide: PrismaService, useValue: database },
+        { provide: CloudinaryService, useValue: cloudinary },
+        { provide: MailService, useValue: mail },
+      ],
+    }).compile();
+    await module.init();
+    processor = module.get(OutboxProcessor);
+  });
+
+  afterEach(async () => {
+    await module.close();
+  });
+
+  it('does not mark cleanup processed until the Cloudinary listener finishes', async () => {
+    const started = deferred();
+    const finished = deferred();
+    cloudinary.deleteFile.mockImplementation(async () => {
+      started.resolve();
+      await finished.promise;
+    });
+    const processing = processor.processBatch();
+    try {
+      await started.promise;
+      expect(database.outboxEvent.updateMany).toHaveBeenCalledTimes(1);
+    } finally {
+      finished.resolve();
+      await processing;
+    }
+    expect(database.outboxEvent.updateMany).toHaveBeenLastCalledWith(
+      objectContaining({
+        data: objectContaining({ status: OutboxStatus.PROCESSED }),
+      }),
+    );
+  });
+
+  it('retries a failed Cloudinary call through the real decorator wrapper', async () => {
+    cloudinary.deleteFile.mockRejectedValueOnce(
+      new Error('Cloudinary unavailable'),
+    );
+    await processor.processBatch();
+    expect(database.outboxEvent.updateMany).toHaveBeenLastCalledWith(
+      objectContaining({
+        data: objectContaining({
+          status: OutboxStatus.FAILED,
+          lastError: 'Cloudinary unavailable',
+        }),
+      }),
+    );
+    database.outboxEvent.findMany.mockResolvedValue([
+      { ...cleanup, attempts: 1 },
+    ]);
+    await processor.processBatch();
+    expect(cloudinary.deleteFile).toHaveBeenCalledTimes(2);
+    expect(database.outboxEvent.updateMany).toHaveBeenLastCalledWith(
+      objectContaining({
+        data: objectContaining({ status: OutboxStatus.PROCESSED }),
+      }),
+    );
+  });
+
+  it('waits for mail and forwards a stable event id to notification deduplication', async () => {
+    database.outboxEvent.findMany.mockResolvedValue([assignment]);
+    const started = deferred();
+    const finished = deferred();
+    mail.sendEmail.mockImplementation(async () => {
+      started.resolve();
+      await finished.promise;
+    });
+    const processing = processor.processBatch();
+    try {
+      await started.promise;
+      expect(database.outboxEvent.updateMany).toHaveBeenCalledTimes(1);
+      expect(database.notification.createMany).toHaveBeenCalledWith({
+        data: [objectContaining({ userId: 7, sourceEventId: cleanup.id })],
+        skipDuplicates: true,
+      });
+    } finally {
+      finished.resolve();
+      await processing;
+    }
+  });
+
+  it('propagates SMTP failure even if notification creation succeeds', async () => {
+    database.outboxEvent.findMany.mockResolvedValue([assignment]);
+    mail.sendEmail.mockRejectedValue(new Error('SMTP unavailable'));
+    await processor.processBatch();
+    expect(database.notification.createMany).toHaveBeenCalled();
+    expect(database.outboxEvent.updateMany).toHaveBeenLastCalledWith(
+      objectContaining({
+        data: objectContaining({
+          status: OutboxStatus.FAILED,
+          lastError: 'SMTP unavailable',
+        }),
+      }),
+    );
+  });
+});

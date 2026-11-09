@@ -12,7 +12,7 @@ import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import cookieParser from 'cookie-parser';
 import helmet from 'helmet';
 import type { Application, NextFunction, Request, Response } from 'express';
-import { MetricsService } from './metrics/metrics.service';
+import { MetricsService } from './platform/metrics/metrics.service';
 
 import { AppModule } from './app.module';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';

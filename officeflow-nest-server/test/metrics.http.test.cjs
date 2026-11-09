@@ -18,8 +18,8 @@ const { ConfigService } = require('@nestjs/config');
 const { Reflector } = require('@nestjs/core');
 const { Test } = require('@nestjs/testing');
 const request = require('supertest');
-const { MetricsModule } = require('../dist/metrics/metrics.module');
-const { MetricsService } = require('../dist/metrics/metrics.service');
+const { MetricsModule } = require('../dist/platform/metrics/metrics.module');
+const { MetricsService } = require('../dist/platform/metrics/metrics.service');
 const {
   HttpExceptionFilter,
 } = require('../dist/common/filters/http-exception.filter');

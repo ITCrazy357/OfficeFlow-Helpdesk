@@ -12,16 +12,16 @@ import { HttpExceptionFilter } from '../src/common/filters/http-exception.filter
 import { ResponseInterceptor } from '../src/common/interceptors/response.interceptor';
 import { requestObservabilityMiddleware } from '../src/common/middleware/request-observability.middleware';
 import { PrismaService } from '../src/prisma/prisma.service';
-import { ResilientThrottlerStorage } from '../src/redis/resilient-throttler.storage';
-import { RedisService } from '../src/redis/redis.service';
-import { MailService } from '../src/mail/mail.service';
-import { OutboxProcessor } from '../src/outbox/outbox.processor';
-import { OutboxMetricsCollector } from '../src/outbox/outbox-metrics.collector';
-import { SlaService } from '../src/sla/sla.service';
-import { AssetWarrantyReminderService } from '../src/assets/asset-warranty-reminder.service';
-import { RefreshTokenCleanupService } from '../src/auth/refresh-token-cleanup.service';
-import { MetricsService } from '../src/metrics/metrics.service';
-import { LeavePlanningService } from '../src/leave-requests/leave-planning.service';
+import { ResilientThrottlerStorage } from '../src/platform/redis/resilient-throttler.storage';
+import { RedisService } from '../src/platform/redis/redis.service';
+import { MailService } from '../src/modules/mail/mail.service';
+import { OutboxProcessor } from '../src/platform/outbox/outbox.processor';
+import { OutboxMetricsCollector } from '../src/platform/outbox/outbox-metrics.collector';
+import { SlaService } from '../src/modules/sla/sla.service';
+import { AssetWarrantyReminderService } from '../src/modules/assets/asset-warranty-reminder.service';
+import { RefreshTokenCleanupService } from '../src/modules/auth/refresh-token-cleanup.service';
+import { MetricsService } from '../src/platform/metrics/metrics.service';
+import { LeavePlanningService } from '../src/modules/leave-requests/leave-planning.service';
 
 const mockPrismaService = {
   $queryRaw: jest.fn().mockResolvedValue([{ connected: 1 }]),
