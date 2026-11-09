@@ -1,5 +1,7 @@
 # Điều tra lỗi 500 của bàn giao và lỗi thiếu Outbox
 
+> Ghi chép theo giai đoạn: đường dẫn, log và số liệu kiểm thử bên dưới phản ánh thời điểm thực hiện. Xem [cấu trúc hiện tại](../../architecture.md) và [runbook triển khai](../backend-production-runbook.md) khi vận hành phiên bản mới.
+
 ## Bằng chứng hiện có
 
 - Ảnh Network: `PATCH /users/19/handoff` trả 500. HTTP 500 chỉ là triệu chứng, chưa chỉ ra truy vấn lỗi.

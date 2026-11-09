@@ -1,5 +1,7 @@
 # Phase 5 — Test và tách TicketsService
 
+> Ghi chép theo giai đoạn: đường dẫn, log và số liệu kiểm thử bên dưới phản ánh thời điểm thực hiện. Xem [cấu trúc hiện tại](../../architecture.md) và [runbook triển khai](../backend-production-runbook.md) khi vận hành phiên bản mới.
+
 ## Phạm vi và kết quả
 
 Đã bổ sung test trước khi tách service, giữ nguyên route/controller/DTO/response và ranh giới transaction.

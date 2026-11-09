@@ -36,7 +36,7 @@ Render automatically provides `RENDER_GIT_COMMIT` at runtime. The health endpoin
 returns this SHA so GitHub can prove that it is checking the new release instead
 of the previous healthy release.
 
-See [leave planning and ticket feedback](leave-planning-and-ticket-feedback.md)
+See [leave planning and ticket feedback](../features/leave-planning-and-ticket-feedback.md)
 for migration `20261018160000_add_leave_planning_and_ticket_feedback`, annual
 allowance setup, legacy leave handling, and requester-only ticket confirmation.
 
@@ -44,7 +44,7 @@ allowance setup, legacy leave handling, and requester-only ticket confirmation.
 
 Optional IT assistance uses backend-only OpenAI credentials and requires healthy
 Redis. AI is disabled by default and adds no database migration. See
-[AI IT assistant](ai-it-assistant.md) for setup, model requirements, data handling,
+[AI IT assistant](../features/ai-it-assistant.md) for setup, model requirements, data handling,
 rate limits, manual fallback and the post-configuration smoke test.
 
 Under **Settings > Environments > production**, configure:
@@ -76,7 +76,7 @@ A green deploy job therefore means:
 
 Asset care adds migration `20261018120000_add_asset_care`. Review pending migrations
 and a database backup before deployment; the default image command applies them
-before Nest starts. See [asset care](asset-care.md) for the date, permissions, and
+before Nest starts. See [asset care](../features/asset-care.md) for the date, permissions, and
 notification rules. Missing asset care columns/tables fail startup and readiness.
 
 This does not replace an authenticated ticket-list smoke test or verification of

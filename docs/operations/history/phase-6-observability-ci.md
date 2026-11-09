@@ -1,5 +1,7 @@
 # Phase 6 — Observability và CI
 
+> Ghi chép theo giai đoạn: đường dẫn, log và số liệu kiểm thử bên dưới phản ánh thời điểm thực hiện. Xem [cấu trúc hiện tại](../../architecture.md) và [runbook triển khai](../backend-production-runbook.md) khi vận hành phiên bản mới.
+
 ## Phạm vi và trạng thái
 
 Code đã có request ID, JSON logging, metrics có bảo vệ, instrumentation Redis/mail/outbox, coverage gate, cấu hình scanning và cảnh báo. Không thay schema, không chạy migration hoặc sửa database production.

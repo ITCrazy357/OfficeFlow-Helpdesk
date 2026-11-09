@@ -50,16 +50,20 @@ Frontend mặc định gọi `/backend-api` trên cùng origin; Next.js chuyển
 ├── officeflow-client/              # Giao diện Next.js
 │   ├── src/app/                    # Trang đăng nhập và các trang nghiệp vụ
 │   ├── src/components/             # Thành phần giao diện
+│   ├── src/features/               # Màn hình, API, hooks và UI theo nghiệp vụ
 │   ├── src/lib/                    # API client, session và tiện ích
 │   └── tests/                      # Regression và kiểm thử trình duyệt
 ├── officeflow-nest-server/         # Backend NestJS
-│   ├── src/                        # Các module nghiệp vụ
+│   ├── src/modules/                # Các module nghiệp vụ
+│   ├── src/platform/               # Redis, Cloudinary, metrics và outbox
+│   ├── src/contracts/events/       # Hợp đồng sự kiện dùng giữa module
 │   ├── src/prisma/                 # Schema, migrations và seed
 │   ├── test/                       # HTTP E2E và integration tests
 │   ├── monitoring/                 # Prometheus và Alertmanager
 │   ├── scripts/                    # Kiểm thử, backup và công cụ database
 │   └── docker-compose.yml          # MySQL, Redis và API
-├── docs/                          # Tài liệu nghiệp vụ và vận hành
+├── docs/features/                 # Quy tắc và API từng tính năng
+├── docs/operations/               # Triển khai, migration, backup và rollback
 ├── scripts/                       # Kiểm tra dùng chung
 └── .github/workflows/              # Backend CI/CD và frontend CI
 ```
@@ -191,8 +195,8 @@ Mật khẩu của tài khoản mới là `SEED_DEFAULT_PASSWORD` đã đặt. S
 
 - **Tệp đính kèm:** cấu hình `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET` ở backend để tải tệp lên.
 - **Email và khôi phục mật khẩu qua email:** đặt `MAIL_ENABLED=true`, cấu hình `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASS`, `MAIL_FROM`.
-- **AI:** đặt `AI_ENABLED=true`, `OPENAI_API_KEY`, `OPENAI_MODEL` ở backend và bảo đảm Redis hoạt động. Xem [hướng dẫn trợ lý IT](docs/ai-it-assistant.md) về dữ liệu gửi đi, giới hạn và quy trình kiểm tra bản nháp.
-- **Giám sát:** cấu hình trong [monitoring](officeflow-nest-server/monitoring/compose.yml) và [runbook production](docs/backend-production-runbook.md). Endpoint `/api/metrics` được bảo vệ bằng `METRICS_TOKEN`.
+- **AI:** đặt `AI_ENABLED=true`, `OPENAI_API_KEY`, `OPENAI_MODEL` ở backend và bảo đảm Redis hoạt động. Xem [hướng dẫn trợ lý IT](docs/features/ai-it-assistant.md) về dữ liệu gửi đi, giới hạn và quy trình kiểm tra bản nháp.
+- **Giám sát:** cấu hình trong [monitoring](officeflow-nest-server/monitoring/compose.yml) và [runbook production](docs/operations/backend-production-runbook.md). Endpoint `/api/metrics` được bảo vệ bằng `METRICS_TOKEN`.
 
 API key và mật khẩu nằm ở backend; không đưa vào biến `NEXT_PUBLIC_*`, mã nguồn hoặc Git.
 
@@ -248,9 +252,9 @@ Playwright tự khởi động frontend ở cổng `3016`; trên Windows cấu h
 ## CI/CD
 
 - [Backend CI/CD](.github/workflows/backend-ci.yml): kiểm tra schema/migrations, lint, coverage, HTTP E2E, integration MySQL/Redis, build, dependency audit, quét secret, image và cấu hình cảnh báo. Job triển khai Render chỉ chạy sau các job kiểm tra khi push `main` và bật `RENDER_DEPLOY_ENABLED=true`; health check phải trả đúng commit đang triển khai.
-- [Frontend CI](.github/workflows/frontend-ci.yml): dependency audit, lint, type check, regression tests, kiểm tra phiên đăng nhập trên trình duyệt và production build.
+- [Frontend CI](.github/workflows/frontend-ci.yml): dependency audit, lint, type check, regression tests, toàn bộ browser tests và production build.
 
-Thiết lập secret, health check, migration, backup và rollback theo [runbook backend production](docs/backend-production-runbook.md). Việc có workflow trong repository không xác nhận trạng thái triển khai hoặc kết quả CI hiện tại.
+Thiết lập secret, health check, migration, backup và rollback theo [runbook backend production](docs/operations/backend-production-runbook.md). Việc có workflow trong repository không xác nhận trạng thái triển khai hoặc kết quả CI hiện tại.
 
 ## Xử lý lỗi thường gặp
 
@@ -266,11 +270,13 @@ Thiết lập secret, health check, migration, backup và rollback theo [runbook
 
 ## Tài liệu chi tiết
 
-- [Hàng đợi công việc IT](docs/it-ticket-queue.md)
-- [SLA theo giờ hành chính](docs/business-sla.md)
-- [Gợi ý tự xử lý trước khi gửi ticket](docs/ticket-self-service.md)
-- [AI hỗ trợ nhân viên IT](docs/ai-it-assistant.md)
-- [Bảo trì và bảo hành tài sản](docs/asset-care.md)
-- [Lịch nghỉ, số dư phép và xác nhận kết quả ticket](docs/leave-planning-and-ticket-feedback.md)
-- [Hiệu năng xử lý](docs/processing-performance.md)
-- [Runbook triển khai và vận hành backend](docs/backend-production-runbook.md)
+- [Cấu trúc mã nguồn và quy tắc tổ chức](docs/architecture.md)
+- [Mục lục tài liệu](docs/README.md)
+- [Hàng đợi công việc IT](docs/features/it-ticket-queue.md)
+- [SLA theo giờ hành chính](docs/features/business-sla.md)
+- [Gợi ý tự xử lý trước khi gửi ticket](docs/features/ticket-self-service.md)
+- [AI hỗ trợ nhân viên IT](docs/features/ai-it-assistant.md)
+- [Bảo trì và bảo hành tài sản](docs/features/asset-care.md)
+- [Lịch nghỉ, số dư phép và xác nhận kết quả ticket](docs/features/leave-planning-and-ticket-feedback.md)
+- [Hiệu năng xử lý](docs/features/processing-performance.md)
+- [Runbook triển khai và vận hành backend](docs/operations/backend-production-runbook.md)

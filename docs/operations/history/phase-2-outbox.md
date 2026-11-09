@@ -1,5 +1,7 @@
 # Phase 2: Transactional Outbox
 
+> Ghi chép theo giai đoạn: đường dẫn, log và số liệu kiểm thử bên dưới phản ánh thời điểm thực hiện. Xem [cấu trúc hiện tại](../../architecture.md) và [runbook triển khai](../backend-production-runbook.md) khi vận hành phiên bản mới.
+
 ## Mục đích và thứ tự gọi
 
 `enqueue` nghĩa là đưa một công việc vào hàng đợi. Ở đây hàng đợi là bảng MySQL

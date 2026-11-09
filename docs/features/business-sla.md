@@ -21,7 +21,7 @@ Hoàn tất xử lý sau hạn cũng được đánh dấu vi phạm ngay khi ch
 
 Worker chạy mỗi phút, tối đa 100 ticket mỗi lượt. Cảnh báo trước hạn cũng tính theo phút làm việc; khoảng nghỉ trưa, cuối tuần và ngày nghỉ cấu hình không được tính. Mỗi mốc phản hồi/xử lý có cảnh báo và chuyển cấp riêng.
 
-Cảnh báo dùng marker trong MySQL và sự kiện outbox trong cùng transaction. Nhiều worker không tạo cảnh báo trùng; marker được giữ sau khi outbox hết thời gian lưu. Thông báo trong ứng dụng chống trùng bằng `sourceEventId`. Email sử dụng cơ chế retry hiện có, vì vậy email đã gửi trước khi một người nhận khác lỗi có thể được gửi lại.
+Cảnh báo dùng marker trong MySQL và sự kiện outbox trong cùng transaction. Nhiều worker không tạo cảnh báo trùng; marker được giữ sau khi outbox hết thời gian lưu. Thông báo trong ứng dụng chống trùng bằng `sourceEventId`. Email lưu receipt theo cặp sự kiện outbox/người nhận để bỏ qua người đã gửi thành công khi người nhận khác cần retry. Nếu tiến trình dừng sau khi SMTP chấp nhận nhưng trước khi receipt được lưu, email vẫn có thể được gửi lại; cơ chế này không bảo đảm exactly-once.
 
 Quản lý ngoài phòng ban người gửi chỉ được đọc/thảo luận ticket khi thực sự nhận chuyển cấp và còn là quản lý của người xử lý. Chính sách chỉ chuyển cấp ADMIN không cấp quyền này cho quản lý. Quyền sửa ticket và đổi trạng thái vẫn tuân theo policy hiện có.
 

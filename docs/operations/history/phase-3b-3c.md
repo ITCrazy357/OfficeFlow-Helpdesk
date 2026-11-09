@@ -1,5 +1,7 @@
 # Phase 3B / 3C — User lifecycle
 
+> Ghi chép theo giai đoạn: đường dẫn, log và số liệu kiểm thử bên dưới phản ánh thời điểm thực hiện. Xem [cấu trúc hiện tại](../../architecture.md) và [runbook triển khai](../backend-production-runbook.md) khi vận hành phiên bản mới.
+
 ## Rules
 
 - A usable administrator has role ADMIN, isActive=true, isLocked=false.

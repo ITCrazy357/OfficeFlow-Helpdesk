@@ -53,10 +53,11 @@ docker compose up -d --no-deps --force-recreate nest-api
 Lệnh này dùng image hiện có, không build lại code và không tạo lại MySQL/Redis.
 Nếu cần cập nhật code trong image, build riêng API trước khi tạo lại container.
 
-Frontend local hiện dùng `NEXT_PUBLIC_API_URL=http://localhost:5001/api`; biến
-trên Render không áp dụng cho backend ở URL này. Nếu muốn frontend local gọi
-Render qua proxy, đặt `NEXT_PUBLIC_API_URL=/backend-api` và `API_PROXY_TARGET`
-thành URL backend Render có hậu tố `/api`, rồi khởi động lại frontend.
+File cấu hình mẫu của frontend dùng `NEXT_PUBLIC_API_URL=/backend-api` và
+`API_PROXY_TARGET=http://localhost:5001/api`. Biến trên Render không áp dụng
+cho API local. Để frontend local gọi Render qua proxy, giữ `/backend-api`,
+đổi `API_PROXY_TARGET` thành URL backend Render có hậu tố `/api`, rồi khởi
+động lại frontend.
 
 Trên web deploy, kiểm tra Request URL và JSON của `/ai/status` trong Network.
 `DISABLED` là cấu hình AI chưa bật/đủ; `UNAVAILABLE` là Redis chưa sẵn sàng.
