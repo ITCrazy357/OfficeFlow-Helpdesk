@@ -3,10 +3,10 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 import { Prisma } from '@prisma/client';
 import { randomUUID } from 'node:crypto';
 import { PrismaService } from '../../src/prisma/prisma.service';
-import { AuditLogsService } from '../../src/audit-logs/audit-logs.service';
-import { OutboxService } from '../../src/outbox/outbox.service';
-import { AccountService } from '../../src/users/accounts.service';
-import { PasswordRecoveryService } from '../../src/password-recovery/password-recovery.service';
+import { AuditLogsService } from '../../src/modules/audit-logs/audit-logs.service';
+import { OutboxService } from '../../src/platform/outbox/outbox.service';
+import { AccountService } from '../../src/modules/users/accounts.service';
+import { PasswordRecoveryService } from '../../src/modules/password-recovery/password-recovery.service';
 
 describe('Password recovery concurrency on disposable MySQL', () => {
   const prisma = new PrismaService(

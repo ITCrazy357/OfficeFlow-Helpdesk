@@ -39,7 +39,7 @@ test("all 25 ticket transitions match the backend contract", () => {
   const { assertTicketStatusTransition } = load(
     path.resolve(
       path.dirname(fileURLToPath(import.meta.url)),
-      "../../officeflow-nest-server/src/tickets/ticket-status.policy.ts",
+      "../../officeflow-nest-server/src/modules/tickets/ticket-status.policy.ts",
     ),
   );
   for (const from of statuses)

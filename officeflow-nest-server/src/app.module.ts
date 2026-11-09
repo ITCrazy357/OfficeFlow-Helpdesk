@@ -5,36 +5,36 @@ import { ScheduleModule } from '@nestjs/schedule';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 
 import { AppController } from './app.controller';
-import { AuditLogsModule } from './audit-logs/audit-logs.module';
-import { AssetsModule } from './assets/assets.module';
-import { AuthModule } from './auth/auth.module';
-import { DashboardModule } from './dashboard/dashboard.module';
-import { DepartmentsModule } from './departments/departments.module';
-import { KnowledgeModule } from './knowledge/knowledge.module';
-import { LeaveRequestsModule } from './leave-requests/leave-requests.module';
-import { MailModule } from './mail/mail.module';
-import { NotificationsModule } from './notifications/notifications.module';
-import { OutboxModule } from './outbox/outbox.module';
-import { PasswordRecoveryModule } from './password-recovery/password-recovery.module';
+import { AuditLogsModule } from './modules/audit-logs/audit-logs.module';
+import { AssetsModule } from './modules/assets/assets.module';
+import { AuthModule } from './modules/auth/auth.module';
+import { DashboardModule } from './modules/dashboard/dashboard.module';
+import { DepartmentsModule } from './modules/departments/departments.module';
+import { KnowledgeModule } from './modules/knowledge/knowledge.module';
+import { LeaveRequestsModule } from './modules/leave-requests/leave-requests.module';
+import { MailModule } from './modules/mail/mail.module';
+import { NotificationsModule } from './modules/notifications/notifications.module';
+import { OutboxModule } from './platform/outbox/outbox.module';
+import { PasswordRecoveryModule } from './modules/password-recovery/password-recovery.module';
 import { PrismaModule } from './prisma/prisma.module';
-import { SlaModule } from './sla/sla.module';
-import { TicketsModule } from './tickets/tickets.module';
-import { UsersModule } from './users/users.module';
-import { TicketCategoriesModule } from './ticket-categories/ticket-categories.module';
-import { RedisModule } from './redis/redis.module';
+import { SlaModule } from './modules/sla/sla.module';
+import { TicketsModule } from './modules/tickets/tickets.module';
+import { UsersModule } from './modules/users/users.module';
+import { TicketCategoriesModule } from './modules/ticket-categories/ticket-categories.module';
+import { RedisModule } from './platform/redis/redis.module';
 import {
   createRateLimitKeyGenerator,
   getIpTracker,
   getLoginAccountTracker,
   getLoginPairTracker,
   isLoginRequest,
-} from './redis/rate-limit.config';
-import { ResilientThrottlerStorage } from './redis/resilient-throttler.storage';
-import { RedisService } from './redis/redis.service';
+} from './platform/redis/rate-limit.config';
+import { ResilientThrottlerStorage } from './platform/redis/resilient-throttler.storage';
+import { RedisService } from './platform/redis/redis.service';
 import { ConfigModule } from '@nestjs/config';
 import { validateEnvironment } from './config/environment.validation';
-import { MetricsModule } from './metrics/metrics.module';
-import { AiModule } from './ai/ai.module';
+import { MetricsModule } from './platform/metrics/metrics.module';
+import { AiModule } from './modules/ai/ai.module';
 
 @Module({
   imports: [
