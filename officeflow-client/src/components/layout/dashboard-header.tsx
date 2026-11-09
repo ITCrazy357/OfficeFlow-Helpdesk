@@ -175,7 +175,7 @@ export function DashboardHeader({ user, onMenuClick }: DashboardHeaderProps) {
             {getInitials(user.name) || <UserRound className="size-4" />}
           </div>
 
-          <div className="hidden min-w-0 max-w-44 text-right sm:block">
+          <div className="hidden min-w-0 max-w-44 text-right lg:block">
             <p className="truncate text-sm font-semibold text-foreground">
               {user.name}
             </p>
@@ -207,7 +207,7 @@ export function DashboardHeader({ user, onMenuClick }: DashboardHeaderProps) {
             <AlertDialogTrigger asChild>
               <Button type="button" variant="ghost" className="px-2 sm:px-4" aria-label="Đăng xuất">
                 <LogOut className="size-4" />
-                <span className="hidden sm:inline">Đăng xuất</span>
+                <span className="hidden lg:inline">Đăng xuất</span>
               </Button>
             </AlertDialogTrigger>
 
