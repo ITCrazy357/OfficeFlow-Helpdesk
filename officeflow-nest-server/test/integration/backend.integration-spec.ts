@@ -1,5 +1,6 @@
 import { ConfigService } from '@nestjs/config';
 import {
+  BadRequestException,
   ForbiddenException,
   ConflictException,
   NotFoundException,
@@ -49,6 +50,11 @@ import { AiRequestLimiter } from '../../src/ai/ai-request-limiter';
 import { AiTask } from '../../src/ai/types/ai-draft.type';
 import { AuthService } from '../../src/auth/auth.service';
 import { AccountService } from '../../src/users/accounts.service';
+import { PasswordRecoveryService } from '../../src/password-recovery/password-recovery.service';
+import { UsersService } from '../../src/users/users.service';
+import { TicketEmailListener } from '../../src/mail/listeners/ticket-email.listener';
+import type { MailService } from '../../src/mail/mail.service';
+import { EmailDeliveryService } from '../../src/mail/email-delivery.service';
 
 describe('Real MySQL/Redis integration (disposable containers only)', () => {
   const prisma = new PrismaService(
@@ -154,6 +160,302 @@ describe('Real MySQL/Redis integration (disposable containers only)', () => {
       },
       employee,
     );
+
+  it('rejects oversized new passwords without changing credentials, tokens, outbox or users', async () => {
+    const password = 'á'.repeat(36) + '-legacy';
+    const hash = await bcrypt.hash(password, 4);
+    const user = await prisma.user.create({
+      data: {
+        name: 'Password boundary fixture',
+        email: `${randomUUID()}@test.invalid`,
+        passwordHash: hash,
+        role: UserRole.EMPLOYEE,
+      },
+    });
+    const token = await prisma.passwordResetToken.create({
+      data: {
+        userId: user.id,
+        tokenHash: randomUUID(),
+        expiresAt: new Date(Date.now() + 60000),
+      },
+    });
+    const accounts = new AccountService(prisma, audit, outbox);
+    const oversized = 'á'.repeat(40);
+    const usersBefore = await prisma.user.count();
+    const outboxBefore = await prisma.outboxEvent.count();
+    const calls = [
+      () =>
+        accounts.changeOwnPassword(
+          { currentPassword: password, newPassword: oversized },
+          { userId: user.id, role: UserRole.EMPLOYEE },
+        ),
+      () => accounts.resetPassword(user.id, { password: oversized }, admin),
+      () =>
+        new UsersService(prisma, audit, new EventEmitter2(), outbox).create(
+          {
+            name: 'Should not create',
+            email: `${randomUUID()}@test.invalid`,
+            password: oversized,
+            role: UserRole.EMPLOYEE,
+            departmentId: 1,
+          },
+          admin,
+        ),
+      () =>
+        new PasswordRecoveryService(
+          prisma,
+          audit,
+          new EventEmitter2(),
+          outbox,
+        ).resetPassword({
+          token: 'unused-invalid-token',
+          newPassword: oversized,
+        }),
+    ];
+    for (const call of calls)
+      await expect(call()).rejects.toThrow(BadRequestException);
+    expect(
+      (await prisma.user.findUniqueOrThrow({ where: { id: user.id } }))
+        .passwordHash,
+    ).toBe(hash);
+    expect(
+      (
+        await prisma.passwordResetToken.findUniqueOrThrow({
+          where: { id: token.id },
+        })
+      ).usedAt,
+    ).toBeNull();
+    expect(await prisma.user.count()).toBe(usersBefore);
+    expect(await prisma.outboxEvent.count()).toBe(outboxBefore);
+  });
+
+  it.each(['demotion', 'deactivation'] as const)(
+    'rejects pending administrator creation after operator %s commits',
+    async (scenario) => {
+      const operator = await prisma.user.create({
+        data: {
+          name: 'Pending create operator',
+          email: `${randomUUID()}@test.invalid`,
+          role: UserRole.ADMIN,
+          passwordHash: 'fixture-only',
+        },
+      });
+      const department = await prisma.department.create({
+        data: { name: randomUUID() },
+      });
+      const email = `${randomUUID()}@test.invalid`;
+      let pause!: () => void, resume!: () => void;
+      const paused = new Promise<void>((resolve) => {
+        pause = resolve;
+      });
+      const released = new Promise<void>((resolve) => {
+        resume = resolve;
+      });
+      const delayed = {
+        user: prisma.user,
+        department: prisma.department,
+        $transaction: async (
+          work: (tx: Prisma.TransactionClient) => Promise<unknown>,
+          options: { isolationLevel: Prisma.TransactionIsolationLevel },
+        ) => {
+          pause();
+          await released;
+          return prisma.$transaction(work, options);
+        },
+      } as unknown as PrismaService;
+      const pending = new UsersService(
+        delayed,
+        audit,
+        new EventEmitter2(),
+        outbox,
+      ).create(
+        {
+          name: 'Should not create admin',
+          email,
+          password: randomUUID(),
+          role: UserRole.ADMIN,
+          departmentId: department.id,
+        },
+        { userId: operator.id, role: UserRole.ADMIN },
+      );
+      const result = expect(pending).rejects.toThrow(ForbiddenException);
+      await paused;
+      try {
+        const users = new UsersService(
+          prisma,
+          audit,
+          new EventEmitter2(),
+          outbox,
+        );
+        if (scenario === 'demotion')
+          await users.update(operator.id, { role: UserRole.EMPLOYEE }, admin);
+        else
+          await users.changeActivationStatus(
+            operator.id,
+            { isActive: false },
+            admin,
+          );
+      } finally {
+        resume();
+      }
+      await result;
+      expect(await prisma.user.count({ where: { email } })).toBe(0);
+      expect(
+        await prisma.auditLog.count({
+          where: { actorId: operator.id, action: 'CREATE', entity: 'USER' },
+        }),
+      ).toBe(0);
+    },
+  );
+
+  it('lets a legacy long password rotate safely and invalidates the old password and session', async () => {
+    const prefix = 'á'.repeat(36);
+    const password = prefix + '-legacy';
+    const user = await prisma.user.create({
+      data: {
+        name: 'Legacy password fixture',
+        email: `${randomUUID()}@test.invalid`,
+        passwordHash: await bcrypt.hash(password, 4),
+        role: UserRole.EMPLOYEE,
+      },
+    });
+    const auth = new AuthService(
+      prisma,
+      new JwtService({ secret: randomUUID() }),
+    );
+    const session = await auth.login({ email: user.email, password });
+    const accounts = new AccountService(prisma, audit, outbox);
+    const actor = { userId: user.id, role: UserRole.EMPLOYEE };
+    await expect(
+      accounts.changeOwnPassword(
+        { currentPassword: password, newPassword: prefix },
+        actor,
+      ),
+    ).rejects.toThrow(BadRequestException);
+    const nextPassword = randomUUID();
+    await expect(
+      accounts.changeOwnPassword(
+        { currentPassword: password, newPassword: nextPassword },
+        actor,
+      ),
+    ).resolves.toMatchObject({ passwordChanged: true });
+    await expect(auth.login({ email: user.email, password })).rejects.toThrow(
+      UnauthorizedException,
+    );
+    await expect(
+      auth.login({ email: user.email, password: nextPassword }),
+    ).resolves.toMatchObject({ user: { id: user.id } });
+    await expect(auth.refresh(session.refreshToken)).rejects.toThrow(
+      UnauthorizedException,
+    );
+  });
+
+  it.each(['sla', 'overdue'] as const)(
+    'retries only incomplete %s email recipients across worker restarts',
+    async (kind) => {
+      const ticket = await createTicket();
+      const first = await prisma.user.findUniqueOrThrow({
+        where: { id: admin.userId },
+      });
+      const second = await prisma.user.create({
+        data: {
+          name: 'Second email fixture',
+          email: `${randomUUID()}@test.invalid`,
+          passwordHash: 'fixture-only',
+          role: UserRole.ADMIN,
+        },
+      });
+      const event = {
+        outboxEventId: randomUUID(),
+        ticketId: ticket.id,
+        ticketTitle: ticket.title,
+        recipientIds: [first.id, second.id],
+        milestone: 'RESPONSE' as const,
+        kind: 'WARNING' as const,
+        dueAt: new Date().toISOString(),
+      };
+      let fail = true;
+      const accepted: string[] = [];
+      const mail = {
+        isEnabled: () => true,
+        sendEmail: jest.fn().mockImplementation(({ to }: { to: string }) => {
+          if (to === second.email && fail) {
+            fail = false;
+            return Promise.reject(new Error('Temporary SMTP fixture failure'));
+          }
+          accepted.push(to);
+          return Promise.resolve({ skipped: false });
+        }),
+      };
+      const listener = () =>
+        new TicketEmailListener(
+          prisma,
+          mail as unknown as MailService,
+          new TicketAccessPolicyService(prisma),
+          new EmailDeliveryService(prisma),
+        );
+      const dispatch = (handler: TicketEmailListener) =>
+        kind === 'sla'
+          ? handler.handleTicketSlaAlert(event)
+          : handler.handleTicketOverdue(event);
+      await expect(dispatch(listener())).rejects.toThrow();
+      expect(
+        await prisma.emailDelivery.count({
+          where: { outboxEventId: event.outboxEventId },
+        }),
+      ).toBe(1);
+      await dispatch(listener());
+      await dispatch(listener());
+      expect(accepted).toEqual([first.email, second.email]);
+      expect(mail.sendEmail).toHaveBeenCalledTimes(3);
+      expect(
+        await prisma.emailDelivery.count({
+          where: { outboxEventId: event.outboxEventId },
+        }),
+      ).toBe(2);
+    },
+  );
+
+  it.each(['created', 'assigned', 'resolved'] as const)(
+    'does not resend a completed single-recipient ticket %s event',
+    async (kind) => {
+      const ticket = await createTicket();
+      const event = {
+        outboxEventId: randomUUID(),
+        ticketId: ticket.id,
+        ticketTitle: ticket.title,
+        assignedToId: admin.userId,
+        assignedByName: 'Fixture admin',
+        resolverId: admin.userId,
+        resolverName: 'Fixture admin',
+        recipientIds: [employee.userId],
+      };
+      const mail = {
+        isEnabled: () => true,
+        sendEmail: jest.fn().mockResolvedValue({ skipped: false }),
+      };
+      const dispatch = () => {
+        const listener = new TicketEmailListener(
+          prisma,
+          mail as unknown as MailService,
+          new TicketAccessPolicyService(prisma),
+          new EmailDeliveryService(prisma),
+        );
+        if (kind === 'created') return listener.handleTicketCreated(event);
+        if (kind === 'assigned') return listener.handleTicketAssigned(event);
+        return listener.handleTicketResolved(event);
+      };
+      await dispatch();
+      await dispatch();
+      expect(mail.sendEmail).toHaveBeenCalledTimes(1);
+      const receipt = await prisma.emailDelivery.findFirstOrThrow({
+        where: { outboxEventId: event.outboxEventId },
+      });
+      expect(receipt.recipientId).toBe(
+        kind === 'assigned' ? admin.userId : employee.userId,
+      );
+    },
+  );
 
   it.each(['reset', 'change', 'lock'] as const)(
     'rejects a pending login after account %s completes',
@@ -347,6 +649,86 @@ describe('Real MySQL/Redis integration (disposable containers only)', () => {
       }),
     ).toBe(0);
   });
+
+  it.each(['demotion', 'lock'] as const)(
+    'rejects a pending password reset after the operator %s completes',
+    async (operation) => {
+      const makeUser = (role: UserRole) =>
+        prisma.user.create({
+          data: {
+            name: 'Account operator fixture',
+            email: `${randomUUID()}@test.invalid`,
+            passwordHash: 'original-fixture-hash',
+            role,
+          },
+        });
+      const operator = await makeUser(UserRole.IT_STAFF);
+      const target = await makeUser(UserRole.EMPLOYEE);
+      let markPaused!: () => void;
+      let resume!: () => void;
+      const paused = new Promise<void>((resolve) => {
+        markPaused = resolve;
+      });
+      const released = new Promise<void>((resolve) => {
+        resume = resolve;
+      });
+      const delayed = {
+        user: prisma.user,
+        $transaction: async (
+          work: (tx: Prisma.TransactionClient) => Promise<unknown>,
+          options: { isolationLevel: Prisma.TransactionIsolationLevel },
+        ) => {
+          markPaused();
+          await released;
+          return prisma.$transaction(work, options);
+        },
+      } as unknown as PrismaService;
+      const accounts = new AccountService(delayed, audit, outbox);
+      const outcome = accounts
+        .resetPassword(
+          target.id,
+          { password: randomUUID() },
+          { userId: operator.id, role: UserRole.IT_STAFF },
+        )
+        .then(
+          (value) => ({ value }),
+          (error: unknown) => ({ error }),
+        );
+      try {
+        await paused;
+        if (operation === 'demotion') {
+          await new UsersService(
+            prisma,
+            audit,
+            new EventEmitter2(),
+            outbox,
+          ).update(operator.id, { role: UserRole.EMPLOYEE }, admin);
+        } else {
+          await new AccountService(prisma, audit, outbox).lockUser(
+            admin,
+            operator.id,
+          );
+        }
+      } finally {
+        resume();
+      }
+      expect(await outcome).toHaveProperty('error.status', 403);
+      expect(
+        await prisma.user.findUniqueOrThrow({ where: { id: target.id } }),
+      ).toMatchObject({
+        passwordHash: target.passwordHash,
+        mustChangePassword: false,
+      });
+      expect(
+        await prisma.outboxEvent.count({
+          where: {
+            type: 'user.password-reset',
+            payload: { path: '$.userId', equals: target.id },
+          },
+        }),
+      ).toBe(0);
+    },
+  );
 
   it('rechecks employee edit permissions when processing starts before its transaction', async () => {
     const ticket = await createTicket();
@@ -879,7 +1261,7 @@ describe('Real MySQL/Redis integration (disposable containers only)', () => {
     expect(payload.recipientIds).not.toContain(employee.userId);
     const listener = new AssetWarrantyNotificationListener(
       prisma,
-      new NotificationsService(prisma),
+      new NotificationsService(prisma, new TicketAccessPolicyService(prisma)),
     );
     await listener.handle({ ...payload, outboxEventId: event.id });
     await listener.handle({ ...payload, outboxEventId: event.id });
@@ -1795,7 +2177,7 @@ describe('Real MySQL/Redis integration (disposable containers only)', () => {
       expect.arrayContaining([admin.userId, manager.userId]),
     );
     const listener = new NotificationsListener(
-      new NotificationsService(prisma),
+      new NotificationsService(prisma, new TicketAccessPolicyService(prisma)),
     );
     await listener.handleTicketSlaAlert({
       ...payload,
@@ -1827,6 +2209,93 @@ describe('Real MySQL/Redis integration (disposable containers only)', () => {
       'Forbidden',
     );
   });
+
+  it.each(['demotion', 'department transfer'] as const)(
+    'does not disclose delayed SLA alerts after recipient %s',
+    async (operation) => {
+      const department = await prisma.department.create({
+        data: { name: randomUUID() },
+      });
+      const other = await prisma.department.create({
+        data: { name: randomUUID() },
+      });
+      const requester = await prisma.user.create({
+        data: {
+          name: 'Requester fixture',
+          email: `${randomUUID()}@test.invalid`,
+          passwordHash: 'test-only',
+          role: UserRole.EMPLOYEE,
+          departmentId: department.id,
+        },
+      });
+      const recipient = await prisma.user.create({
+        data: {
+          name: 'Former recipient fixture',
+          email: `${randomUUID()}@test.invalid`,
+          passwordHash: 'test-only',
+          role: operation === 'demotion' ? UserRole.ADMIN : UserRole.MANAGER,
+          departmentId: department.id,
+        },
+      });
+      const ticket = await tickets.create(
+        { title: 'Private SLA fixture', description: 'Confidential fixture' },
+        { userId: requester.id, role: UserRole.EMPLOYEE },
+      );
+      const event: TicketSlaAlertEvent = {
+        ticketId: ticket.id,
+        ticketTitle: ticket.title,
+        milestone: 'RESPONSE',
+        kind: 'ESCALATED',
+        dueAt: new Date().toISOString(),
+        recipientIds: [recipient.id, admin.userId, requester.id],
+        outboxEventId: randomUUID(),
+      };
+      const access = new TicketAccessPolicyService(prisma);
+      await access.canAccessTicket(ticket.id, {
+        userId: recipient.id,
+        role: recipient.role,
+      });
+      await new UsersService(prisma, audit, new EventEmitter2(), outbox).update(
+        recipient.id,
+        operation === 'demotion'
+          ? { role: UserRole.EMPLOYEE }
+          : { departmentId: other.id },
+        admin,
+      );
+      await expect(
+        access.canAccessTicket(ticket.id, {
+          userId: recipient.id,
+          role: operation === 'demotion' ? UserRole.EMPLOYEE : UserRole.MANAGER,
+        }),
+      ).rejects.toThrow(ForbiddenException);
+      const notifications = new NotificationsService(prisma, access);
+      await new NotificationsListener(notifications).handleTicketSlaAlert(
+        event,
+      );
+      expect(
+        (await notifications.findMine(recipient.id, {})).items,
+      ).toHaveLength(0);
+      expect(
+        await prisma.notification.count({
+          where: { sourceEventId: event.outboxEventId },
+        }),
+      ).toBe(2);
+      const mail = {
+        isEnabled: () => true,
+        sendEmail: jest.fn().mockResolvedValue({}),
+      };
+      await new TicketEmailListener(
+        prisma,
+        mail as unknown as MailService,
+        access,
+        new EmailDeliveryService(prisma),
+      ).handleTicketSlaAlert(event);
+      expect(mail.sendEmail).toHaveBeenCalledTimes(2);
+      expect(mail.sendEmail).not.toHaveBeenCalledWith(
+        expect.objectContaining({ to: recipient.email }),
+      );
+    },
+  );
 
   it('rolls back a warning marker when its outbox event cannot be persisted', async () => {
     const ticket = await createTicket();

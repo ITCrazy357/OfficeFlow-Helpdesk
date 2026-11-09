@@ -4,9 +4,10 @@ import { NotificationsController } from './notifications.controller';
 import { NotificationsListener } from './notifications.listener';
 import { LeaveNotificationsListener } from './listeners/leave-notifications.listener';
 import { NotificationsService } from './notifications.service';
+import { TicketAccessModule } from '../tickets/ticket-access.module';
 
 @Module({
-  imports: [AuthModule],
+  imports: [AuthModule, TicketAccessModule],
   controllers: [NotificationsController],
   providers: [
     NotificationsService,

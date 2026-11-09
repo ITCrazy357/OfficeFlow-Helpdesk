@@ -961,3 +961,78 @@ test("knowledge suggestion queries use normalized input and pass cancellation to
   assert.deepEqual(calls, [{ url: '/knowledge/suggest-for-ticket', body: { title: 'VPN', description: 'x' }, options: { signal: controller.signal } }]);
   assert.equal(options.refetchOnWindowFocus, false);
 });
+
+test("new passwords enforce UTF-8 byte limits across self-service and admin forms", () => {
+  const load = createSourceLoader();
+  const auth = load("features/auth/schemas.ts");
+  const users = load("features/users/schemas.ts");
+  for (const [accepted, rejected] of [
+    ["a".repeat(72), "a".repeat(73)],
+    ["á".repeat(36), "á".repeat(37)],
+    ["🔐".repeat(18), "🔐".repeat(19)],
+  ]) {
+    for (const [password, expected] of [
+      [accepted, true],
+      [rejected, false],
+    ]) {
+      assert.equal(
+        auth.changePasswordSchema.safeParse({
+          currentPassword: "legacy-password",
+          newPassword: password,
+          confirmPassword: password,
+        }).success,
+        expected,
+      );
+      assert.equal(
+        auth.resetForgottenPasswordSchema.safeParse({
+          newPassword: password,
+          confirmPassword: password,
+        }).success,
+        expected,
+      );
+      assert.equal(
+        users.resetPasswordSchema.safeParse({
+          password,
+          confirmPassword: password,
+        }).success,
+        expected,
+      );
+      assert.equal(
+        users.userFormSchema.safeParse({
+          name: "Fixture",
+          email: "fixture@test.invalid",
+          role: "EMPLOYEE",
+          departmentId: "1",
+          password,
+        }).success,
+        expected,
+      );
+    }
+  }
+  const legacy = "á".repeat(40);
+  assert.equal(
+    auth.loginSchema.safeParse({
+      email: "fixture@test.invalid",
+      password: legacy,
+    }).success,
+    true,
+  );
+  assert.equal(
+    auth.changePasswordSchema.safeParse({
+      currentPassword: legacy,
+      newPassword: "independent-new-password",
+      confirmPassword: "independent-new-password",
+    }).success,
+    true,
+  );
+  assert.equal(
+    users.userFormSchema.safeParse({
+      name: "Fixture",
+      email: "fixture@test.invalid",
+      role: "EMPLOYEE",
+      departmentId: "1",
+      password: "",
+    }).success,
+    true,
+  );
+});

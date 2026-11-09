@@ -24,7 +24,7 @@ function getRefreshCookieOptions(): CookieOptions {
   };
 }
 
-function setNoStoreHeaders(response: Response) {
+export function setNoStoreHeaders(response: Response) {
   response.setHeader('Cache-Control', 'no-store');
   response.setHeader('Pragma', 'no-cache');
 }

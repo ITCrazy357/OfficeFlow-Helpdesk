@@ -24,6 +24,7 @@ describe('Prisma startup readiness', () => {
     notificationReadSpy = jest
       .spyOn(service.notification, 'findFirst')
       .mockResolvedValue(null);
+    jest.spyOn(service.emailDelivery, 'findFirst').mockResolvedValue(null);
     jest.spyOn(service.ticket, 'findFirst').mockResolvedValue(null);
     jest.spyOn(service.slaPolicy, 'findFirst').mockResolvedValue(null);
     jest.spyOn(service.asset, 'findFirst').mockResolvedValue(null);
@@ -64,6 +65,14 @@ describe('Prisma startup readiness', () => {
     const error = new Error('SLA schema unavailable');
     slaAlertReadSpy.mockRejectedValue(error);
 
+    await expect(service.onModuleInit()).rejects.toBe(error);
+    expect(disconnectSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it('fails startup and closes the pool when email delivery receipts are unavailable', async () => {
+    jest.spyOn(service, '$queryRaw').mockResolvedValue([{ ok: 1 }]);
+    const error = new Error('Email receipt schema unavailable');
+    jest.spyOn(service.emailDelivery, 'findFirst').mockRejectedValue(error);
     await expect(service.onModuleInit()).rejects.toBe(error);
     expect(disconnectSpy).toHaveBeenCalledTimes(1);
   });

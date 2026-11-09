@@ -6,10 +6,58 @@ import {
 import { type Prisma, UserRole } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import type { CurrentUserPayload } from '../common/decorators/current-user.decorator';
+import { runSerializableTransaction } from '../common/database/serializable-transaction.util';
+
+export type TicketRecipient = {
+  id: number;
+  name: string;
+  email: string;
+  role: UserRole;
+};
 
 @Injectable()
 export class TicketAccessPolicyService {
   constructor(private readonly prisma: PrismaService) {}
+
+  async getRecipients(
+    ticketId: number,
+    userIds: number[],
+    transaction?: Prisma.TransactionClient,
+  ): Promise<TicketRecipient[]> {
+    if (userIds.length === 0) return [];
+    if (!transaction) {
+      return runSerializableTransaction(this.prisma, (tx) =>
+        this.getRecipients(ticketId, userIds, tx),
+      );
+    }
+    const candidates = await transaction.user.findMany({
+      where: {
+        id: { in: [...new Set(userIds)] },
+        isActive: true,
+        isLocked: false,
+        mustChangePassword: false,
+      },
+      select: { id: true, name: true, email: true, role: true },
+    });
+    const allowed: TicketRecipient[] = [];
+    for (const user of candidates) {
+      try {
+        await this.canAccessTicket(
+          ticketId,
+          { userId: user.id, role: user.role },
+          transaction,
+        );
+        allowed.push(user);
+      } catch (error) {
+        if (
+          !(error instanceof ForbiddenException) &&
+          !(error instanceof NotFoundException)
+        )
+          throw error;
+      }
+    }
+    return allowed;
+  }
 
   private escalatedScope(managerId: number): Prisma.TicketWhereInput {
     return {

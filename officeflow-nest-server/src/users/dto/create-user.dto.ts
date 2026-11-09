@@ -9,6 +9,7 @@ import {
   Min,
   MinLength,
 } from 'class-validator';
+import { NewPasswordByteLength } from '../../common/security/password-policy';
 
 export class CreateUserDto {
   @ApiProperty({
@@ -28,10 +29,12 @@ export class CreateUserDto {
 
   @ApiProperty({
     example: 'correct-horse-battery-staple',
-    description: 'Initial password, 12 to 128 characters',
+    description:
+      'Initial password, at least 12 characters and at most 72 UTF-8 bytes',
   })
   @IsString()
   @MinLength(12)
+  @NewPasswordByteLength()
   @MaxLength(128)
   password!: string;
 

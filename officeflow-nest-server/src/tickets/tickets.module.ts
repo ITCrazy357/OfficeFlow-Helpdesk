@@ -6,7 +6,7 @@ import { CloudinaryModule } from '../cloudinary/cloudinary.module';
 
 import { TicketsController } from './tickets.controller';
 import { TicketsService } from './tickets.service';
-import { TicketAccessPolicyService } from './ticket-access-policy.service';
+import { TicketAccessModule } from './ticket-access.module';
 import { TicketQueryService } from './ticket-query.service';
 import { TicketWorkflowService } from './ticket-workflow.service';
 import { TicketAttachmentService } from './ticket-attachment.service';
@@ -16,11 +16,16 @@ import { TicketFeedbackController } from './ticket-feedback.controller';
 import { TicketFeedbackService } from './ticket-feedback.service';
 
 @Module({
-  imports: [AuthModule, CloudinaryModule, AuditLogsModule, SlaModule],
+  imports: [
+    AuthModule,
+    CloudinaryModule,
+    AuditLogsModule,
+    SlaModule,
+    TicketAccessModule,
+  ],
   controllers: [TicketsController, TicketFeedbackController],
   providers: [
     TicketsService,
-    TicketAccessPolicyService,
     TicketQueryService,
     TicketWorkflowService,
     TicketAttachmentService,

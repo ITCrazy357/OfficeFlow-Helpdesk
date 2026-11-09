@@ -3,6 +3,7 @@ import { Prisma } from '@prisma/client';
 type SchemaClient = Pick<
   Prisma.TransactionClient,
   | 'outboxEvent'
+  | 'emailDelivery'
   | 'notification'
   | 'ticket'
   | 'slaPolicy'
@@ -39,6 +40,9 @@ export async function assertDatabaseSchemaReady(
       },
     });
     await database.notification.findFirst({ select: { sourceEventId: true } });
+    await database.emailDelivery.findFirst({
+      select: { outboxEventId: true, recipientId: true, deliveredAt: true },
+    });
     await database.ticket.findFirst({
       select: {
         slaPolicy: true,
@@ -105,7 +109,7 @@ export async function assertDatabaseSchemaReady(
       // Retain the error code for safe startup diagnostics, without raw SQL,
       // connection details or adapter metadata from the original error.
       throw new Prisma.PrismaClientKnownRequestError(
-        `Database schema is not ready (${error.code}). Check migrations 20260906170000_add_transactional_outbox, 20261017120000_add_business_sla, 20261018120000_add_asset_care, 20261018160000_add_leave_planning_and_ticket_feedback and the database target. Back up and review pending migrations before deploying them.`,
+        `Database schema is not ready (${error.code}). Check migrations 20260906170000_add_transactional_outbox, 20261017120000_add_business_sla, 20261018120000_add_asset_care, 20261018160000_add_leave_planning_and_ticket_feedback, 20261101010000_add_email_delivery_receipts and the database target. Back up and review pending migrations before deploying them.`,
         { code: error.code, clientVersion: error.clientVersion },
       );
     }

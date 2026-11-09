@@ -3,6 +3,7 @@ import { NotificationType } from '@prisma/client';
 
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from './notifications.service';
+import { TicketAccessPolicyService } from '../tickets/ticket-access-policy.service';
 
 const mockPrismaService = {
   notification: {
@@ -23,6 +24,7 @@ describe('NotificationsService', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         NotificationsService,
+        { provide: TicketAccessPolicyService, useValue: {} },
         {
           provide: PrismaService,
           useValue: mockPrismaService,

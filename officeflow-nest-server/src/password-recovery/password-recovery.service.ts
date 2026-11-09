@@ -3,6 +3,7 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 import { AuditLogAction, AuditLogEntity, Prisma } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 import { createHash, randomBytes } from 'node:crypto';
+import { assertNewPasswordBytes } from '../common/security/password-policy';
 
 import { AuditLogsService } from '../audit-logs/audit-logs.service';
 import { PasswordResetRequestedEvent } from '../notifications/events/password-reset-requested.event';
@@ -199,6 +200,7 @@ export class PasswordRecoveryService {
     dto: ResetForgottenPasswordDto,
     metadata: RequestMetadata = {},
   ) {
+    assertNewPasswordBytes(dto.newPassword);
     const tokenHash = hashPasswordResetToken(dto.token);
     const resetToken = await this.prisma.passwordResetToken.findUnique({
       where: { tokenHash },

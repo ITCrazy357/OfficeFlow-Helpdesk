@@ -1,6 +1,60 @@
-# Local database exports may contain real accounts and private business data.
-/officeflow-nest-server/*.sql
-*.sql.gz
-*.sql.zip
+# Dependencies and generated build/test output.
+node_modules/
+.next/
+dist/
+build/
+out/
+coverage/
+.nyc_output/
+test-results/
+playwright-report/
+blob-report/
+*.tsbuildinfo
+next-env.d.ts
+
+# Local environment files; keep sanitized configuration examples tracked.
+.env
+.env.*
+!.env.example
+!.env.*.example
+.vercel/
+
+# Local editor settings and operating-system files.
+.vscode/
+.idea/
+*.code-workspace
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Logs, temporary files and editor/merge leftovers.
+*.log
+*.tmp
+*.temp
+*.swp
+*.swo
+*~
+*.orig
+*.rej
+.tmp/
+.temp/
+
+# Local database exports and backups may contain real accounts/private data.
+*.sql
+*.sql.*
+*.dump
+*.dump.gz
+*.bak
+.backups/
 /.local-backups/
 /.verification/
+# Schema migrations are application source and must ship with the backend.
+!/officeflow-nest-server/src/prisma/migrations/**/migration.sql
+
+# Local review reports and screenshots; product/runbook documentation stays tracked.
+/docs/reviews/
+/docs/admin-dashboard/
+/docs/form-alignment/
+/docs/ui-refresh/
+/docs/officeflow-ui-refresh.md
+/officeflow-client/FRONTEND_REVIEW.md

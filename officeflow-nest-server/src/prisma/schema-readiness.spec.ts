@@ -5,6 +5,7 @@ import { getSafeErrorDetails } from '../common/diagnostics/request-diagnostics';
 describe('Database schema readiness', () => {
   const database = {
     outboxEvent: { findFirst: jest.fn() },
+    emailDelivery: { findFirst: jest.fn() },
     notification: { findFirst: jest.fn() },
     ticket: { findFirst: jest.fn() },
     slaPolicy: { findFirst: jest.fn() },
@@ -49,6 +50,7 @@ describe('Database schema readiness', () => {
 
   it.each([
     ['outboxEvent', 'P2021'],
+    ['emailDelivery', 'P2021'],
     ['notification', 'P2022'],
     ['ticket', 'P2022'],
     ['slaPolicy', 'P2021'],

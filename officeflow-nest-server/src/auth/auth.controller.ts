@@ -30,6 +30,7 @@ import {
   clearRefreshCookie,
   readRefreshCookie,
   setRefreshCookie,
+  setNoStoreHeaders,
 } from './auth-cookie';
 import { TrustedOriginGuard } from './trusted-origin.guard';
 
@@ -85,6 +86,7 @@ export class AuthController {
     @Req() request: Request,
     @Res({ passthrough: true }) response: Response,
   ) {
+    setNoStoreHeaders(response);
     const currentRefreshToken = readRefreshCookie(request);
 
     if (!currentRefreshToken) {
@@ -106,7 +108,7 @@ export class AuthController {
 
       return { accessToken: result.accessToken };
     } catch (error) {
-      clearRefreshCookie(response);
+      if (error instanceof UnauthorizedException) clearRefreshCookie(response);
       throw error;
     }
   }

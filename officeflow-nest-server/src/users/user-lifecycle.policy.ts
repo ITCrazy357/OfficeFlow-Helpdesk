@@ -35,6 +35,7 @@ export async function assertActiveAdmin(
       role: true,
       isActive: true,
       isLocked: true,
+      mustChangePassword: true,
     },
   });
 
@@ -42,7 +43,8 @@ export async function assertActiveAdmin(
     !actor ||
     actor.role !== UserRole.ADMIN ||
     !actor.isActive ||
-    actor.isLocked
+    actor.isLocked ||
+    actor.mustChangePassword
   ) {
     throw new ForbiddenException('An active administrator is required');
   }
