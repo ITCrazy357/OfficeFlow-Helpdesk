@@ -1,7 +1,5 @@
-import {
-  formatSlaDeadline,
-  type TicketSlaAlertEvent,
-} from '../../notifications/events/ticket-sla-alert.event';
+import { formatSlaDeadline } from '../../common/formatting/sla-deadline';
+import { type TicketSlaAlertEvent } from '../../contracts/events/tickets/ticket-sla-alert.event';
 import { emailLayoutTemplate, escapeHtml } from './email-layout.template';
 
 export function ticketSlaAlertEmailTemplate(

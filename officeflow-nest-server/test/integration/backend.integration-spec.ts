@@ -42,7 +42,7 @@ import {
 import { assetCareDates } from '../../src/assets/asset-care.util';
 import { NotificationsService } from '../../src/notifications/notifications.service';
 import { NotificationsListener } from '../../src/notifications/notifications.listener';
-import type { TicketSlaAlertEvent } from '../../src/notifications/events/ticket-sla-alert.event';
+import type { TicketSlaAlertEvent } from '../../src/contracts/events/tickets/ticket-sla-alert.event';
 import { LeavePlanningService } from '../../src/leave-requests/leave-planning.service';
 import { LeaveRequestService } from '../../src/leave-requests/leave-requests.service';
 import { TicketFeedbackService } from '../../src/tickets/ticket-feedback.service';

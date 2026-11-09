@@ -1,6 +1,6 @@
 import type { Prisma } from '@prisma/client';
 
-import { OUTBOX_EVENT_TYPES } from './outbox.constants';
+import { OUTBOX_EVENT_TYPES } from '../contracts/events/outbox-events';
 import { OutboxService } from './outbox.service';
 
 const mockOutboxEvent = {

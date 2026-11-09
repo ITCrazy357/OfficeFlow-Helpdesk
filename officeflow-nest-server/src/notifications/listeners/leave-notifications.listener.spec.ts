@@ -1,8 +1,8 @@
 import { LeaveStatus, NotificationType } from '@prisma/client';
 
-import { LeaveApprovedEvent } from '../../leave-requests/events/leave-approved.event';
-import { LeaveCancelledEvent } from '../../leave-requests/events/leave-cancelled.event';
-import { LeaveRequestedEvent } from '../../leave-requests/events/leave-requested.event';
+import { LeaveApprovedEvent } from '../../contracts/events/leave-requests/leave-approved.event';
+import { LeaveCancelledEvent } from '../../contracts/events/leave-requests/leave-cancelled.event';
+import { LeaveRequestedEvent } from '../../contracts/events/leave-requests/leave-requested.event';
 import type { PrismaService } from '../../prisma/prisma.service';
 import type { NotificationsService } from '../notifications.service';
 import { LeaveNotificationsListener } from './leave-notifications.listener';

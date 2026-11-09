@@ -8,7 +8,7 @@ import {
   OUTBOX_EVENT_TYPES,
   type OutboxDispatchedEvent,
   type OutboxEventPayloadByType,
-} from '../outbox/outbox.constants';
+} from '../contracts/events/outbox-events';
 import { runSerializableTransaction } from '../common/database/serializable-transaction.util';
 import { NotificationsService } from '../notifications/notifications.service';
 import { warrantyWindow, warrantyCalendarDate } from './asset-care.util';

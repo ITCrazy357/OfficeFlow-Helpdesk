@@ -1,7 +1,7 @@
-import { TicketAssignedEvent } from '../../notifications/events/ticket-assigned.event';
-import { TicketCreatedEvent } from '../../notifications/events/ticket-created.event';
-import { TicketOverdueEvent } from '../../notifications/events/ticket-overdue.event';
-import { TicketResolvedEvent } from '../../notifications/events/ticket-resolved.event';
+import { TicketAssignedEvent } from '../../contracts/events/tickets/ticket-assigned.event';
+import { TicketCreatedEvent } from '../../contracts/events/tickets/ticket-created.event';
+import { TicketOverdueEvent } from '../../contracts/events/tickets/ticket-overdue.event';
+import { TicketResolvedEvent } from '../../contracts/events/tickets/ticket-resolved.event';
 import type { PrismaService } from '../../prisma/prisma.service';
 import type { MailService } from '../mail.service';
 import { TicketEmailListener } from './ticket-email.listener';

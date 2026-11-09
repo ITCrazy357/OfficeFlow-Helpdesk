@@ -2,21 +2,21 @@ import { Injectable, Logger } from '@nestjs/common';
 import { getSafeErrorDetails } from '../../common/diagnostics/request-diagnostics';
 import { OnEvent } from '@nestjs/event-emitter';
 
-import { TicketAssignedEvent } from '../../notifications/events/ticket-assigned.event';
-import { TicketCreatedEvent } from '../../notifications/events/ticket-created.event';
-import { TicketOverdueEvent } from '../../notifications/events/ticket-overdue.event';
-import { TicketResolvedEvent } from '../../notifications/events/ticket-resolved.event';
+import { TicketAssignedEvent } from '../../contracts/events/tickets/ticket-assigned.event';
+import { TicketCreatedEvent } from '../../contracts/events/tickets/ticket-created.event';
+import { TicketOverdueEvent } from '../../contracts/events/tickets/ticket-overdue.event';
+import { TicketResolvedEvent } from '../../contracts/events/tickets/ticket-resolved.event';
 import { PrismaService } from '../../prisma/prisma.service';
 import { MailService } from '../mail.service';
 import { ticketAssignedEmailTemplate } from '../templates/ticket-assigned-email.template';
 import { ticketCreatedEmailTemplate } from '../templates/ticket-created-email.template';
 import { ticketOverdueEmailTemplate } from '../templates/ticket-overdue-email.template';
 import { ticketResolvedEmailTemplate } from '../templates/ticket-resolved-email.template';
-import type { TicketSlaAlertEvent } from '../../notifications/events/ticket-sla-alert.event';
+import type { TicketSlaAlertEvent } from '../../contracts/events/tickets/ticket-sla-alert.event';
 import { ticketSlaAlertEmailTemplate } from '../templates/ticket-sla-alert-email.template';
 import { TicketAccessPolicyService } from '../../tickets/ticket-access-policy.service';
 import { EmailDeliveryService } from '../email-delivery.service';
-import type { OutboxDispatchedEvent } from '../../outbox/outbox.constants';
+import type { OutboxDispatchedEvent } from '../../contracts/events/outbox-events';
 
 @Injectable()
 export class TicketEmailListener {

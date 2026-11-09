@@ -15,7 +15,7 @@ import {
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditLogsService } from '../audit-logs/audit-logs.service';
 import { OutboxService } from '../outbox/outbox.service';
-import { OUTBOX_EVENT_TYPES } from '../outbox/outbox.constants';
+import { OUTBOX_EVENT_TYPES } from '../contracts/events/outbox-events';
 import type { CurrentUserPayload } from '../common/decorators/current-user.decorator';
 import { runSerializableTransaction } from '../common/database/serializable-transaction.util';
 import { assertTicketAssignee } from '../users/user-lifecycle.policy';

@@ -7,7 +7,7 @@ import { AuditLogAction, AuditLogEntity, AssetStatus } from '@prisma/client';
 import { AuditLogsService } from '../audit-logs/audit-logs.service';
 import { runSerializableTransaction } from '../common/database/serializable-transaction.util';
 import type { CurrentUserPayload } from '../common/decorators/current-user.decorator';
-import { OUTBOX_EVENT_TYPES } from '../outbox/outbox.constants';
+import { OUTBOX_EVENT_TYPES } from '../contracts/events/outbox-events';
 import { OutboxService } from '../outbox/outbox.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { AssignAssetDto } from './dto/assign-asset.dto';

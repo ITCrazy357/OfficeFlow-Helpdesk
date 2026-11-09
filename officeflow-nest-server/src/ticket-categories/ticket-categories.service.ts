@@ -8,7 +8,7 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 import {
   DASHBOARD_CACHE_INVALIDATE_EVENT,
   DashboardCacheInvalidatedEvent,
-} from '../dashboard/events/dashboard-cache-invalidated.event';
+} from '../contracts/events/dashboard/dashboard-cache-invalidated.event';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateTicketCategoryDto } from './dto/create-ticket-category.dto';
 import { UpdateTicketCategoryDto } from './dto/update-ticket-category.dto';

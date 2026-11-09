@@ -17,14 +17,14 @@ import {
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditLogsService } from '../audit-logs/audit-logs.service';
 import { OutboxService } from '../outbox/outbox.service';
-import { OUTBOX_EVENT_TYPES } from '../outbox/outbox.constants';
+import { OUTBOX_EVENT_TYPES } from '../contracts/events/outbox-events';
 import type { CurrentUserPayload } from '../common/decorators/current-user.decorator';
 import { runSerializableTransaction } from '../common/database/serializable-transaction.util';
 import { assertTicketAssignee } from '../users/user-lifecycle.policy';
 import {
   DASHBOARD_CACHE_INVALIDATE_EVENT,
   DashboardCacheInvalidatedEvent,
-} from '../dashboard/events/dashboard-cache-invalidated.event';
+} from '../contracts/events/dashboard/dashboard-cache-invalidated.event';
 import { CreateTicketDto } from './dto/create-ticket.dto';
 import { UpdateTicketDto } from './dto/update-ticket.dto';
 import { UpdateTicketStatusDto } from './dto/update-ticket-status.dto';

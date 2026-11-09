@@ -21,8 +21,8 @@ import type { CurrentUserPayload } from '../common/decorators/current-user.decor
 import {
   DASHBOARD_CACHE_INVALIDATE_EVENT,
   DashboardCacheInvalidatedEvent,
-} from '../dashboard/events/dashboard-cache-invalidated.event';
-import { OUTBOX_EVENT_TYPES } from '../outbox/outbox.constants';
+} from '../contracts/events/dashboard/dashboard-cache-invalidated.event';
+import { OUTBOX_EVENT_TYPES } from '../contracts/events/outbox-events';
 import { OutboxService } from '../outbox/outbox.service';
 import { PrismaService } from '../prisma/prisma.service';
 

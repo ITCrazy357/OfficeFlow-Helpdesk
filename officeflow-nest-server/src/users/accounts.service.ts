@@ -16,7 +16,7 @@ import { assertNewPasswordBytes } from '../common/security/password-policy';
 
 import { AuditLogsService } from '../audit-logs/audit-logs.service';
 import { type CurrentUserPayload } from '../common/decorators/current-user.decorator';
-import { OUTBOX_EVENT_TYPES } from '../outbox/outbox.constants';
+import { OUTBOX_EVENT_TYPES } from '../contracts/events/outbox-events';
 import { OutboxService } from '../outbox/outbox.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { runSerializableTransaction } from '../common/database/serializable-transaction.util';

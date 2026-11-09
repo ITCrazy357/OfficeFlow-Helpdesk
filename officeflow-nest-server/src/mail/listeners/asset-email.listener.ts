@@ -2,8 +2,8 @@ import { Injectable, Logger } from '@nestjs/common';
 import { getSafeErrorDetails } from '../../common/diagnostics/request-diagnostics';
 import { OnEvent } from '@nestjs/event-emitter';
 
-import { AssetAssignedEvent } from '../../notifications/events/asset-assigned.event';
-import { AssetReturnedEvent } from '../../notifications/events/asset-returned.event';
+import { AssetAssignedEvent } from '../../contracts/events/assets/asset-assigned.event';
+import { AssetReturnedEvent } from '../../contracts/events/assets/asset-returned.event';
 import { PrismaService } from '../../prisma/prisma.service';
 import { MailService } from '../mail.service';
 import { assetAssignedEmailTemplate } from '../templates/asset-assigned-email.template';

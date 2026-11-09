@@ -6,7 +6,7 @@ import {
   type CloudinaryDeliveryType,
   type CloudinaryResourceType,
 } from '../cloudinary/cloudinary.service';
-import { OUTBOX_EVENT_TYPES } from './outbox.constants';
+import { OUTBOX_EVENT_TYPES } from '../contracts/events/outbox-events';
 
 type CloudinaryAssetDeleteEvent = {
   publicId: string;

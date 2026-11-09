@@ -1,19 +1,17 @@
+import { formatSlaDeadline } from '../common/formatting/sla-deadline';
 import { Injectable } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
 import { NotificationType } from '@prisma/client';
 
-import type { OutboxDispatchedEvent } from '../outbox/outbox.constants';
+import type { OutboxDispatchedEvent } from '../contracts/events/outbox-events';
 import { NotificationsService } from './notifications.service';
-import { AssetAssignedEvent } from './events/asset-assigned.event';
-import { AssetReturnedEvent } from './events/asset-returned.event';
-import { TicketAssignedEvent } from './events/ticket-assigned.event';
-import { TicketCommentedEvent } from './events/ticket-commented.event';
-import { TicketOverdueEvent } from './events/ticket-overdue.event';
-import { TicketStatusChangedEvent } from './events/ticket-status-changed.event';
-import {
-  formatSlaDeadline,
-  type TicketSlaAlertEvent,
-} from './events/ticket-sla-alert.event';
+import { AssetAssignedEvent } from '../contracts/events/assets/asset-assigned.event';
+import { AssetReturnedEvent } from '../contracts/events/assets/asset-returned.event';
+import { TicketAssignedEvent } from '../contracts/events/tickets/ticket-assigned.event';
+import { TicketCommentedEvent } from '../contracts/events/tickets/ticket-commented.event';
+import { TicketOverdueEvent } from '../contracts/events/tickets/ticket-overdue.event';
+import { TicketStatusChangedEvent } from '../contracts/events/tickets/ticket-status-changed.event';
+import { type TicketSlaAlertEvent } from '../contracts/events/tickets/ticket-sla-alert.event';
 
 @Injectable()
 export class NotificationsListener {

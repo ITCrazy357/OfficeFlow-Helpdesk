@@ -4,7 +4,7 @@ import { RedisService } from '../../redis/redis.service';
 import {
   DASHBOARD_CACHE_INVALIDATE_EVENT,
   type DashboardCacheInvalidatedEvent,
-} from '../events/dashboard-cache-invalidated.event';
+} from '../../contracts/events/dashboard/dashboard-cache-invalidated.event';
 
 @Injectable()
 export class DashboardCacheListener {

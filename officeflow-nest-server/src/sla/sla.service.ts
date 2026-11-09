@@ -4,11 +4,11 @@ import { Cron, CronExpression } from '@nestjs/schedule';
 import { Prisma, TicketStatus, UserRole } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { OutboxService } from '../outbox/outbox.service';
-import { OUTBOX_EVENT_TYPES } from '../outbox/outbox.constants';
+import { OUTBOX_EVENT_TYPES } from '../contracts/events/outbox-events';
 import {
   DASHBOARD_CACHE_INVALIDATE_EVENT,
   DashboardCacheInvalidatedEvent,
-} from '../dashboard/events/dashboard-cache-invalidated.event';
+} from '../contracts/events/dashboard/dashboard-cache-invalidated.event';
 import type { SlaPolicyConfig } from './sla-policy';
 import { runSerializableTransaction } from '../common/database/serializable-transaction.util';
 

@@ -1,4 +1,4 @@
-import { DashboardCacheInvalidatedEvent } from '../events/dashboard-cache-invalidated.event';
+import { DashboardCacheInvalidatedEvent } from '../../contracts/events/dashboard/dashboard-cache-invalidated.event';
 import { RedisService } from '../../redis/redis.service';
 import { DashboardCacheListener } from './dashboard-cache.listener';
 

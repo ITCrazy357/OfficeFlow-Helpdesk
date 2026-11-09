@@ -2,10 +2,10 @@ import { Injectable, Logger } from '@nestjs/common';
 import { getSafeErrorDetails } from '../../common/diagnostics/request-diagnostics';
 import { OnEvent } from '@nestjs/event-emitter';
 
-import { PasswordRecoveryCompletedEvent } from '../../notifications/events/password-recovery-completed.event';
-import { PasswordResetRequestedEvent } from '../../notifications/events/password-reset-requested.event';
-import { UserCreatedEvent } from '../../notifications/events/user-created.event';
-import { UserPasswordResetEvent } from '../../notifications/events/user-password-reset.event';
+import { PasswordRecoveryCompletedEvent } from '../../contracts/events/users/password-recovery-completed.event';
+import { PasswordResetRequestedEvent } from '../../contracts/events/users/password-reset-requested.event';
+import { UserCreatedEvent } from '../../contracts/events/users/user-created.event';
+import { UserPasswordResetEvent } from '../../contracts/events/users/user-password-reset.event';
 import { PrismaService } from '../../prisma/prisma.service';
 import { MailService } from '../mail.service';
 import { passwordRecoveryCompletedEmailTemplate } from '../templates/password-recovery-completed-email.template';

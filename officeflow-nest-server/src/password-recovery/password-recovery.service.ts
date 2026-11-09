@@ -6,8 +6,8 @@ import { createHash, randomBytes } from 'node:crypto';
 import { assertNewPasswordBytes } from '../common/security/password-policy';
 
 import { AuditLogsService } from '../audit-logs/audit-logs.service';
-import { PasswordResetRequestedEvent } from '../notifications/events/password-reset-requested.event';
-import { OUTBOX_EVENT_TYPES } from '../outbox/outbox.constants';
+import { PasswordResetRequestedEvent } from '../contracts/events/users/password-reset-requested.event';
+import { OUTBOX_EVENT_TYPES } from '../contracts/events/outbox-events';
 import { OutboxService } from '../outbox/outbox.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';

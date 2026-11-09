@@ -1,5 +1,5 @@
-import { PasswordResetRequestedEvent } from '../../notifications/events/password-reset-requested.event';
-import { PasswordRecoveryCompletedEvent } from '../../notifications/events/password-recovery-completed.event';
+import { PasswordResetRequestedEvent } from '../../contracts/events/users/password-reset-requested.event';
+import { PasswordRecoveryCompletedEvent } from '../../contracts/events/users/password-recovery-completed.event';
 import type { PrismaService } from '../../prisma/prisma.service';
 import type { MailService } from '../mail.service';
 import { UserEmailListener } from './user-email.listener';

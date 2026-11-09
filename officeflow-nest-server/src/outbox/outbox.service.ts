@@ -5,7 +5,7 @@ import { randomUUID } from 'node:crypto';
 import type {
   OutboxEventPayloadByType,
   OutboxEventType,
-} from './outbox.constants';
+} from '../contracts/events/outbox-events';
 
 type OutboxClient = Pick<Prisma.TransactionClient, 'outboxEvent'>;
 
