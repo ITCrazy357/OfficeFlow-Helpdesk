@@ -7,6 +7,7 @@ import type { PrismaService } from '../prisma/prisma.service';
 import type { SlaPolicyService } from '../sla/sla-policy.service';
 import type { TicketQueryService } from './ticket-query.service';
 import { TicketWorkflowService } from './ticket-workflow.service';
+import type { TicketAssignmentService } from './ticket-assignment.service';
 
 describe('Ticket information update authorization', () => {
   const employee: CurrentUserPayload = { userId: 7, role: UserRole.EMPLOYEE };
@@ -43,6 +44,7 @@ describe('Ticket information update authorization', () => {
     {} as OutboxService,
     {} as TicketQueryService,
     {} as SlaPolicyService,
+    {} as TicketAssignmentService,
   );
 
   beforeEach(() => {

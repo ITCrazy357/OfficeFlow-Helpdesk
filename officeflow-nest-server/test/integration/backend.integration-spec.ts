@@ -16,6 +16,7 @@ import { PrismaService } from '../../src/prisma/prisma.service';
 import { AuditLogsService } from '../../src/audit-logs/audit-logs.service';
 import { OutboxService } from '../../src/outbox/outbox.service';
 import { AssetsService } from '../../src/assets/assets.service';
+import { AssetAssignmentService } from '../../src/assets/asset-assignment.service';
 import { TicketsService } from '../../src/tickets/tickets.service';
 import { CloudinaryService } from '../../src/cloudinary/cloudinary.service';
 import { RedisService } from '../../src/redis/redis.service';
@@ -24,6 +25,7 @@ import { MetricsService } from '../../src/metrics/metrics.service';
 import { TicketAccessPolicyService } from '../../src/tickets/ticket-access-policy.service';
 import { TicketQueryService } from '../../src/tickets/ticket-query.service';
 import { TicketWorkflowService } from '../../src/tickets/ticket-workflow.service';
+import { TicketAssignmentService } from '../../src/tickets/ticket-assignment.service';
 import { TicketAttachmentService } from '../../src/tickets/ticket-attachment.service';
 import { TicketCommentService } from '../../src/tickets/ticket-comment.service';
 import { SlaPolicyService } from '../../src/sla/sla-policy.service';
@@ -68,7 +70,11 @@ describe('Real MySQL/Redis integration (disposable containers only)', () => {
     deleteFile: jest.fn(),
     uploadFile: jest.fn(),
   };
-  const assets = new AssetsService(prisma, audit, outbox);
+  const assets = new AssetsService(
+    prisma,
+    audit,
+    new AssetAssignmentService(prisma, audit, outbox),
+  );
   const planning = new LeavePlanningService(
     prisma,
     new SlaPolicyService(prisma, audit),
@@ -119,6 +125,7 @@ describe('Real MySQL/Redis integration (disposable containers only)', () => {
         TicketAccessPolicyService,
         TicketQueryService,
         TicketWorkflowService,
+        TicketAssignmentService,
         TicketAttachmentService,
         TicketCommentService,
         SlaPolicyService,
@@ -758,6 +765,7 @@ describe('Real MySQL/Redis integration (disposable containers only)', () => {
       outbox,
       new TicketQueryService(prisma, new TicketAccessPolicyService(prisma)),
       new SlaPolicyService(prisma, audit),
+      new TicketAssignmentService(prisma, audit, outbox),
     );
     const edit = workflow.update(
       ticket.id,

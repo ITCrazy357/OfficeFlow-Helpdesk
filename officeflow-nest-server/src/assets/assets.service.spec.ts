@@ -1,5 +1,6 @@
 import { AssetStatus } from '@prisma/client';
 import { AssetsService } from './assets.service';
+import { AssetAssignmentService } from './asset-assignment.service';
 import type { PrismaService } from '../prisma/prisma.service';
 import type { AuditLogsService } from '../audit-logs/audit-logs.service';
 
@@ -22,7 +23,11 @@ describe('AssetsService assignment lifecycle', () => {
   const service = new AssetsService(
     prisma as unknown as PrismaService,
     audit as unknown as AuditLogsService,
-    outbox,
+    new AssetAssignmentService(
+      prisma as unknown as PrismaService,
+      audit as unknown as AuditLogsService,
+      outbox,
+    ),
   );
   const actor = { userId: 1, role: 'ADMIN' as const };
 

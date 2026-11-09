@@ -9,6 +9,7 @@ import { TicketsService } from './tickets.service';
 import { TicketAccessModule } from './ticket-access.module';
 import { TicketQueryService } from './ticket-query.service';
 import { TicketWorkflowService } from './ticket-workflow.service';
+import { TicketAssignmentService } from './ticket-assignment.service';
 import { TicketAttachmentService } from './ticket-attachment.service';
 import { TicketCommentService } from './ticket-comment.service';
 import { SlaModule } from '../sla/sla.module';
@@ -28,6 +29,7 @@ import { TicketFeedbackService } from './ticket-feedback.service';
     TicketsService,
     TicketQueryService,
     TicketWorkflowService,
+    TicketAssignmentService,
     TicketAttachmentService,
     TicketCommentService,
     TicketFeedbackService,

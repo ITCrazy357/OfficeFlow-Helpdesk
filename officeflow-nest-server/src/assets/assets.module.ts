@@ -4,6 +4,7 @@ import { AuditLogsModule } from '../audit-logs/audit-logs.module';
 import { AuthModule } from '../auth/auth.module';
 import { AssetsController } from './assets.controller';
 import { AssetsService } from './assets.service';
+import { AssetAssignmentService } from './asset-assignment.service';
 import { AssetMaintenanceService } from './asset-maintenance.service';
 import {
   AssetWarrantyReminderService,
@@ -16,6 +17,7 @@ import { NotificationsModule } from '../notifications/notifications.module';
   controllers: [AssetsController],
   providers: [
     AssetsService,
+    AssetAssignmentService,
     AssetMaintenanceService,
     AssetWarrantyReminderService,
     AssetWarrantyNotificationListener,

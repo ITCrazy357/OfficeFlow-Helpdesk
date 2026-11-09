@@ -25,8 +25,6 @@ import {
   DASHBOARD_CACHE_INVALIDATE_EVENT,
   DashboardCacheInvalidatedEvent,
 } from '../dashboard/events/dashboard-cache-invalidated.event';
-import { AssignTicketDto } from './dto/assign-ticket.dto';
-import { BulkAssignTicketsDto } from './dto/bulk-assign-tickets.dto';
 import { CreateTicketDto } from './dto/create-ticket.dto';
 import { UpdateTicketDto } from './dto/update-ticket.dto';
 import { UpdateTicketStatusDto } from './dto/update-ticket-status.dto';
@@ -35,51 +33,13 @@ import { SlaPolicyService } from '../sla/sla-policy.service';
 import { calculateTicketDeadlines } from '../sla/sla-calendar';
 import { assertTicketStatusTransition } from './ticket-status.policy';
 import { TicketQueryService } from './ticket-query.service';
+import { TicketAssignmentService } from './ticket-assignment.service';
+import { ticketStatusSelect } from './ticket-select';
 import { createTicketHistory } from './ticket-history.util';
 import {
   resolveCloudinaryDeliveryType,
   resolveCloudinaryResourceType,
 } from './ticket-delivery.util';
-
-const ticketStatusSelect = {
-  id: true,
-  title: true,
-  description: true,
-  status: true,
-  priority: true,
-  dueAt: true,
-  resolveAt: true,
-  resolutionVersion: true,
-  confirmedAt: true,
-  isOverdue: true,
-  firstResponseDueAt: true,
-  firstRespondedAt: true,
-  firstResponseOverdue: true,
-  resolutionWarningAt: true,
-  createdAt: true,
-  updatedAt: true,
-  createdBy: {
-    select: {
-      id: true,
-      name: true,
-      email: true,
-      departmentId: true,
-    },
-  },
-  assignedTo: {
-    select: {
-      id: true,
-      name: true,
-      email: true,
-    },
-  },
-  category: {
-    select: {
-      id: true,
-      name: true,
-    },
-  },
-} satisfies Prisma.TicketSelect;
 
 @Injectable()
 export class TicketWorkflowService {
@@ -90,6 +50,7 @@ export class TicketWorkflowService {
     private readonly outboxService: OutboxService,
     private readonly query: TicketQueryService,
     private readonly slaPolicies: SlaPolicyService,
+    private readonly assignment: TicketAssignmentService,
   ) {}
   private async ensureCategoryExists(
     categoryId?: number,
@@ -508,168 +469,12 @@ export class TicketWorkflowService {
     return result.updatedTicket;
   }
 
-  async assign(
-    id: number,
-    assignTicketDto: AssignTicketDto,
-    currentUser: CurrentUserPayload,
-  ) {
-    if (
-      currentUser.role !== UserRole.ADMIN &&
-      currentUser.role !== UserRole.IT_STAFF
-    ) {
-      throw new ForbiddenException('Forbidden');
-    }
-
-    const updatedTicket = await runSerializableTransaction(
-      this.prisma,
-      async (transaction) => {
-        const ticket = await transaction.ticket.findUnique({
-          where: { id },
-          select: {
-            id: true,
-            title: true,
-            assignedToId: true,
-          },
-        });
-
-        if (!ticket) {
-          throw new NotFoundException('Ticket not found');
-        }
-
-        await assertTicketAssignee(transaction, assignTicketDto.assignedToId);
-
-        const actor = await transaction.user.findUnique({
-          where: { id: currentUser.userId },
-          select: {
-            name: true,
-          },
-        });
-
-        if (!actor) {
-          throw new NotFoundException('Actor not found');
-        }
-
-        return this.applyAssignment(
-          transaction,
-          ticket,
-          assignTicketDto.assignedToId,
-          currentUser,
-          actor.name,
-        );
-      },
-    );
-
-    return updatedTicket;
+  assign(...args: Parameters<TicketAssignmentService['assign']>) {
+    return this.assignment.assign(...args);
   }
 
-  async bulkAssign(dto: BulkAssignTicketsDto, currentUser: CurrentUserPayload) {
-    if (
-      currentUser.role !== UserRole.ADMIN &&
-      currentUser.role !== UserRole.IT_STAFF
-    ) {
-      throw new ForbiddenException('Forbidden');
-    }
-
-    return runSerializableTransaction(this.prisma, async (transaction) => {
-      const tickets = await transaction.ticket.findMany({
-        where: { id: { in: dto.ticketIds } },
-        select: { id: true, title: true, status: true, assignedToId: true },
-        orderBy: { id: 'asc' },
-      });
-      if (tickets.length !== dto.ticketIds.length) {
-        throw new NotFoundException('One or more tickets no longer exist');
-      }
-      if (
-        tickets.some(
-          (ticket) =>
-            ticket.status !== TicketStatus.OPEN &&
-            ticket.status !== TicketStatus.IN_PROGRESS,
-        )
-      ) {
-        throw new ConflictException(
-          'Only OPEN or IN_PROGRESS tickets can be assigned in bulk',
-        );
-      }
-
-      await assertTicketAssignee(transaction, dto.assignedToId);
-      const actor = await transaction.user.findUnique({
-        where: { id: currentUser.userId },
-        select: { name: true },
-      });
-      if (!actor) throw new NotFoundException('Actor not found');
-
-      let assignedCount = 0;
-      for (const ticket of tickets) {
-        if (ticket.assignedToId === dto.assignedToId) continue;
-        await this.applyAssignment(
-          transaction,
-          ticket,
-          dto.assignedToId,
-          currentUser,
-          actor.name,
-        );
-        assignedCount++;
-      }
-      return { assignedCount, unchangedCount: tickets.length - assignedCount };
-    });
-  }
-
-  private async applyAssignment(
-    transaction: Prisma.TransactionClient,
-    ticket: { id: number; title: string; assignedToId: number | null },
-    assignedToId: number,
-    currentUser: CurrentUserPayload,
-    actorName: string,
-  ) {
-    const id = ticket.id;
-    const result = await transaction.ticket.update({
-      where: { id },
-      data: {
-        assignedToId,
-      },
-      select: ticketStatusSelect,
-    });
-
-    await createTicketHistory(transaction, {
-      ticketId: id,
-      userId: currentUser.userId,
-      action: TicketHistoryAction.ASSIGNED,
-      oldValue: ticket.assignedToId ? String(ticket.assignedToId) : undefined,
-      newValue: String(assignedToId),
-    });
-
-    await this.auditLogsService.create(
-      {
-        actorId: currentUser.userId,
-        entity: AuditLogEntity.TICKET,
-        entityId: ticket.id,
-        action: AuditLogAction.ASSIGNED,
-        description: `Assigned ticket ${ticket.title}.`,
-        oldValues: {
-          assignedToId: ticket.assignedToId,
-        },
-        newValues: {
-          assignedToId,
-        },
-        ipAddress: currentUser.ipAddress,
-        userAgent: currentUser.userAgent,
-      },
-      transaction,
-    );
-
-    if (ticket.assignedToId !== assignedToId) {
-      await this.outboxService.enqueue(transaction, {
-        type: OUTBOX_EVENT_TYPES.TICKET_ASSIGNED,
-        payload: {
-          ticketId: id,
-          ticketTitle: ticket.title,
-          assignedToId,
-          assignedByName: actorName || 'Someone',
-        },
-      });
-    }
-
-    return result;
+  bulkAssign(...args: Parameters<TicketAssignmentService['bulkAssign']>) {
+    return this.assignment.bulkAssign(...args);
   }
 
   async remove(id: number, currentUser: CurrentUserPayload) {

@@ -12,6 +12,7 @@ import { TicketsService } from './tickets.service';
 import { TicketAccessPolicyService } from './ticket-access-policy.service';
 import { TicketQueryService } from './ticket-query.service';
 import { TicketWorkflowService } from './ticket-workflow.service';
+import { TicketAssignmentService } from './ticket-assignment.service';
 import { TicketAttachmentService } from './ticket-attachment.service';
 import { TicketCommentService } from './ticket-comment.service';
 import { TicketSlaFilter } from './dto/get-tickets-query.dto';
@@ -122,6 +123,7 @@ describe('TicketsService', () => {
         TicketAccessPolicyService,
         TicketQueryService,
         TicketWorkflowService,
+        TicketAssignmentService,
         TicketAttachmentService,
         TicketCommentService,
         {
